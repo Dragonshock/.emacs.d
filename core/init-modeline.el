@@ -136,7 +136,7 @@
                   face ,panel-face))
       " "
       ,(or +mode-line-project-crumb
-           '(:propertize "%b" face ,meta-face))
+           `(:propertize "%b" face ,meta-face))
       " "
       (,active-p (:eval (breadcrumb-imenu-crumbs)))
       (:propertize +mode-line-remote-host-name

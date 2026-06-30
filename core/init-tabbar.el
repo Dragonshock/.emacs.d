@@ -26,13 +26,10 @@
           (lambda (name &rest _) (concat " " name " "))
           tab-bar-tab-name-format-face))
 
-  (defun-call! +show-tab-bar ()
-    (interactive)
-    (setq tab-bar-format '(tab-bar-format-tabs))
-    (tab-bar--update-tab-bar-lines))
+  (setq tab-bar-format '(tab-bar-format-tabs))
 
   ;; WORKAROUND: fresh tab-bar for daemon
-  (add-hook! server-after-make-frame-hook :call-immediately
+  (add-hook! (server-after-make-frame-hook window-setup-hook) :call-immediately
     (defun +refresh-tab-bar (&rest _)
       (tab-bar--update-tab-bar-lines)
       (force-mode-line-update)))

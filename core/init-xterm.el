@@ -1,5 +1,15 @@
 ;;; -*- lexical-binding: t -*-
 
+;; warp/truncation indicator in tty
+(set-display-table-slot standard-display-table
+                        'wrap
+                        (make-glyph-code ?↩ 'shadow))
+
+(set-display-table-slot standard-display-table
+                        'truncation
+                        (make-glyph-code ?… 'shadow))
+
+
 ;; [Kitty Graphics Protocol] Implements support for Kitty's "graphics protocol",
 ;; which allows the terminal to display images and videos inline.
 (use-package kitty-graphics
