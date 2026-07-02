@@ -10,7 +10,6 @@
               ("M-o" . other-window))
   :config
   (setq tab-bar-separator ""
-        tab-bar-show 1
         tab-bar-new-tab-choice "*scratch*"
         tab-bar-tab-name-truncated-max 20
         tab-bar-auto-width nil

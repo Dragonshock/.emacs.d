@@ -9,8 +9,7 @@
               ("<tab>" . minibuffer-complete)
               ("C-<return>" . vertico-exit-input)
               ("C-, ." . vertico-quick-jump))
-  :hook ((after-init . vertico-mode)
-         (vertico-mode . vertico-mouse-mode))
+  :hook ((after-init . vertico-mode))
   :config
   (setq vertico-cycle t
         vertico-resize nil

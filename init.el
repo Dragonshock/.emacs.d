@@ -34,10 +34,10 @@
                      'init-modeline
                      'init-tabbar
                      'init-ai
+                     'init-chat
+                     'init-pdf
                      'init-test
 
-                     ;; 'init-pdf
-                     ;; 'init-chat
                      ;; 'init-elfeed
                      ))
 

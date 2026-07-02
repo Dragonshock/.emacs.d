@@ -76,14 +76,35 @@
 
 ;; [dired-hacks] Several additional extensions for dired
 (use-package dired-hacks
-  :straight (:files (:defaults "*.el"))
+  :straight (:load-path "~/code/dired-hacks/")
   :after dired
   :init
   (use-package dired-subtree
     :bind (:map dired-mode-map
                 ("TAB" . dired-subtree-toggle))
     :config
-    (setq dired-subtree-line-prefix "  |  ")))
+    (setq dired-subtree-line-prefix "  |  "))
+
+  (use-package dired-collapse
+   :after f
+   :hook (dired-mode . dired-collapse-mode))
+
+  (use-package dired-narrow
+    :bind (:map dired-mode-map
+                (";" . dired-narrow-fuzzy)))
+  )
+
+
+;; [ffx] `dired-collapse'-style folding for file-name completion.
+;; When a directory holds a single sub-directory chain (ignoring the same
+;; entries `dired-omit-mode' hides), offer an extra candidate that jumps
+;; straight to the end of the chain, alongside the normal one-level candidate.
+;; e.g. when "a/" only ever contains "a/b/c/d/", both show up:
+;;   a/
+;;   a/b/c/d/
+(use-package ffx
+  :load-path "~/code/ffx.el/"
+  :hook (after-init . ffx-mode))
 
 
 ;; [diredfl] Make dired colorful

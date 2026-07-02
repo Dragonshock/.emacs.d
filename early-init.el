@@ -117,7 +117,19 @@
                           old-value))))
               101)))
 
-;; TODO: optimize `load-suffixes'
+;; optimize `load-suffixes'
+(setq load-suffixes '(".elc" ".el")
+      load-file-rep-suffixes '(""))
+
+(defun +restore-load-suffixes-h ()
+  "Restore GC settings after startup."
+  (setq load-suffixes `(".elc" ".el"
+                        ,(cond ((eq system-type 'darwin) ".dylib")
+                               ((eq system-type 'gnu/linux) ".so")
+                               ((eq system-type 'windows-nt) ".dll")
+                               (t nil)))))
+
+(add-hook 'emacs-startup-hook #'+restore-load-suffixes-h 100)
 
 ;; Site files will use `load-file', which emit messages and triggers redisplay
 ;; Make it silent and undo advice later

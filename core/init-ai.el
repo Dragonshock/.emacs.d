@@ -57,3 +57,20 @@
 ;;     (interactive)
 ;;     (agent-shell--dwim :config (+agent-shell-openai-make-codex-config)
 ;;                        :new-shell t)))
+
+(use-package codex-ide
+  :straight (:type git :host github :repo "dgillis/emacs-codex-ide")
+  :custom-face
+  (codex-ide-item-summary-face ((t (:inherit font-lock-function-name-face :height 0.9))))
+  (codex-ide-item-detail-face ((t (:inherit shadow :height 0.8))))
+  :init
+  (setq codex-ide-diff-inline-fold-threshold 20
+        codex-ide-image-detail "auto"
+        codex-ide-prompt-placeholder-text ""
+        codex-ide-placeholder-ellipsis-animation-interval nil
+        codex-ide-status-mode-auto-refresh-delay 0.3
+        codex-ide-buffer-name-function
+        (lambda (dir)
+          (format "%s: %s"
+                  codex-ide-buffer-name-prefix
+                  (file-name-nondirectory (directory-file-name dir))))))
