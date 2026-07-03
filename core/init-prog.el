@@ -57,15 +57,14 @@
 
 
 ;; [Eglot] LSP support
-(defconst +eglot-auto-start-modes
-  '(c-mode c++-mode rust-mode python-mode java-mode
-    c-ts-mode c++-ts-mode rust-ts-mode python-ts-mode)
-  "Major modes where Eglot should start automatically.")
-
-
 (use-package eglot
   :straight (:type built-in)
   :commands (eglot eglot-ensure)
+  :preface
+  (defconst +eglot-auto-start-modes
+    '(c-mode c++-mode rust-mode python-mode java-mode
+             c-ts-mode c++-ts-mode rust-ts-mode python-ts-mode)
+    "Major modes where Eglot should start automatically.")
   :init
   (dolist (mode +eglot-auto-start-modes)
     (add-hook (intern (format "%s-hook" mode)) #'eglot-ensure))
@@ -178,11 +177,6 @@
   (setq eglot-booster-io-only t))
 
 
-;; (use-package eglot-x
-;;   :straight (:host github :repo "nemethf/eglot-x")
-;;   :hook (eglot-managed-mode . eglot-x-setup))
-
-
 ;; [Eldoc]
 (use-package eldoc
   :bind (("C-h h" . eldoc))
@@ -214,7 +208,7 @@
   :config
   (setq webpaste-paste-confirmation t
         webpaste-add-to-killring t
-        webpaste-provider-priority '("paste.mozilla.org" "dpaste.org" "ix.io")))
+        webpaste-provider-priority '("paste.rs")))
 
 
 ;; [dumb-jump] Jump to definition (integrated with xref, a fallback of lsp)
@@ -326,10 +320,6 @@
   :straight (:host github :repo "nverno/llvm-mode" :files ("*.el")))
 
 
-(use-package swift-mode
-  :straight t)
-
-
 (use-package js
   :config
   (setq js-indent-level 2))
@@ -354,21 +344,6 @@
 
 (use-package rust-playground
   :straight t)
-
-
-(use-package go-mode
-  :straight t
-  :config
-  (setq gofmt-command "goimports")
-  (add-hook 'before-save-hook 'gofmt-before-save))
-
-
-(use-package haskell-mode
-  :straight t
-  :config
-  (setq
-   haskell-process-suggest-remove-import-lines t
-   haskell-process-auto-import-loaded-modules t))
 
 
 (use-package verilog-mode
@@ -435,23 +410,6 @@
    web-mode-code-indent-offset 2
    web-mode-enable-html-entities-fontification t
    web-mode-auto-close-style 1))
-
-
-;; [skewer-mode] Live browser JavaScript, CSS, and HTML interaction
-(use-package skewer-mode
-  :straight t
-  :hook ((js-mode              . skewer-mode)
-         (css-mode             . skewer-css-mode)
-         ((html-mode web-mode) . skewer-html-mode)))
-
-
-;; [agda]
-(use-package agda
-  :no-require t
-  :when (executable-find "agda-mode")
-  :init
-  (load-file (let ((coding-system-for-read 'utf-8))
-               (shell-command-to-string "agda-mode locate"))))
 
 
 ;; [treesit]

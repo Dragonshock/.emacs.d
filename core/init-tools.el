@@ -34,6 +34,12 @@
    regexp-search-ring-max 200))
 
 
+;; [speedbar]
+(use-package speedbar
+  :init
+  (setq speedbar-prefer-window t))
+
+
 ;; [goto-addr] Click to open URL
 (use-package goto-addr
   :hook ((text-mode . goto-address-mode)

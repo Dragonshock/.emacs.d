@@ -97,7 +97,8 @@
           "\\*Agenda Commands\\*" "\\*Org Select\\*" "\\*Capture\\*" "^CAPTURE-.*\\.org*"
           "\\*Graphviz Preview: .*\\*"
 
-          "^GPTel-popup: .*"
+          gptel-mode
+          ghostel-mode
 
           (lambda (buffer)
             (with-current-buffer buffer
@@ -199,7 +200,8 @@
 
   (add-hook! (auto-dim-other-buffers-mode-hook enable-theme-functions server-after-make-frame-hook) :unless-daemonp-call-immediately
     (defun +auto-dim-other-buffers-auto-set-face (&rest _)
-      (let ((dim (face-background 'mode-line)))
+      (let ((dim (or (face-background 'mode-line)
+                     'unspecified)))
         (set-face-background 'auto-dim-other-buffers-face dim)
         (set-face-attribute 'auto-dim-other-buffers-hide nil
                             :foreground dim

@@ -63,14 +63,38 @@
   :custom-face
   (codex-ide-item-summary-face ((t (:inherit font-lock-function-name-face :height 0.9))))
   (codex-ide-item-detail-face ((t (:inherit shadow :height 0.8))))
+  :preface
+  (defun +codex-ide-submit-or-newline ()
+    "Submit one-line Codex prompts, otherwise insert a newline."
+    (interactive)
+    (let* ((session (codex-ide--get-default-session-for-current-buffer))
+           (start (and session
+                       (codex-ide-session-input-start-marker session)))
+           (end (and session
+                     (codex-ide--input-end-position session))))
+      (if (and (markerp start)
+               end
+               (not (save-excursion
+                      (goto-char (marker-position start))
+                      (search-forward "\n" end t))))
+          (codex-ide-submit)
+        (newline))))
+  :bind (:map codex-ide-session-prompt-minor-mode-map
+              ("RET" . codex-ide-submit)
+              ("<return>" . +codex-ide-submit-or-newline)
+              ("S-<return>" . newline)
+              :map codex-ide-session-mode-map
+              ("C-c C-;" . codex-ide-agent-config-menu)
+              ("C-c C-r" . codex-ide-status))
   :init
   (setq codex-ide-diff-inline-fold-threshold 20
         codex-ide-image-detail "auto"
         codex-ide-prompt-placeholder-text ""
         codex-ide-placeholder-ellipsis-animation-interval nil
         codex-ide-status-mode-auto-refresh-delay 0.3
-        codex-ide-buffer-name-function
-        (lambda (dir)
-          (format "%s: %s"
-                  codex-ide-buffer-name-prefix
-                  (file-name-nondirectory (directory-file-name dir))))))
+        codex-ide-want-mcp-bridge nil
+        codex-ide-emacs-context-policy nil
+        codex-ide-buffer-name-function (lambda (dir)
+                                         (format "%s: %s"
+                                                 codex-ide-buffer-name-prefix
+                                                 (file-name-nondirectory (directory-file-name dir))))))

@@ -129,7 +129,7 @@
                                ((eq system-type 'windows-nt) ".dll")
                                (t nil)))))
 
-(add-hook 'emacs-startup-hook #'+restore-load-suffixes-h 100)
+(add-hook 'before-init-hook #'+restore-load-suffixes-h 100)
 
 ;; Site files will use `load-file', which emit messages and triggers redisplay
 ;; Make it silent and undo advice later

@@ -54,9 +54,7 @@ If no project is found, create a temporary Eshell instance in the current direct
            (root-name (if project
                           (file-name-nondirectory (directory-file-name (project-root project))) ;; Use project name
                         (file-name-nondirectory dir-name))) ;; Use current directory name if no project
-           (popup-buffer-name (if arg
-                                  (format "GPTel-popup: %s" root-name)
-                                (format "Eshell-popup: %s" root-name)))
+           (popup-buffer-name (format "%s-popup: %s" (if arg "Ghostel" "Eshell") root-name))
            (win (get-buffer-window popup-buffer-name)))
 
       ;; If an argument is provided, you can add some custom behavior, like opening a GPT prompt.
@@ -69,8 +67,7 @@ If no project is found, create a temporary Eshell instance in the current direct
         (let ((display-comint-buffer-action '(display-buffer-at-bottom
                                               (inhibit-same-window . nil))))
           (if arg
-              ;; Open a GPT prompt
-              (with-current-buffer (gptel popup-buffer-name)
+              (with-current-buffer (ghostel-project)
                 ;; display current buffer
                 (display-buffer (current-buffer)))
             ;; Open a eshell
@@ -251,10 +248,12 @@ If no project is found, create a temporary Eshell instance in the current direct
 ;; [esh-tldr] Browse local tldr pages
 (use-package esh-tldr
   :load-path "~/code/tldr.el"
+  :commands (esh-tldr esh-tldr-dwim consult-esh-tldr)
   :bind ("C-h t" . esh-tldr-dwim)
-  :hook ((shell-mode eshell-mode comint-mode) . esh-tldr-capf-setup)
-  :config
-  (setq esh-tldr-use-tempel t))
+  ;; :hook ((shell-mode eshell-mode comint-mode) . esh-tldr-capf-setup)
+  ;; :config
+  ;; (setq esh-tldr-use-tempel t)
+  )
 
 
 (use-package eshell-did-you-mean
@@ -294,6 +293,16 @@ Like normal Emacs `C-k'.  Kill to end of line and put content in kill-ring."
          ("M" . ghostel-project-list-buffers))
   :config
   (setq ghostel-enable-osc52 t)
+
+  (defadvice! +ghostel-project-popup-buffer-name (_orig root)
+    :around 'ghostel--project-buffer-name
+    "Name `ghostel-project' buffers as Popper popup buffers for ROOT."
+    (let* ((project-name (file-name-nondirectory
+                          (directory-file-name root)))
+           (remote (file-remote-p root))
+           (remote-suffix (when remote
+                            (format "@%s" (string-trim remote "/" ":")))))
+      (format "Ghostel-popup: %s%s" project-name (or remote-suffix ""))))
 
   (add-to-list 'project-switch-commands '(ghostel-project "Ghostel") t)
   (add-to-list 'project-switch-commands '(ghostel-project-list-buffers "Ghostel buffers") t)
