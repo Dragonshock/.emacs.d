@@ -48,8 +48,15 @@
 
   ;; HACK: Set cursor color automatically
   (add-hook! (enable-theme-functions server-after-make-frame-hook) :unless-daemonp-call-immediately
-    (defun +sis-set-other-cursor-color (&rest _)
-      (setq sis-other-cursor-color (face-foreground 'error nil t))))
+    (defun +sis-set-cursor-color (&rest _)
+      (setq sis-other-cursor-color (face-foreground 'error nil t)
+            sis-default-cursor-color (face-background 'cursor nil t))))
+
+  ;; Recover the terminal cursor color when leaving Emacs (TUI only).
+  (add-hook! kill-emacs-hook
+    (defun +sis-reset-terminal-cursor-color ()
+      (unless (display-graphic-p)
+        (send-string-to-terminal "\e]112\a"))))
 
   (defun +sis-remove-head-space-after-cc-punc (_)
     (when (or (memq (char-before) '(?， ?。 ?？ ?！ ?； ?： ?（ ?【 ?「 ?“))
