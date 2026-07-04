@@ -62,9 +62,8 @@
                                             telega-capf-markdown-precode
                                             telega-capf-botcmd))
 
-  (if (eq system-type 'gnu/linux)
-      (setq telega-proxies '((:server "127.0.0.1" :port 7891 :enable t :type (:@type "proxyTypeSocks5"))))
-    (setq telega-server-libs-prefix "/opt/homebrew/Cellar/tdlib/HEAD-1a50ec4"))
+  (when (eq system-type 'gnu/linux)
+    (setq telega-proxies '((:server "127.0.0.1" :port 7891 :enable t :type (:@type "proxyTypeSocks5")))))
 
   (defadvice! +telega-message-header-username-only-a
     (orig msg &optional msg-chat msg-sender addon-inserter)
