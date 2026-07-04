@@ -39,6 +39,12 @@
           ((eq modified 'autosaved)
            '+mode-line-meta-inactive-autosaved-face))))
 
+(defsubst +mode-line-get-window-name ()
+  "Get window number for current window, as set by `ace-window'."
+  (let ((path (window-parameter (selected-window) 'ace-window-path)))
+    (when (and path (not (string-empty-p path)))
+      (concat " " path " "))))
+
 (defsubst +mode-line-macro-indicator ()
   "Display current Emacs macro being recorded."
   (cond (defining-kbd-macro " MacroDef ")
@@ -48,7 +54,7 @@
   "Display whether it is in overwrite mode or read-only buffer."
   (let ((ro (when buffer-read-only " %%"))
         (ov (when overwrite-mode " #")))
-    (concat ro ov " ")))
+    (concat ro ov)))
 
 (defsubst +mode-line-symbol-overlay-indicator ()
   "Display the number of matches for symbol overlay."
@@ -128,7 +134,9 @@
   (let* ((meta-face (+mode-line-get-window-name-face))
          (active-p (mode-line-window-selected-p))
          (panel-face `(:inherit ,meta-face :inverse-video ,active-p)))
-    `((:propertize ,(+mode-line-overwrite-readonly-indicator)
+    `((:propertize ,(+mode-line-get-window-name)
+                   face ,panel-face)
+      (:propertize ,(+mode-line-overwrite-readonly-indicator)
                    face ,panel-face)
       (,active-p (:propertize
                   ,(concat (+mode-line-macro-indicator)

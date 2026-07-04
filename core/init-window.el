@@ -16,11 +16,37 @@
   :custom-face
   (aw-leading-char-face ((t (:inherit font-lock-keyword-face :bold t :height 3.0))))
   (aw-minibuffer-leading-char-face ((t (:inherit font-lock-keyword-face :bold t :height 1.0))))
+  ;; (aw-mode-line-face ((t (:inherit mode-line-emphasis :bold t))))
   :hook ((window-configuration-change . aw-update)) ;; For modeline
+  ;; (add-hook 'after-make-frame-functions #'aw--after-make-frame t)
   :config
   (setq aw-scope 'global
         aw-background nil
-        aw-ignore-current t))
+        aw-ignore-current t)
+
+  ;; Select window via `H-1'...`H-9'
+  (defun +aw--select-window (number)
+    "Select the specified window."
+    (let* ((window-list (aw-window-list))
+           (target-window nil))
+      (cl-loop for win in window-list
+               when (and (window-live-p win)
+                         (eq number
+                             (string-to-number
+                              (window-parameter win 'ace-window-path))))
+               do (setq target-window win)
+               finally return target-window)
+
+      ;; Select the target window if found
+      (if target-window
+          (aw-switch-to-window target-window)
+        (message "No specified window: %d" number))))
+
+  (dotimes (n 9)
+    (bind-key (format "C-%d" (1+ n))
+              (lambda ()
+                (interactive)
+                (+aw--select-window (1+ n))))))
 
 
 ;; [winner] Restore old window configurations
