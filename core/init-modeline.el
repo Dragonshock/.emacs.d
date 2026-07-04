@@ -52,8 +52,8 @@
 
 (defsubst +mode-line-overwrite-readonly-indicator ()
   "Display whether it is in overwrite mode or read-only buffer."
-  (let ((ro (when buffer-read-only " %%"))
-        (ov (when overwrite-mode " #")))
+  (let ((ro (when buffer-read-only "%% "))
+        (ov (when overwrite-mode "# ")))
     (concat ro ov)))
 
 (defsubst +mode-line-symbol-overlay-indicator ()
