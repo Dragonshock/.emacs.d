@@ -18,6 +18,13 @@
   (add-hook 'gptel-post-response-functions 'gptel-end-of-response)
   )
 
+
+(use-package gptel-agent
+  :straight t
+  :after gptel
+  :config (gptel-agent-update))
+
+
 (use-package gptel-magit
   :load-path "~/code/gptel-magit/"
   ;; :straight (gptel-magit :type git :host github :repo "roife/gptel-magit")

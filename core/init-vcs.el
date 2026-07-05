@@ -273,7 +273,8 @@
 
 ;; [consult-gh] Interface for GitHub `gh'
 (use-package consult-gh
-  :straight (consult-gh :type git :host github :repo "armindarvish/consult-gh")
+  :straight (consult-gh :type git :host github :repo "armindarvish/consult-gh"
+                        :files ("*.el"))
   :after consult
   :config
   (setq consult-gh-default-clone-directory "~/code/"
@@ -290,6 +291,7 @@
 
 ;; Install `consult-gh-embark' for embark actions
 (use-package consult-gh-embark
+  :straight nil
   :after consult-gh
   :config
   (consult-gh-embark-mode +1))
@@ -297,6 +299,7 @@
 
 ;; Install `consult-gh-forge' for forge actions
 (use-package consult-gh-forge
+  :straight nil
   :after consult-gh
   :config
   (consult-gh-forge-mode +1)

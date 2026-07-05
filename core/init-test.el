@@ -1,4 +1,20 @@
 ;;; -*- lexical-binding: t -*-
+
+(use-package chirp
+  :straight (:host github :repo "LuciusChen/chirp"
+             :files ("chirp.el" "lisp/*.el"))
+  :commands (chirp-home
+             chirp-following
+             chirp-bookmarks
+             chirp-likes
+             chirp-me
+             chirp-list
+             chirp-search
+             chirp-thread
+             chirp-profile
+             chirp-profile-followers
+             chirp-profile-following-users))
+
 (defun jdtls-command-contact (&optional interactive)
   (let* ((jdtls-cache-dir (file-name-concat user-emacs-directory "cache" "lsp-cache"))
          (project-dir (file-name-nondirectory (directory-file-name (project-root (project-current)))))
