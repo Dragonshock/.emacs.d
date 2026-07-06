@@ -196,25 +196,7 @@
   :straight t
   :hook (window-setup . zoom-mode)
   :config
-  (setq zoom-ignored-major-modes '(ediff-mode vundo-mode minibuffer-mode))
-
-  (with-eval-after-load 'vertico-buffer
-    (defadvice! +zoom-preserve-vertico-buffer-height (&rest _)
-      :after #'vertico-buffer--setup
-      "Preserve Vertico buffer display height against `zoom-mode'."
-      ;; TRICK: Here we use `vertico--candidates-ov' to get the window of Vertico
-      ;; buffer display, because `vertico-buffer--setup' is called before the
-      ;; window is created.
-      (when-let* ((window (and (overlayp vertico--candidates-ov)
-                               (overlay-get vertico--candidates-ov 'window)))
-                  ((window-live-p window)))
-        (window-preserve-size window nil t))))
-
-  (add-hook 'ediff-after-setup-windows-hook
-            '(lambda () (with-selected-window (get-buffer-window "*Ediff Control Panel*")
-                     (setq window-size-fixed t)
-                     (window-resize (selected-window) (- 5 (window-total-height)) nil t))))
-  )
+  (setq zoom-ignored-major-modes '(ediff-mode vundo-mode minibuffer-mode speedbar-mode)))
 
 ;; [auto-dim-other-buffers] Dim non-active buffers
 (use-package auto-dim-other-buffers
