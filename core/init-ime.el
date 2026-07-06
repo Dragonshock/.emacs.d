@@ -1,5 +1,18 @@
 ;;; -*- lexical-binding: t; -*-
 
+(defun +liberime-prepend-env-path (name path)
+  (when (file-directory-p path)
+    (let ((value (getenv name)))
+      (unless (member path (and value (split-string value path-separator t)))
+        (setenv name
+                (if (and value (not (string= value "")))
+                    (concat path path-separator value)
+                  path))))))
+
+(when (eq system-type 'darwin)
+  (+liberime-prepend-env-path "CPATH" "/opt/homebrew/include")
+  (+liberime-prepend-env-path "LIBRARY_PATH" "/opt/homebrew/lib"))
+
 (use-package liberime
   :straight (liberime :type git :host github :repo "emacs-rime/liberime")
   :demand t
