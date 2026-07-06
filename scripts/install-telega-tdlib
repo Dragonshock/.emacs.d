@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  echo "Usage: $0 TD_VERSION [PREFIX]" >&2
+}
+
+run() {
+  printf '+'
+  printf ' %q' "$@"
+  printf '\n'
+  "$@"
+}
+
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+  usage
+  exit 2
+fi
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "install-telega-tdlib currently only supports macOS" >&2
+  exit 1
+fi
+
+version="$1"
+prefix="${2:-"$HOME/.local"}"
+
+if [[ ! "$version" =~ ^(.+)-([[:xdigit:]]+)$ ]]; then
+  echo "Cannot extract TDLib commit from version: $version" >&2
+  exit 1
+fi
+
+commitish="${BASH_REMATCH[2]}"
+repos_dir="$prefix/repos"
+bin_dir="$prefix/bin"
+lib_dir="$prefix/lib"
+td_dir="$repos_dir/td-$version"
+build_dir="$td_dir/build"
+
+commit="$(
+  curl -fsSL \
+    -H "Accept: application/vnd.github+json" \
+    -H "User-Agent: Emacs" \
+    "https://api.github.com/repos/tdlib/td/commits/$commitish" |
+    sed -n 's/^[[:space:]]*"sha":[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' |
+    head -n 1
+)"
+
+if [[ -z "$commit" ]]; then
+  echo "Cannot resolve TDLib commit: $commitish" >&2
+  exit 1
+fi
+
+echo "Installing TDLib $version ($commit) into $prefix"
+
+run brew install cmake gperf openssl@3 pkg-config
+
+run rm -rf "$td_dir"
+run mkdir -p "$repos_dir" "$bin_dir"
+
+run git clone --revision "$commit" https://github.com/tdlib/td.git "$td_dir"
+
+cc="$(xcrun -find clang)"
+cxx="$(xcrun -find clang++)"
+openssl_root="$(brew --prefix openssl@3)"
+jobs="$(sysctl -n hw.physicalcpu)"
+
+run cmake -S "$td_dir" -B "$build_dir" \
+  -DCMAKE_BUILD_TYPE=Release \
+  "-DCMAKE_INSTALL_PREFIX=$prefix" \
+  "-DCMAKE_C_COMPILER=$cc" \
+  "-DCMAKE_CXX_COMPILER=$cxx" \
+  "-DOPENSSL_ROOT_DIR=$openssl_root"
+
+run cmake --build "$build_dir" --target install --parallel "$jobs"
+
+run cp "$lib_dir"/libtd*.dylib "$bin_dir"/
+
+echo "Installed TDLib $version ($commit) into $prefix"

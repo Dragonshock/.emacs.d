@@ -86,7 +86,6 @@
     (setq dired-subtree-line-prefix "  |  "))
 
   (use-package dired-collapse
-    :after f
     :custom-face
     (dired-collapse-shadow ((t (:inherit diredfl-dir-name))))
     :hook (dired-mode . dired-collapse-mode))

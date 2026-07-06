@@ -3,101 +3,24 @@
 ;;   :straight t)
 
 (use-package telega
-  :straight t
+  :straight (:files (:defaults "contrib/*.el"))
   :preface
   (defun +telega-install-tdlib ()
     "Fetch and install telega's expected TDLib commit under ~/.local."
     (interactive)
     (unless (eq system-type 'darwin)
       (user-error "+telega-install-tdlib currently only supports macOS"))
-    (require 'json)
     (require 'telega)
-    (require 'url)
     (require 'compile)
-    (let* ((version (telega-dockrefile-tdlib-version))
-           (prefix (expand-file-name "~/.local"))
-           (repos-dir (expand-file-name "repos" prefix))
-           (bin-dir (expand-file-name "bin" prefix))
-           (lib-dir (expand-file-name "lib" prefix))
-           commit td-dir build-dir buffer commands)
-      (string-match "\\`\\(.+\\)-\\([[:xdigit:]]+\\)\\'" version)
-      (setq commit (match-string 2 version))
-      (let ((url-request-extra-headers
-             '(("Accept" . "application/vnd.github+json")
-               ("User-Agent" . "Emacs"))))
-        (with-current-buffer (url-retrieve-synchronously
-                              (format "https://api.github.com/repos/tdlib/td/commits/%s" commit))
-          (goto-char (point-min))
-          (re-search-forward "\r?\n\r?\n")
-          (let ((json-object-type 'alist)
-                (json-key-type 'symbol))
-            (setq commit (alist-get 'sha (json-read))))
-          (kill-buffer (current-buffer))))
-      (setq td-dir (expand-file-name (format "td-%s" version) repos-dir)
-            build-dir (expand-file-name "build" td-dir)
-            buffer (get-buffer-create "*telega-install-tdlib*"))
-      (when (file-exists-p td-dir)
-        (delete-directory td-dir t))
-      (make-directory repos-dir t)
-      (make-directory bin-dir t)
-      (setq commands
-            `(("brew" "install" "cmake" "gperf" "openssl@3" "pkg-config")
-              ("git" "clone" "--revision" ,commit "https://github.com/tdlib/td.git" ,td-dir)
-              ,(lambda ()
-                 `("cmake" "-S" ,td-dir "-B" ,build-dir
-                   "-DCMAKE_BUILD_TYPE=Release"
-                   ,(format "-DCMAKE_INSTALL_PREFIX=%s" prefix)
-                   ,(format "-DCMAKE_C_COMPILER=%s"
-                            (car (process-lines "xcrun" "-find" "clang")))
-                   ,(format "-DCMAKE_CXX_COMPILER=%s"
-                            (car (process-lines "xcrun" "-find" "clang++")))
-                   ,(format "-DOPENSSL_ROOT_DIR=%s"
-                            (car (process-lines "brew" "--prefix" "openssl@3")))))
-              ("cmake" "--build" ,build-dir "--target" "install" "--parallel"
-               ,(car (process-lines "sysctl" "-n" "hw.physicalcpu")))))
-      (with-current-buffer buffer
-        (let ((inhibit-read-only t))
-          (erase-buffer))
-        (compilation-mode))
-      (display-buffer buffer)
-      (let (next)
-        (setq next
-              (lambda ()
-                (if commands
-                    (let ((command (pop commands)))
-                      (when (functionp command)
-                        (setq command (funcall command)))
-                      (with-current-buffer buffer
-                        (let ((inhibit-read-only t))
-                          (goto-char (point-max))
-                          (insert "$ " (mapconcat #'identity command " ") "\n")))
-                      (make-process
-                       :name "telega-install-tdlib"
-                       :buffer buffer
-                       :command command
-                       :connection-type 'pipe
-                       :noquery t
-                       :sentinel
-                       (lambda (process _event)
-                         (when (memq (process-status process) '(exit signal))
-                           (if (zerop (process-exit-status process))
-                               (funcall next)
-                             (with-current-buffer buffer
-                               (let ((inhibit-read-only t))
-                                 (goto-char (point-max))
-                                 (insert (format "%s exited with %s\n"
-                                                 (mapconcat #'identity command " ")
-                                                 (process-exit-status process)))))
-                             (message "TDLib install failed"))))))
-                  (dolist (file (directory-files lib-dir t "\\`libtd.*\\.dylib\\'"))
-                    (copy-file file (expand-file-name (file-name-nondirectory file) bin-dir) t))
-                  (with-current-buffer buffer
-                    (let ((inhibit-read-only t))
-                      (goto-char (point-max))
-                      (insert (format "Installed TDLib %s (%s) into %s\n" version commit prefix))))
-                  (message "Installed TDLib %s" version))))
-        (funcall next)
-        (message "Installing TDLib %s" version))))
+    (let ((script (expand-file-name "scripts/install-telega-tdlib" user-emacs-directory))
+          (version (telega-dockrefile-tdlib-version))
+          (prefix (expand-file-name "~/.local")))
+      (unless (file-executable-p script)
+        (user-error "TDLib install script is not executable: %s" script))
+      (compilation-start
+       (mapconcat #'shell-quote-argument (list script version prefix) " ")
+       'compilation-mode
+       (lambda (_) "*telega-install-tdlib*"))))
   :custom-face
   (telega-msg-heading ((t (:inherit hl-line :background unspecified))))
   (telega-msg-inline-reply ((t (:inherit (hl-line font-lock-function-name-face)))))
@@ -184,15 +107,29 @@
               telega-ins--inline-sticker
               telega-chatbuf-sticker-insert)
     (let ((telega-use-images t))
-      (apply orig-fn args))))
+      (apply orig-fn args)))
+
+  (defadvice! +telega-hide-sponsored-messages-a (&rest _)
+    :override #'telega-chatbuf-footer-ins-sponsored-messages
+    nil)
+
+  (add-hook 'telega-ready-hook
+            (defun +telega-disable-sponsored-messages-h ()
+              (telega--toggleHasSponsoredMessagesEnabled nil))))
 
 
 (use-package telega-adblock
   :straight nil
   :after telega
-  :hook (telega-chat-mode . telega-adblock-mode))
+  :hook (telega-chat-mode . telega-adblock-mode)
+  :config
+  (setq telega-adblock-for '(and (type channel)
+                                 (not unmuted)
+                                 (not (is-verified by-telegram))
+                                 (not (has-username "hacker_news_zh")))))
 
 
 (use-package telega-dired-dwim
   :straight nil
-  :after telega)
+  :after telega
+  :demand t)

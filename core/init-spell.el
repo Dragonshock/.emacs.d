@@ -37,7 +37,6 @@
 
 ;; [flyspell] spell checking overlays
 (use-package flyspell
-  :after ispell
   :hook ((text-mode . flyspell-mode)
          (prog-mode . flyspell-prog-mode))
   :bind (:map flyspell-mode-map
