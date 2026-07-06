@@ -26,8 +26,7 @@
 
 
 (use-package gptel-magit
-  :load-path "~/code/gptel-magit/"
-  ;; :straight (gptel-magit :type git :host github :repo "roife/gptel-magit")
+  :straight (gptel-magit :type git :host github :repo "roife/gptel-magit")
   :hook ((magit-mode . gptel-magit-install))
   :config
   (setq gptel-magit-body-length 72

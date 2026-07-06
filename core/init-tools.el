@@ -37,7 +37,8 @@
 ;; [speedbar]
 (use-package speedbar
   :init
-  (setq speedbar-prefer-window t))
+  (setq speedbar-prefer-window t
+        speedbar-window-default-width 30))
 
 
 ;; [goto-addr] Click to open URL

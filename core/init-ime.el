@@ -4,11 +4,11 @@
   :straight (liberime :type git :host github :repo "emacs-rime/liberime")
   :demand t
   :init
-  (setq liberime-auto-build t))
+  (setq liberime-auto-build t
+        liberime-user-data-dir "~/Library/Rime/"))
 
 (use-package rimel
-  :straight (rimel :type nil
-                   :local-repo "~/code/rimel")
+  :straight (rimel :type git :host github :repo "emacs-rime/rimel")
   :after liberime
   :demand t
   :custom-face

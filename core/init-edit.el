@@ -209,3 +209,10 @@
                             xref-go-back
                             xref-find-definitions
                             xref-find-references)))
+
+
+;; [expreg]
+(use-package expreg
+  :straight t
+  :bind (("C-=" . expreg-expand)
+         ("C--" . expreg-contract)))

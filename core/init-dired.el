@@ -76,7 +76,7 @@
 
 ;; [dired-hacks] Several additional extensions for dired
 (use-package dired-hacks
-  :straight (:load-path "~/code/dired-hacks/")
+  :straight (:host github :repo "roife/dired-hacks" :branch "fix/collapse-subtree")
   :after dired
   :init
   (use-package dired-subtree
@@ -86,8 +86,10 @@
     (setq dired-subtree-line-prefix "  |  "))
 
   (use-package dired-collapse
-   :after f
-   :hook (dired-mode . dired-collapse-mode))
+    :after f
+    :custom-face
+    (dired-collapse-shadow ((t (:inherit diredfl-dir-name))))
+    :hook (dired-mode . dired-collapse-mode))
 
   (use-package dired-narrow
     :bind (:map dired-mode-map
@@ -103,7 +105,7 @@
 ;;   a/
 ;;   a/b/c/d/
 (use-package ffx
-  :load-path "~/code/ffx.el/"
+  :straight (:host github :repo "roife/ffx.el")
   :hook (after-init . ffx-mode))
 
 

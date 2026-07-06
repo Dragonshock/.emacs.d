@@ -196,7 +196,20 @@
   :straight t
   :hook (window-setup . zoom-mode)
   :config
-  (setq zoom-ignored-major-modes '(ediff-mode vundo-mode minibuffer-mode speedbar-mode)))
+  (setq zoom-ignored-major-modes '(ediff-mode vundo-mode minibuffer-mode speedbar-mode))
+
+  (defun +zoom-fix-window-size-h ()
+    (setq-local window-size-fixed t))
+
+  (defun +zoom-fix-window-width-h ()
+    (setq-local window-size-fixed 'width))
+
+  (defun +zoom-fix-window-height-h ()
+    (setq-local window-size-fixed 'height))
+
+  (add-hook 'vundo-mode-hook #'+zoom-fix-window-size-h)
+  (add-hook 'speedbar-mode-hook #'+zoom-fix-window-width-h)
+  (add-hook 'ediff-mode-hook #'+zoom-fix-window-height-h))
 
 ;; [auto-dim-other-buffers] Dim non-active buffers
 (use-package auto-dim-other-buffers
