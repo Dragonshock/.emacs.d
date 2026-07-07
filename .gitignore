@@ -46,3 +46,19 @@ undohist/
 undo-fu-session/
 chirp/
 persist/
+
+# ---- 本地补充 (Dragonshock) ----
+# Emacs 状态文件 (后缀形式, 原配置只忽略了无后缀名)
+recentf.eld
+places.eld
+network-security.eld
+
+# ediff 合并时的临时冲突文件
+\#*#
+.*-merge.*
+
+# macOS Finder 元数据
+.DS_Store
+
+# 备份目录 (本地用,不进版本库)
+backups/
