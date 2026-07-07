@@ -21,13 +21,24 @@
        (mapconcat #'shell-quote-argument (list script version prefix) " ")
        'compilation-mode
        (lambda (_) "*telega-install-tdlib*"))))
+
+  (defun +telega-toggle-archive ()
+    "Toggle telega root buffer between the main and archive filters."
+    (interactive)
+    (let* ((archive-p (equal (telega-filter-active) '(archive)))
+           (filter (if archive-p (list telega-filter-default) '(archive))))
+      (telega-filters-push filter)
+      (message "telega filter: %s" (if archive-p telega-filter-default 'archive))))
+
   :custom-face
   (telega-msg-heading ((t (:inherit hl-line :background unspecified))))
   (telega-msg-inline-reply ((t (:inherit (hl-line font-lock-function-name-face)))))
   (telega-msg-inline-forward ((t (:inherit (hl-line font-lock-type-face)))))
   (telega-msg-user-title ((t (:bold t))))
   :bind (:map telega-chat-button-map
-              ("h" . nil))
+              ("h" . nil)
+              :map telega-root-mode-map
+              ("A" . +telega-toggle-archive))
   :hook ((telega-chat-mode . corfu-mode)
          (telega-chat-mode . telega-completions-setup-capf))
   :config
@@ -36,7 +47,6 @@
         telega-root-show-avatars nil
         telega-completions-username-show-avatars nil
         telega-active-locations-show-avatars nil
-
         telega-avatar-text-function (lambda (&rest _) "")
 
         telega-translate-to-language-by-default "zh"
@@ -53,7 +63,7 @@
                                               :with-unread-trail-p t
                                               :with-members-trail-p nil
                                               :with-bot-verification-p nil
-                                              :with-status-icons-trail-p nil)
+                                              :with-status-icons-trail-p t)
 
         ;; emoji
         telega-symbol-pin "%"
@@ -81,6 +91,7 @@
   (when (eq system-type 'gnu/linux)
     (setq telega-proxies '((:server "127.0.0.1" :port 7891 :enable t :type (:@type "proxyTypeSocks5")))))
 
+  ;; HACK: Show full name only in chatbuf
   (defadvice! +telega-message-header-username-only-a
     (orig msg &optional msg-chat msg-sender addon-inserter)
     :around #'telega-ins--message-header
@@ -99,6 +110,7 @@
                  (lambda (&rest _) nil)))
         (funcall orig msg msg-chat msg-sender addon-inserter))))
 
+  ;; HACK: show stickers
   (defadvice! +telega-enable-image-for-stickers (orig-fn &rest args)
     :around '(telega-sticker--create-image
               telega-describe-stickerset
@@ -109,24 +121,23 @@
     (let ((telega-use-images t))
       (apply orig-fn args)))
 
+  ;; HACK: disable sponsored msg
   (defadvice! +telega-hide-sponsored-messages-a (&rest _)
     :override #'telega-chatbuf-footer-ins-sponsored-messages
     nil)
 
-  (add-hook 'telega-ready-hook
-            (defun +telega-disable-sponsored-messages-h ()
-              (telega--toggleHasSponsoredMessagesEnabled nil))))
+  (add-hook! telega-ready-hook
+    (defun +telega-disable-sponsored-messages-h ()
+      (telega--toggleHasSponsoredMessagesEnabled nil)))
 
-
-(use-package telega-adblock
-  :straight nil
-  :after telega
-  :hook (telega-chat-mode . telega-adblock-mode)
-  :config
-  (setq telega-adblock-for '(and (type channel)
-                                 (not unmuted)
-                                 (not (is-verified by-telegram))
-                                 (not (has-username "hacker_news_zh")))))
+  ;; HACK: remove filter line in main filter
+  (defadvice! +telega-hide-default-filter-footer-a (orig-fn &rest args)
+    :around #'telega-filters--footer
+    (if (and (telega-filter-default-p)
+             (not telega--sort-criteria)
+             (not telega--sort-inverted))
+        ""
+      (apply orig-fn args))))
 
 
 (use-package telega-dired-dwim

@@ -2,9 +2,19 @@
 
 (use-package gptel
   :straight t
-  :commands (gptel-api-key-from-auth-source)
+  :commands (gptel-api-key-from-auth-source
+             +gptel-rewrite-translate-to-chinese)
+  :bind (("C-c r t" . +gptel-rewrite-translate-to-chinese))
+  :preface
+  (defun +gptel-rewrite-translate-to-chinese (_beg _end)
+    "Translate the active region to Chinese with `gptel-rewrite'."
+    (interactive "r")
+    (unless (use-region-p)
+      (user-error "Select a region to translate"))
+    (require 'gptel-rewrite)
+    (gptel--suffix-rewrite "Translate into fluent Simplified Chinese."))
   :init
-  (setq gptel-model 'deepseek-v4-pro
+  (setq gptel-model 'deepseek-v4-flash
         gptel-default-mode 'org-mode
         gptel-confirm-tool-calls nil)
   :config
@@ -16,8 +26,9 @@
 
   (add-hook 'gptel-post-stream-hook 'gptel-auto-scroll)
   (add-hook 'gptel-post-response-functions 'gptel-end-of-response)
+  (with-eval-after-load 'embark
+    (keymap-set embark-region-map "T" #'+gptel-rewrite-translate-to-chinese))
   )
-
 
 (use-package gptel-agent
   :straight t
@@ -32,37 +43,18 @@
   (setq gptel-magit-body-length 72
         gptel-magit-commit-prompt (cdr (assoc "Conventional Commits" gptel-magit-commit-styles-alist))))
 
-;; (use-package agent-shell
-;;   :straight (:type git :host github :repo "xenodium/agent-shell")
-;;   :commands (agent-shell +agent-shell-openai-start-codex)
-;;   :bind (("C-c a a" . agent-shell)
-;;          ("C-c a c" . +agent-shell-openai-start-codex))
-;;   :config
-;;   (setq agent-shell-show-welcome-message nil
-;;       agent-shell-prefer-viewport-interaction nil
-;;       agent-shell-show-busy-indicator nil
-;;       agent-shell-session-strategy 'new
-;;       agent-shell-openai-codex-acp-command '("codex-acp")
-;;       agent-shell-show-config-icons nil
-;;       agent-shell-status-kind-label-function #'agent-shell--plain-colored-status-kind-label
-;;       agent-shell-markdown-table-use-unicode-borders nil
-;;       agent-shell-preferred-agent-config
-;;       (+agent-shell-openai-make-codex-config)
-;;       agent-shell-permission-icon "!"
-;;       agent-shell-thought-process-icon "")
-;;
-;;   (require 'agent-shell-openai)
-;;   (defun +agent-shell-openai-make-codex-config ()
-;;     "Create a Codex config that reuses the local Codex login."
-;;     (let ((config (agent-shell-openai-make-codex-config)))
-;;       (setf (alist-get :needs-authentication config) nil
-;;             (alist-get :authenticate-request-maker config) nil)
-;;       config))
-;;   (defun +agent-shell-openai-start-codex ()
-;;     "Start an interactive Codex agent shell."
-;;     (interactive)
-;;     (agent-shell--dwim :config (+agent-shell-openai-make-codex-config)
-;;                        :new-shell t)))
+(use-package gptel-quick
+  :straight (gptel-quick :type git :host github :repo "karthink/gptel-quick")
+  :after (gptel embark)
+  :config
+  (setq gptel-quick-backend (gptel-make-deepseek "DeepSeek-quick"
+                              :stream t
+                              :request-params '(:thinking (:type "disabled"))
+                              :key #'gptel-api-key-from-auth-source)
+        gptel-quick-model 'deepseek-v4-flash
+        gptel-quick-word-count 500
+        gptel-quick-system-message (lambda (&rest _) "一句话不分行解释："))
+  (keymap-set embark-general-map "?" #'gptel-quick))
 
 (use-package codex-ide
   :straight (:type git :host github :repo "dgillis/emacs-codex-ide")
