@@ -1,9 +1,11 @@
 # Prerequisite
 
 - Font
-  + `Apple Color Emoji` / `Noto Color Emoji`
-  + `Sarasa Gothic`
+  + `MonoLisaCode` / `MonoLisaText` (primary)
+  + `LXGW WenKai Mono Screen` (CJK)
+  + `Apple Color Emoji` / `Noto Color Emoji` (emoji)
 - `rg`
 - `fd`
 - `aspell`
-- `rime` / `fcitx5-rime`
+- `readability-cli`
+- `difft` (difftastic, structural diff)

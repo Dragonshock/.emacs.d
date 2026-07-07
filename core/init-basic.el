@@ -299,8 +299,8 @@
  ("C-M-S-v" . +scroll-other-window-down)
  ("M-<up>" . +scroll-other-window-down)
 
- ("C-v" . +scroll-window-down)
- ("M-v" . +scroll-window))
+ ("M-v" . +scroll-window-down)
+ ("C-v" . +scroll-window))
 
 
 ;; [tramp] Edit file remotely
@@ -354,3 +354,9 @@
 ;; [backup walker] A utility to view Emacs backup files.
 (use-package backup-walker
   :straight t)
+
+
+;; [info]Add local Info manuals
+(use-package info
+  :config
+  (add-to-list 'Info-directory-list (expand-file-name "~/Documents/Info")))

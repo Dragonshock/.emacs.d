@@ -1,4 +1,11 @@
-;; -*- lexical-binding: t; -*-
+;;; init-chat.el --- Telegram client (Telega) -*- lexical-binding: t -*-
+
+;;; Commentary:
+;; Telega — a full-featured Telegram client for Emacs.
+;; Requires: brew install tdlib (macOS) or equivalent.
+
+;;; Code:
+
 ;; (use-package language-detection
 ;;   :straight t)
 
@@ -126,6 +133,10 @@
   (defadvice! +telega-hide-sponsored-messages-a (&rest _)
     :override #'telega-chatbuf-footer-ins-sponsored-messages
     nil)
+
+  (add-hook 'telega-ready-hook
+            (defun +telega-disable-sponsored-messages-h ()
+              (telega--toggleHasSponsoredMessagesEnabled nil))))
 
   (add-hook! telega-ready-hook
     (defun +telega-disable-sponsored-messages-h ()

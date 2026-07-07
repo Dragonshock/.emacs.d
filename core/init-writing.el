@@ -30,10 +30,10 @@
 
 
 ;; [typst-ts-mode]
-(use-package typst-ts-mode
-  :straight (:host sourcehut :repo "meow_king/typst-ts-mode")
-  :custom
-  (typst-ts-mode-watch-options "--open"))
+;; (use-package typst-ts-mode
+;;   :straight (:host sourcehut :repo "meow_king/typst-ts-mode")
+;;   :custom
+;;   (typst-ts-mode-watch-options "--open"))
 
 ;; [auctex]
 (use-package tex

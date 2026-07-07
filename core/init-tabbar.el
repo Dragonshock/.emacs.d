@@ -4,10 +4,10 @@
 (use-package tab-bar
   ;; Turn on tab-bar-mode in early-init to speed-up
   ;; :hook (window-setup . tab-bar-mode)
-  :bind (:map tab-bar-mode-map
-              ("M-w" . tab-close)
-              ("M-t" . tab-new)
-              ("M-o" . other-window))
+  ;; :bind (:map tab-bar-mode-map
+  ;;             ("M-w" . tab-close)
+  ;;             ("M-t" . tab-new)
+  ;;             ("M-o" . other-window))
   :config
   (setq tab-bar-separator ""
         tab-bar-new-tab-choice "*scratch*"

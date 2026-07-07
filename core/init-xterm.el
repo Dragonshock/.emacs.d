@@ -23,10 +23,20 @@
 ;; which allows the terminal to send key events to Emacs.
 (use-package kkp
   :straight t
-  :hook (tty-setup . global-kkp-mode))
+  :hook (tty-setup . global-kkp-mode)
+  :init
+  ;; KKP encodes C-g as an escape sequence, which Emacs can't detect at the
+  ;; byte level — so C-g can't interrupt blocking synchronous subprocesses
+  ;; (e.g. envrc/direnv `call-process').  This restores the legacy single-byte
+  ;; C-g encoding around such calls.  Must be set before `global-kkp-mode'
+  ;; first runs (the :hook above fires at tty-setup, after this :init).
+  (setq kkp-restore-legacy-keys-around-subprocesses t))
 
 
 ;; []
+;; NOTE: Emacs 31 turns on `xterm-mouse-mode' by default in compatible
+;; terminals (including kitty).  This hook is kept as a fallback for
+;; non-compatible terminals.
 (use-package term/xterm
   :straight nil
   :hook (tty-setup . xterm-mouse-mode)

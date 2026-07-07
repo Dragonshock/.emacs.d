@@ -6,12 +6,19 @@
                      (float-time (time-subtract nil before-init-time))
                      (float-time (time-subtract after-init-time before-init-time)))))
 
+;; Proxy
+;; (setq url-proxy-services
+;;       '(("no_proxy" . "^\\(localhost\\|10.*\\)")
+;;         ("http" . "127.0.0.1:7890")
+;;         ("https" . "127.0.0.1:7890")))
+
 (defvar +init-files (list
                      'init-util
                      'init-straight
                      'init-basic
                      'init-ui
                      'init-xterm
+                     'init-ghostel
                      (when (eq system-type 'darwin) 'init-mac)
                      'init-completion
                      'init-tools
@@ -23,14 +30,15 @@
                      'init-dired
                      'init-eshell
                      'init-prog
+                     'init-scheme
                      'init-writing
                      'init-org
                      'init-vcs
                      'init-browser
                      'init-ibuffer
                      'init-dict
-                     'init-ime
-                     'init-modal
+                     ;; 'init-ime
+                     ;; 'init-modal
                      'init-modeline
                      'init-tabbar
                      'init-ai

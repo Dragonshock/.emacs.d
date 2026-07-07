@@ -97,3 +97,50 @@
                                          (format "%s: %s"
                                                  codex-ide-buffer-name-prefix
                                                  (file-name-nondirectory (directory-file-name dir))))))
+
+
+;; Claude Code IDE — Claude Code CLI 的 Emacs 集成。
+;; 通过 MCP 桥接 Emacs 与 Claude Code CLI:让 Claude 感知当前文件/选区/xref/
+;; diagnostics,用 ediff 审阅改动,并可暴露自定义 Elisp 工具。前置依赖:已安装
+;; `claude' CLI 并登录。终端后端沿用本配置的 ghostel(提供 `ghostel-exec')。
+(use-package claude-code-ide
+  :straight (:type git :host github :repo "manzaltu/claude-code-ide.el")
+  :after (ghostel project)
+  :bind (("C-c C-'" . claude-code-ide-menu))
+  :init
+  ;; 终端后端:用本配置已有的 ghostel(native module);可选 vterm / eat。
+  (setq claude-code-ide-terminal-backend 'ghostel)
+
+  ;; 窗口布局:右侧 side window,打开时不抢焦点(留在代码 buffer)。
+  (setq claude-code-ide-use-side-window t
+        claude-code-ide-window-side     'right
+        claude-code-ide-window-width    100
+        claude-code-ide-focus-on-open   nil)
+
+  ;; diff:用 Emacs 原生 ediff 打开,审阅完再 apply。
+  (setq claude-code-ide-use-ide-diff            t
+        claude-code-ide-focus-claude-after-ediff nil
+        claude-code-ide-show-claude-window-in-ediff t
+        claude-code-ide-switch-tab-on-ediff      t)
+
+  ;; 诊断:本配置用 flymake(init-prog),留 auto 自动识别 flymake/flycheck。
+  (setq claude-code-ide-diagnostics-backend 'auto)
+
+  ;; 缓冲命名:沿用 codex-ide 的 "<prefix>: <dir>" 风格(前缀用字面量,
+  ;; claude-code-ide 没有 `-prefix' 变量,默认实现是 *claude-code[<dir>]*)。
+  (setq claude-code-ide-buffer-name-function
+        (lambda (dir)
+          (if dir
+              (format "claude-code: %s"
+                      (file-name-nondirectory (directory-file-name dir)))
+            "claude-code: Global")))
+
+  ;; 允许 Claude 经 `executeCode' MCP 工具在 Emacs 内求值 Elisp。
+  (setq claude-code-ide-enable-execute-code t)
+
+  ;; CLI 额外参数:留空用 `claude' 默认账号;指定模型可如 "--model opus"。
+  (setq claude-code-ide-cli-extra-flags "")
+  :config
+  ;; 启用内置 Emacs MCP 工具(xref-find-references / xref-find-apropos /
+  ;; treesit-info / imenu-list-symbols / project-info)暴露给 Claude。
+  (claude-code-ide-emacs-tools-setup))

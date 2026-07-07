@@ -219,6 +219,23 @@
   (setq auto-dim-other-buffers-dim-on-focus-out nil
         auto-dim-other-buffers-dim-on-switch-to-minibuffer t)
 
+  ;; 让行号也参与 dim
+  (setq auto-dim-other-buffers-affected-faces
+        (append
+         auto-dim-other-buffers-affected-faces
+         '((line-number
+            . (auto-dim-other-buffers . nil))
+           (line-number-current-line
+            . (auto-dim-other-buffers . nil)))))
+
+  ;; Never dim minibuffer
+  (add-hook! auto-dim-other-buffers-never-dim-buffer-functions
+    (defun +auto-dim-other-buffers-never-dim-minibuffer (buffer)
+      "Keep minibuffer-backed UI buffers, such as Vertico buffer display, lit."
+      (with-current-buffer buffer
+        (minibufferp))))
+
+  ;; Follow current theme
   (add-hook! (auto-dim-other-buffers-mode-hook enable-theme-functions server-after-make-frame-hook) :unless-daemonp-call-immediately
     (defun +auto-dim-other-buffers-auto-set-face (&rest _)
       (let ((dim (or (face-background 'mode-line)

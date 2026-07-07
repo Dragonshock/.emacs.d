@@ -101,19 +101,20 @@
 
 
 ;; Font: Same width and height for emoji, chinese and english characters
-(defvar +font-size (if (eq system-type 'darwin) 16 26))
+(defvar +font-size (if (eq system-type 'darwin) 14 26))
 
 (add-hook! server-after-make-frame-hook :unless-daemonp-call-immediately
   (defun +setup-fonts ()
     "Setup fonts."
     (when (display-graphic-p)
-      (set-face-attribute 'default nil :font (font-spec :family "Sarasa Mono SC" :size +font-size))
-      (set-face-font 'fixed-pitch "Sarasa Mono SC")
-      (set-face-font 'fixed-pitch-serif "Sarasa Mono Slab SC")
-      (set-face-font 'variable-pitch "Sarasa UI SC")
+      (set-face-attribute 'default nil :font (font-spec :family "MonoLisaCode" :size +font-size))
+      (set-face-font 'fixed-pitch "MonoLisaCode")
+      (set-face-font 'fixed-pitch-serif "MonoLisaCode")
+      (set-face-font 'variable-pitch "MonoLisaText")
 
+      ;; Sarasa Mono SC, JetBrains Maple Mono, LXGW WenKai Mono Screen
       (dolist (charset '(han cjk-misc))
-        (set-fontset-font t charset (font-spec :family "Sarasa Mono SC")))
+        (set-fontset-font t charset (font-spec :family "LXGW WenKai Mono Screen")))
 
       ;; font for emoji, set as unicode to cover more chars
       (if (eq system-type 'darwin)
@@ -134,18 +135,25 @@
 (setq custom-safe-themes t)
 
 
-(use-package doom-themes
-  :straight t
+;; (use-package doom-themes
+;;   :straight t
+;;   :config
+;;   (setq doom-themes-enable-bold t
+;;         doom-themes-enable-italic t)
+;;
+;;   (doom-themes-org-config))
+
+(use-package doric-themes
+  ;; :straight (:type git
+  ;;                  :host github
+  ;;                  :repo "protesilaos/doric-themes")
+  :demand t
+  :load-path "/Users/dragon/Documents/Emacs"
   :config
-  (setq doom-themes-enable-bold t
-        doom-themes-enable-italic t)
+  (setq doric-themes-to-toggle '(doric-tiger doric-fire)))
 
-  (doom-themes-org-config)
-  (setcdr (assoc 'gnus-group-news-low-empty doom-themes-base-faces)
-         '(:inherit 'gnus-group-mail-1-empty :weight 'normal)))
-
-(defvar +light-theme 'doom-gruvbox-light)
-(defvar +dark-theme 'doom-gruvbox)
+(defvar +light-theme 'doric-beach) ;; doom-gruvbox-light doric-tiger
+(defvar +dark-theme 'doric-valley)        ;; doom-gruvbox doric-lion
 (add-hook! (tty-setup-hook server-after-make-frame-hook) :unless-daemonp-call-immediately
   (defun +load-theme (&optional theme)
     (setq theme (if (if (display-graphic-p)
