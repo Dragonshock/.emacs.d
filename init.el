@@ -36,9 +36,8 @@
                      'init-ai
                      'init-chat
                      'init-pdf
+                     'init-elfeed
                      'init-test
-
-                     ;; 'init-elfeed
                      ))
 
 (let ((init-directory (expand-file-name "core/" user-emacs-directory)))

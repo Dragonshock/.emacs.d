@@ -1,15 +1,5 @@
 ;;; -*- lexical-binding: t -*-
 
-;; [browse-url] Pass a URL to browser
-(use-package browse-url
-  :defines dired-mode-map
-  :bind (("C-, o" . browse-url-at-point)
-         ("C-, e" . browse-url-emacs))
-  :config
-  ;; (setq browse-url-browser-function 'xwidget-webkit-browse-url)
-  )
-
-
 ;; [isearch] Use builtin isearch to replace `anzu'
 (use-package isearch
   :bind (:map isearch-mode-map
