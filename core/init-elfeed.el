@@ -22,8 +22,7 @@
                        ;; programming
                        ("https://matklad.github.io/feed.xml" matklad)
                        ("https://rust-analyzer.github.io/feed.xml" rust-analyzer)
-                       ("https://blog.rust-lang.org/feed.xml" rust)
-                       ("https://hnrss.org/newest?points=150" hacker-news))
+                       ("https://blog.rust-lang.org/feed.xml" rust))
         elfeed-enclosure-default-dir (expand-file-name "elfeed/" user-emacs-directory)
         elfeed-show-entry-switch #'pop-to-buffer
         elfeed-show-entry-delete #'delete-window

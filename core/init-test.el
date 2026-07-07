@@ -1,8 +1,7 @@
 ;;; -*- lexical-binding: t -*-
 
 (use-package chirp
-  :straight (:host github :repo "LuciusChen/chirp"
-             :files ("chirp.el" "lisp/*.el"))
+  :straight (:host github :repo "LuciusChen/chirp")
   :commands (chirp-home
              chirp-following
              chirp-bookmarks
@@ -13,7 +12,10 @@
              chirp-thread
              chirp-profile
              chirp-profile-followers
-             chirp-profile-following-users))
+             chirp-profile-following-users)
+  :config
+  (setq chirp-show-avatars nil
+        chirp-show-tweet-media nil))
 
 (defun jdtls-command-contact (&optional interactive)
   (let* ((jdtls-cache-dir (file-name-concat user-emacs-directory "cache" "lsp-cache"))

@@ -273,7 +273,6 @@
 ;; [quickrun] Run commands quickly
 (use-package quickrun
   :straight t
-  :bind (("C-c r"  . quickrun))
   :config
   (setq quickrun-focus-p nil))
 
