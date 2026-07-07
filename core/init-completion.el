@@ -280,8 +280,8 @@
         (setq-local completion-at-point-functions
                     (append completion-at-point-functions (list capf))))))
 
-  (defun +completion-add-default-capfs ()
-    (+completion-add-capfs #'cape-file #'cape-dabbrev))
+  (setq-default completion-at-point-functions
+                (append completion-at-point-functions (list #'cape-file #'cape-dabbrev)))
 
   (defun +completion-add-tex-capfs ()
     (+completion-add-capfs #'cape-tex)))
