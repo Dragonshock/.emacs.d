@@ -270,8 +270,7 @@
 
 (use-package cape
   :straight t
-  :hook (((prog-mode conf-mode yaml-mode shell-mode eshell-mode text-mode codex-ide-session-mode) . +completion-add-default-capfs)
-         ((TeX-mode LaTeX-mode org-mode markdown-mode) . +completion-add-tex-capfs))
+  :hook (((TeX-mode LaTeX-mode org-mode markdown-mode) . +completion-add-tex-capfs))
   :init
   (defun +completion-add-capfs (&rest capfs)
     "Append CAPFS to the buffer-local `completion-at-point-functions'."

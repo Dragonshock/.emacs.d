@@ -3,7 +3,8 @@
 ;;   :straight t)
 
 (use-package telega
-  :straight (:files (:defaults "contrib/*.el" "etc"))
+  :straight (:host github :repo "zevlg/telega.el"
+                   :files (:defaults "contrib/*.el" "etc"))
   :preface
   (defun +telega-install-tdlib ()
     "Fetch and install telega's expected TDLib commit under ~/.local."

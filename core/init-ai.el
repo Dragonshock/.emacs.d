@@ -54,7 +54,8 @@
         gptel-quick-model 'deepseek-v4-flash
         gptel-quick-word-count 500
         gptel-quick-system-message (lambda (&rest _) "一句话不分行解释："))
-  (keymap-set embark-general-map "?" #'gptel-quick))
+  (keymap-set embark-general-map "?" #'gptel-quick)
+  )
 
 (use-package codex-ide
   :straight (:type git :host github :repo "dgillis/emacs-codex-ide")

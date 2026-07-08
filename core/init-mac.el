@@ -15,10 +15,9 @@
                   :files ("*.el" "module/*" "module"))
  :hook (after-init . emt-mode))
 
-(when (display-graphic-p)
-  (add-hook! ns-system-appearance-change-functions
-    (defun +mac-auto-change-theme-with-system (&rest _)
-      (+load-theme))))
+(add-hook! ns-system-appearance-change-functions
+  (defun +mac-auto-change-theme-with-system (&rest _)
+    (+load-theme)))
 
 ;; Prevent accidental touch
 (unbind-key "C-<wheel-down>")
