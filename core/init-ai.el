@@ -150,5 +150,3 @@
   ;; 启用内置 Emacs MCP 工具(xref-find-references / xref-find-apropos /
   ;; treesit-info / imenu-list-symbols / project-info)暴露给 Claude。
   (claude-code-ide-emacs-tools-setup))
-
->>>>>>> upstream/master
