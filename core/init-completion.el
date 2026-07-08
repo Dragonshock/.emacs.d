@@ -12,7 +12,6 @@
   :hook ((after-init . vertico-mode))
   :config
   (setq vertico-cycle t
-        vertico-resize nil
         vertico-count 15)
 
   ;; WORKAROUND: https://github.com/minad/vertico#problematic-completion-commands
@@ -35,7 +34,7 @@
   :straight nil
   :after vertico
   :bind (:map vertico-map
-              ("M-q" . vertico-quick-jump)))
+              ("C-," . vertico-quick-jump)))
 
 
 (use-package vertico-buffer
@@ -48,7 +47,8 @@
                                         (window-height . 0.5)))
   (defadvice! +vertico-buffer-disbale-mode-line ()
     :before #'vertico-buffer--setup
-    (setq-local mode-line-format nil)))
+    (setq-local mode-line-format nil))
+  )
 
 
 ;;; Matching styles
