@@ -146,11 +146,13 @@
       ,(or +mode-line-project-crumb
            `(:propertize "%b" face ,meta-face))
       " "
-      (,active-p (:eval (breadcrumb-imenu-crumbs)))
+      (:eval (breadcrumb-imenu-crumbs))
       (:propertize +mode-line-remote-host-name
                    face +mode-line-host-name-active-face)
       " "
       (:eval +mode-line-encoding)
+      " "
+      eglot-mode-line-progress
       )))
 
 (setq-default mode-line-format '((:eval (+mode-line-normal))))
