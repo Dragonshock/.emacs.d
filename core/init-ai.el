@@ -53,7 +53,7 @@
                               :key #'gptel-api-key-from-auth-source)
         gptel-quick-model 'deepseek-v4-flash
         gptel-quick-word-count 500
-        gptel-quick-system-message (lambda (&rest _) "一句话不分行解释："))
+        gptel-quick-system-message (lambda (&rest _) "一句话解释："))
   (keymap-set embark-general-map "?" #'gptel-quick)
   )
 
@@ -70,6 +70,7 @@
         codex-ide-status-mode-auto-refresh-delay 0.3
         codex-ide-want-mcp-bridge nil
         codex-ide-emacs-context-policy nil
+        codex-ide-session-transcript-default-detail-level 'compact
         codex-ide-buffer-name-function (lambda (dir)
                                          (format "%s: %s"
                                                  codex-ide-buffer-name-prefix
@@ -95,10 +96,11 @@
           (codex-ide-submit)
         (newline))))
   :bind (:map codex-ide-session-prompt-minor-mode-map
-              ("RET" . codex-ide-submit)
+              ("RET" . +codex-ide-submit-or-newline)
               ("<return>" . +codex-ide-submit-or-newline)
               ("S-<return>" . newline)
               :map codex-ide-session-mode-map
               ("C-c C-;" . codex-ide-agent-config-menu)
               ("C-c C-r" . codex-ide-status))
-  )
+  :config
+  (require 'codex-ide))
