@@ -217,7 +217,9 @@
   :hook ((after-init . auto-dim-other-buffers-mode))
   :config
   (setq auto-dim-other-buffers-dim-on-focus-out nil
-        auto-dim-other-buffers-dim-on-switch-to-minibuffer t)
+        auto-dim-other-buffers-dim-on-switch-to-minibuffer nil)
+
+  (add-hook 'auto-dim-other-buffers-never-dim-buffer-functions #'minibufferp)
 
   (add-hook! (auto-dim-other-buffers-mode-hook enable-theme-functions server-after-make-frame-hook) :unless-daemonp-call-immediately
     (defun +auto-dim-other-buffers-auto-set-face (&rest _)

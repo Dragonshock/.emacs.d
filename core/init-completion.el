@@ -38,28 +38,17 @@
               ("M-q" . vertico-quick-jump)))
 
 
-(use-package vertico-multiform
+(use-package vertico-buffer
   :straight nil
   :after vertico
-  :hook (vertico-mode . vertico-multiform-mode)
+  :hook (vertico-mode . vertico-buffer-mode)
   :config
-  (setq vertico-buffer-display-action
-        '((display-buffer-reuse-window display-buffer-pop-up-window))
-        vertico-multiform-commands
-        '((consult-fd buffer)
-          (consult-grep buffer)
-          (consult-git-grep buffer)
-          (consult-imenu buffer)
-          (consult-imenu-multi buffer)
-          (consult-line buffer)
-          (consult-locate buffer)
-          (consult-ripgrep buffer)
-          (consult-register grid))
-        vertico-multiform-categories
-        '((consult-grep buffer)
-          (consult-location buffer)
-          (imenu buffer)
-          (kill-ring grid))))
+  (setq vertico-buffer-display-action '(display-buffer-in-direction
+                                        (direction . below)
+                                        (window-height . 0.5)))
+  (defadvice! +vertico-buffer-disbale-mode-line ()
+    :before #'vertico-buffer--setup
+    (setq-local mode-line-format nil)))
 
 
 ;;; Matching styles
