@@ -348,7 +348,7 @@
   :hook (after-init . exec-path-from-shell-initialize)
   :init
   (setq exec-path-from-shell-arguments '("-l")
-        exec-path-from-shell-variables '("PATH" "JAVA_HOME" "JDTLS_JAVA_HOME" "MANPATH")))
+        exec-path-from-shell-variables '("PATH" "HOMEBREW" "JAVA_HOME" "JDTLS_JAVA_HOME" "MANPATH")))
 
 
 ;; [backup walker] A utility to view Emacs backup files.

@@ -174,6 +174,12 @@
       (puni-backward-delete-char)))
   )
 
+;; [dtdr-indent] Detect indentation size
+(use-package dtrt-indent
+  :straight t
+  :config
+  (dtrt-indent-global-mode 1))
+
 
 ;; [embrace] Add/change/delete pairs of symbol
 (use-package embrace

@@ -76,7 +76,7 @@
   :config
   (setq eglot-events-buffer-config '(:size 0 :format full)
         eglot-autoshutdown t
-        eglot-report-progress 'messages
+        ;; eglot-report-progress 'messages
         eglot-documentation-renderer 'markdown-ts-view-mode
         eglot-code-action-indications nil)
 
@@ -91,11 +91,10 @@
                                             :hover (:memoryLayout (:size "both")
                                                                   :show (:traitAssocItems 5)
                                                                   :documentation (:keywords (:enable :json-false)))
-                                            :inlayHints(;:bindingModeHints (:enable t)
-                                                                          :lifetimeElisionHints (:enable "skip_trivial" :useParameterNames t)
-                                                                          :closureReturnTypeHints (:enable "always")
-                                                                          :discriminantHints (:enable t)
-                                                                          :genericParameterHints (:lifetime (:enable t)))
+                                            :inlayHints (:lifetimeElisionHints (:enable "skip_trivial" :useParameterNames t)
+                                                                               :closureReturnTypeHints (:enable "always")
+                                                                               :discriminantHints (:enable t)
+                                                                               :genericParameterHints (:lifetime (:enable t)))
                                             :semanticHighlighting (:operator (:specialization (:enable t))
                                                                              :punctuation (:enable t :specialization (:enable t)))
                                             :workspace (:symbol (:search (:kind "all_symbols"
@@ -103,59 +102,29 @@
                                             :lru (:capacity 1024)
                                             :diagnostics (:enable :json-false)))
                   (:typescript . (:preferences (:importModuleSpecifierPreference "non-relative")))
-                  (:gopls . ((staticcheck . t)
-                             (matcher . "CaseSensitive")))))
+                  (:java . (:configuration
+                            (:runtimes [(:name "JavaSE-17"
+                                               :path "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home/")
+                                        (:name "JavaSE-21"
+                                               :path "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/"
+                                               :default t)])
+                            :import (:gradle (:enabled t
+                                              :wrapper (:enabled t)))
+                            :autobuild (:enabled :json-false)
+                            :extendedClientCapabilities (:classFileContentsSupport t)))))
 
-  (defsubst find-value-and-succ (value lst)
-    (while (and lst (not (eq (car lst) value)))
-      (setq lst (cdr lst)))
-    (if lst
-        (car (cdr lst))
-      nil))
+  (defun jdtls-command-contact (&optional interactive)
+    (let* ((jdtls-java-home (getenv "JDTLS_JAVA_HOME"))
+           (project-root (project-root (project-current t)))
+           (data-dir (expand-file-name
+                      (file-name-concat user-emacs-directory
+                                        "cache" "lsp-cache"
+                                        (md5 (expand-file-name project-root))))))
+      `("env" ,(concat "JAVA_HOME=" jdtls-java-home)
+        "jdtls" "--jvm-arg=-Xmx16G" "-data" ,data-dir)))
+  (push '(java-mode . jdtls-command-contact) eglot-server-programs)
 
-  (defsubst set-value-and-succ (key value lst)
-    (let ((key-pos (member key lst)))
-      (if key-pos
-          (if (cdr key-pos)
-              (setcar (cdr key-pos) value)
-            (error "Key found but no value (no succ element) to update"))
-        (setf lst (append lst (list key value)))))
-    lst)
-
-  (defsubst toggle-boolean-json (v)
-    (if (eq v :json-false)
-        t
-      :json-false))
-
-  (defun +eglot-toggle-exclude-imports-for-rust-analyzer ()
-    (interactive)
-    (let* ((current-config (alist-get :rust-analyzer eglot-workspace-configuration))
-           (references (find-value-and-succ :references current-config))
-           (val (find-value-and-succ :excludeImports references)))
-      (if references
-          (setf references (set-value-and-succ :excludeImports (toggle-boolean-json (or val :json-false)) references))
-        (setq references (list :excludeImports t)))
-      (setq current-config (set-value-and-succ :references references current-config))
-      (setf (alist-get :rust-analyzer eglot-workspace-configuration) current-config)
-      (if (eq val :json-false)
-          (message "Exclude imports")
-        (message "Include imports")))
-    )
-
-  (defun +eglot-toggle-exclude-tests-for-rust-analyzer ()
-    (interactive)
-    (let* ((current-config (alist-get :rust-analyzer eglot-workspace-configuration))
-           (references (find-value-and-succ :references current-config))
-           (val (find-value-and-succ :excludeTests references)))
-      (if references
-          (setf references (set-value-and-succ :excludeTests (toggle-boolean-json (or val :json-false)) references))
-        (setq references (list :excludeTests t)))
-      (setq current-config (set-value-and-succ :references references current-config))
-      (setf (alist-get :rust-analyzer eglot-workspace-configuration) current-config)
-      )
-    )
-
-  ;; we call eldoc manually by C-h .
+  ;; we call eldoc manually
   (add-hook! eglot-managed-mode-hook
     (defun +eglot-disable-eldoc-mode ()
       (when (eglot-managed-p)
