@@ -102,20 +102,6 @@
 (advice-add #'after-insert-file-set-coding :after #'+mode-line-update-encoding)
 (advice-add #'set-buffer-file-coding-system :after #'+mode-line-update-encoding)
 
-
-;;; [vcs-info] cache for vcs
-(defvar-local +mode-line-smerge-count nil) ; [smerge] cache for smerge conflict indicator
-(defadvice! +mode-line-update-smerge-count (&rest _)
-  :after '(smerge-auto-leave smerge-mode)
-  (let ((all-matches-count (count-matches smerge-begin-re (point-min) (point-max))))
-    (setq-local +mode-line-smerge-count
-                (if (zerop all-matches-count)
-                    nil
-                  (propertize (concat "[" (number-to-string all-matches-count) "]")
-                              'face 'vc-dir-status-warning)))
-    ))
-
-
 ;; [project-crumb]
 (defvar-local +mode-line-project-crumb nil)
 (add-hook! (find-file-hook after-save-hook clone-indirect-buffer-hook Info-selection-hook
@@ -152,8 +138,7 @@
       " "
       (:eval +mode-line-encoding)
       " "
-      eglot-mode-line-progress
-      )))
+      eglot-mode-line-progress)))
 
 (setq-default mode-line-format '((:eval (+mode-line-normal))))
 (setq-default header-line-format nil)

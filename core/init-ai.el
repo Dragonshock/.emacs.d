@@ -53,7 +53,7 @@
                               :key #'gptel-api-key-from-auth-source)
         gptel-quick-model 'deepseek-v4-flash
         gptel-quick-word-count 500
-        gptel-quick-system-message (lambda (&rest _) "一句话不分行解释："))
+        gptel-quick-system-message (lambda (&rest _) "一句话解释："))
   (keymap-set embark-general-map "?" #'gptel-quick)
   )
 
@@ -62,6 +62,23 @@
   :custom-face
   (codex-ide-item-summary-face ((t (:inherit font-lock-function-name-face :height 0.9))))
   (codex-ide-item-detail-face ((t (:inherit shadow :height 0.8))))
+  :init
+  (setq codex-ide-diff-inline-fold-threshold 20
+        codex-ide-image-detail "auto"
+        codex-ide-prompt-placeholder-text ""
+        codex-ide-placeholder-ellipsis-animation-interval nil
+        codex-ide-status-mode-auto-refresh-delay 0.3
+        codex-ide-want-mcp-bridge nil
+        codex-ide-emacs-context-policy nil
+        codex-ide-session-transcript-default-detail-level 'compact
+        codex-ide-buffer-name-function (lambda (dir)
+                                         (format "%s: %s"
+                                                 codex-ide-buffer-name-prefix
+                                                 (file-name-nondirectory (directory-file-name dir)))))
+  )
+
+(use-package codex-ide-session
+  :straight nil
   :preface
   (defun +codex-ide-submit-or-newline ()
     "Submit one-line Codex prompts, otherwise insert a newline."
@@ -79,25 +96,14 @@
           (codex-ide-submit)
         (newline))))
   :bind (:map codex-ide-session-prompt-minor-mode-map
-              ("RET" . codex-ide-submit)
+              ("RET" . +codex-ide-submit-or-newline)
               ("<return>" . +codex-ide-submit-or-newline)
               ("S-<return>" . newline)
               :map codex-ide-session-mode-map
               ("C-c C-;" . codex-ide-agent-config-menu)
               ("C-c C-r" . codex-ide-status))
-  :init
-  (setq codex-ide-diff-inline-fold-threshold 20
-        codex-ide-image-detail "auto"
-        codex-ide-prompt-placeholder-text ""
-        codex-ide-placeholder-ellipsis-animation-interval nil
-        codex-ide-status-mode-auto-refresh-delay 0.3
-        codex-ide-want-mcp-bridge nil
-        codex-ide-emacs-context-policy nil
-        codex-ide-buffer-name-function (lambda (dir)
-                                         (format "%s: %s"
-                                                 codex-ide-buffer-name-prefix
-                                                 (file-name-nondirectory (directory-file-name dir))))))
-
+  :config
+  (require 'codex-ide))
 
 ;; Claude Code IDE — Claude Code CLI 的 Emacs 集成。
 ;; 通过 MCP 桥接 Emacs 与 Claude Code CLI:让 Claude 感知当前文件/选区/xref/
@@ -144,3 +150,5 @@
   ;; 启用内置 Emacs MCP 工具(xref-find-references / xref-find-apropos /
   ;; treesit-info / imenu-list-symbols / project-info)暴露给 Claude。
   (claude-code-ide-emacs-tools-setup))
+
+>>>>>>> upstream/master
