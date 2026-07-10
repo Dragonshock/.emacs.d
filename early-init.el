@@ -121,7 +121,7 @@
       load-file-rep-suffixes '(""))
 
 (defun +restore-load-suffixes-h ()
-  "Restore GC settings after startup."
+  "Restore dynamic module suffixes before loading the init file."
   (setq load-suffixes `(".elc" ".el"
                         ,(cond ((eq system-type 'darwin) ".dylib")
                                ((eq system-type 'gnu/linux) ".so")

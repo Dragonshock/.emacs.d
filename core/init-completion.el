@@ -153,9 +153,6 @@
         consult-async-min-input 2
         consult-async-refresh-delay 0.05)
 
-  ;; replace multi-occur with consult-multi-occur
-  (advice-add #'multi-occur :override #'consult-multi-occur)
-
   ;; [consult-register] Configure the register formatting.
   (setq register-preview-delay 0.5
         register-preview-function #'consult-register-format)
