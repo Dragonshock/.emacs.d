@@ -189,7 +189,7 @@
 
 ;; [scrollview] Show scroll progress in the fringe
 (use-package scrollview
-  :straight (:host github :repo "roife/scrollview.el" :branch "main")
+  :straight (:type git :host github :repo "roife/scrollview.el" :branch "main")
   :hook ((after-init . global-scrollview-mode)))
 
 (setq frame-title-format
