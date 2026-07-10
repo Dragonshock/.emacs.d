@@ -32,7 +32,7 @@
    eshell-prefer-lisp-functions t
 
    ;; Visual commands require a proper terminal. Eshell can't handle that
-   eshell-visual-commands '("top" "htop" "less" "more" "bat" "talnet")
+   eshell-visual-commands '("top" "htop" "less" "more" "bat" "telnet")
    eshell-visual-subcommands '(("git" "help" "lg" "log" "diff" "show"))
 
    ;; Completion like bash

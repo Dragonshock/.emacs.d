@@ -205,13 +205,12 @@
   (setq dogears-functions '(find-file
                             recenter-top-bottom
                             other-window switch-to-buffer
-                            aw-select toggle-window-split
+                            aw-select
                             windmove-do-window-select
-                            pager-page-down pager-page-up
+                            pager-page-up
                             tab-bar-select-tab
                             pop-to-mark-command
                             pop-global-mark
-                            goto-last-change
                             xref-go-back
                             xref-find-definitions
                             xref-find-references)))

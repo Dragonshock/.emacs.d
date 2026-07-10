@@ -17,7 +17,6 @@
 
 (add-hook 'emacs-startup-hook #'+restore-gc-threshold-h 100)
 
-;; Prevent unwanted runtime compilation
 (setq native-comp-jit-compilation t)
 
 ;; Keep early startup quiet unless we're debugging init.

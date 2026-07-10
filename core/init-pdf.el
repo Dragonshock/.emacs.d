@@ -1,3 +1,5 @@
+;;; -*- lexical-binding: t -*-
+
 ;; [emacs-reader] read docs in emacs
 (use-package reader
   :straight '(reader :type git :host codeberg :repo "MonadicSheep/emacs-reader"

@@ -216,7 +216,7 @@
   (setq corfu-cycle t
         corfu-auto t
         corfu-auto-prefix 2
-        corfu-preselect t
+        corfu-preselect 'first
         corfu-preview-current nil
         corfu-auto-delay 0.1)
 
@@ -228,7 +228,7 @@
        (let ((completion-extra-properties extras)
              completion-cycle-threshold completion-cycling)
          (consult-completion-in-region beg end table pred)))))
-  (add-to-list 'corfu-continue-commands #'corfu-move-to-minibuffer)
+  (add-to-list 'corfu-continue-commands #'+corfu-move-to-minibuffer)
 
   (defun +corfu-enable-in-minibuffer ()
     "Enable Corfu in the minibuffer if `completion-at-point' is bound."
