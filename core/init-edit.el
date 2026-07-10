@@ -84,6 +84,16 @@
   :hook (find-file . editorconfig-mode))
 
 
+;; [apheleia] Format buffers asynchronously without moving point
+(use-package apheleia
+  :straight t
+  :commands (apheleia-format-buffer)
+  :bind (("C-c f f" . apheleia-format-buffer))
+  :hook (after-init . apheleia-global-mode)
+  :config
+  (setq apheleia-hide-log-buffers t))
+
+
 ;; [ediff] Diff & patch
 (use-package ediff
   :hook ((ediff-before-setup . +ediff-save-window-config)
