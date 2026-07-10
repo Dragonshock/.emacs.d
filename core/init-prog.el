@@ -246,6 +246,22 @@
   (setq quickrun-focus-p nil))
 
 
+;; [dape] Debug Adapter Protocol client
+(use-package dape
+  :straight t
+  :commands (dape)
+  :bind (:map prog-mode-map
+              ("C-c D" . dape))
+  :preface
+  (defun +dape-save-buffers-h ()
+    "Save file-visiting buffers before starting a debug session."
+    (save-some-buffers t t))
+  :init
+  (setq dape-buffer-window-arrangement 'right)
+  :config
+  (add-hook 'dape-start-hook #'+dape-save-buffers-h))
+
+
 ;; [flymake] On-the-fly syntax checker
 (use-package flymake
   :straight (:type built-in)
