@@ -111,6 +111,7 @@
 
 ;; [project] Project manager
 (use-package project
+  :straight (:type built-in)
   :bind (:map project-prefix-map
               ("m" . magit-status))
   :config
