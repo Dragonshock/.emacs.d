@@ -17,7 +17,6 @@
 
 (add-hook 'emacs-startup-hook #'+restore-gc-threshold-h 100)
 
-;; Prevent unwanted runtime compilation
 (setq native-comp-jit-compilation t)
 
 ;; Keep early startup quiet unless we're debugging init.
@@ -124,7 +123,7 @@
       load-file-rep-suffixes '(""))
 
 (defun +restore-load-suffixes-h ()
-  "Restore GC settings after startup."
+  "Restore dynamic module suffixes before loading the init file."
   (setq load-suffixes `(".elc" ".el"
                         ,(cond ((eq system-type 'darwin) ".dylib")
                                ((eq system-type 'gnu/linux) ".so")

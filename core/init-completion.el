@@ -12,7 +12,6 @@
   :hook ((after-init . vertico-mode))
   :config
   (setq vertico-cycle t
-        vertico-resize nil
         vertico-count 15)
 
   ;; WORKAROUND: https://github.com/minad/vertico#problematic-completion-commands
@@ -35,7 +34,7 @@
   :straight nil
   :after vertico
   :bind (:map vertico-map
-              ("M-q" . vertico-quick-jump)))
+              ("C-," . vertico-quick-jump)))
 
 
 (use-package vertico-buffer
@@ -48,7 +47,8 @@
                                         (window-height . 0.5)))
   (defadvice! +vertico-buffer-disbale-mode-line ()
     :before #'vertico-buffer--setup
-    (setq-local mode-line-format nil)))
+    (setq-local mode-line-format nil))
+  )
 
 
 ;;; Matching styles
@@ -161,9 +161,6 @@
         consult-async-min-input 2
         consult-async-refresh-delay 0.05)
 
-  ;; replace multi-occur with consult-multi-occur
-  (advice-add #'multi-occur :override #'consult-multi-occur)
-
   ;; [consult-register] Configure the register formatting.
   (setq register-preview-delay 0.5
         register-preview-function #'consult-register-format)
@@ -228,7 +225,7 @@
   (setq corfu-cycle t
         corfu-auto t
         corfu-auto-prefix 2
-        corfu-preselect t
+        corfu-preselect 'first
         corfu-preview-current nil
         corfu-auto-delay 0.1)
 
@@ -240,7 +237,7 @@
        (let ((completion-extra-properties extras)
              completion-cycle-threshold completion-cycling)
          (consult-completion-in-region beg end table pred)))))
-  (add-to-list 'corfu-continue-commands #'corfu-move-to-minibuffer)
+  (add-to-list 'corfu-continue-commands #'+corfu-move-to-minibuffer)
 
   (defun +corfu-enable-in-minibuffer ()
     "Enable Corfu in the minibuffer if `completion-at-point' is bound."

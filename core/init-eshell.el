@@ -32,7 +32,7 @@
    eshell-prefer-lisp-functions t
 
    ;; Visual commands require a proper terminal. Eshell can't handle that
-   eshell-visual-commands '("top" "htop" "less" "more" "bat" "talnet")
+   eshell-visual-commands '("top" "htop" "less" "more" "bat" "telnet")
    eshell-visual-subcommands '(("git" "help" "lg" "log" "diff" "show"))
 
    ;; Completion like bash
@@ -291,9 +291,13 @@ Like normal Emacs `C-k'.  Kill to end of line and put content in kill-ring."
          :map project-prefix-map
          ("m" . ghostel-project)
          ("M" . ghostel-project-list-buffers))
-  :config
-  (setq ghostel-enable-osc52 t)
+  :init
+  (setq ghostel-module-directory
+        (expand-file-name "ghostel/" user-emacs-directory)
+        ghostel-module-auto-install 'download
+        ghostel-enable-osc52 t)
 
+  :config
   (defadvice! +ghostel-project-popup-buffer-name (_orig root)
     :around 'ghostel--project-buffer-name
     "Name `ghostel-project' buffers as Popper popup buffers for ROOT."

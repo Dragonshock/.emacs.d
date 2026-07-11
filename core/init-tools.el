@@ -123,19 +123,6 @@
                                   (project-search "Search")
                                   (magit-status "Magit")))
 
-  ;; Use [fd] to find file in project
-  (defun +search-project-files-with-fd (dir)
-    "Use `fd' to list files in DIR."
-    (let* ((default-directory dir)
-           (localdir (file-local-name (expand-file-name dir)))
-           (command (format "fd -H -t f -0 . %s" localdir)))
-      (project--remote-file-names
-       (sort (split-string (shell-command-to-string command) "\0" t)
-             #'string<))))
-  (cl-defmethod project-files ((project (head local)) &optional dirs)
-    "Override `project-files' to use `fd' in local projects."
-    (mapcan #'+search-project-files-with-fd
-            (or dirs (list (project-root project)))))
   )
 
 

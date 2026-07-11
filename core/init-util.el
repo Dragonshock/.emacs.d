@@ -47,7 +47,7 @@ This macro accepts, in order:
     `(progn
        ,@defn-forms
        (dolist (func (list ,@func-forms))
-         (dolist (hook (nreverse ',hook-forms))
+         (dolist (hook ',(reverse hook-forms))
            ,(if remove-p
                 `(remove-hook hook func ,local-p)
               `(add-hook hook func ,(or depth append-p) ,local-p)))

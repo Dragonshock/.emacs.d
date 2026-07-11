@@ -137,16 +137,15 @@
 
   (dolist (cmd '(recenter-top-bottom
                  other-window switch-to-buffer
-                 aw-select toggle-window-split
+                 aw-select
                  windmove-do-window-select
-                 pager-page-down pager-page-up
+                 pager-page-up
                  treemacs-select-window
                  tab-bar-select-tab))
     (advice-add cmd :after #'+pulse-momentary-line))
 
   (dolist (cmd '(pop-to-mark-command
-                 pop-global-mark
-                 goto-last-change))
+                 pop-global-mark))
     (advice-add cmd :after #'+recenter-and-pulse))
 
   (dolist (cmd '(symbol-overlay-basic-jump

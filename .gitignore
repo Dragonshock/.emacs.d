@@ -46,6 +46,8 @@ undohist/
 undo-fu-session/
 chirp/
 persist/
+ghostel/
+
 
 # ---- 本地补充 (Dragonshock) ----
 # Emacs 状态文件 (后缀形式, 原配置只忽略了无后缀名)

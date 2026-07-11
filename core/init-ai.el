@@ -111,7 +111,15 @@
 ;; `claude' CLI 并登录。终端后端沿用本配置的 ghostel(提供 `ghostel-exec')。
 (use-package claude-code-ide
   :straight (:type git :host github :repo "manzaltu/claude-code-ide.el")
-  :after (ghostel project)
+  ;; NOTE: 不要把 `ghostel' 放进 `:after' —— `use-package' 的 `:after' 会把
+  ;; `:init' 也一并延迟到所有 :after feature 加载之后才执行。而 ghostel 在本
+  ;; 配置里是 `:straight t' 惰性加载,平时不会自动 load。一旦 ghostel 未先被
+  ;; 调起,这里的 `setq claude-code-ide-terminal-backend 'ghostel' 就不会跑,
+  ;; backend 停留在上游 defcustom 默认值 `'vterm',随后 M-x claude-code-ide-menu
+  ;; 会报 "vterm is not installed"。故仅以 `project' 作为 `:after' 门槛(运行期
+  ;; 真正需要的只是 project);ghostel 由 `claude-code-ide--terminal-ensure-backend'
+  ;; 在拉起会话时用 `(require 'ghostel nil t)' 现加载即可。
+  :after (project)
   :bind (("C-c C-'" . claude-code-ide-menu))
   :init
   ;; 终端后端:用本配置已有的 ghostel(native module);可选 vterm / eat。

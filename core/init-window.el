@@ -181,13 +181,15 @@
              do (eval `(setq ,var-no-select ',(symbol-value var))))
     )
 
-  (defun +popper-smart-popup-at-bottom (buffer &optional alist)
-    (let ((window (popper-display-popup-at-bottom buffer alist)))
+  (defun +popper-smart-popup (buffer &optional alist)
+    (let ((window (display-buffer-in-direction buffer
+                                               (append alist '((direction . below)
+                                                               (window-height . 0.5))))))
       (unless (cl-progv +popper-unpacked-vars
                   (mapcar #'symbol-value +popper-unpacked-vars-no-select)
                 (popper-popup-p buffer))
         (select-window window))))
-  (setq popper-display-function #'+popper-smart-popup-at-bottom)
+  (setq popper-display-function #'+popper-smart-popup)
   )
 
 
