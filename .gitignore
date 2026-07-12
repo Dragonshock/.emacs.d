@@ -64,3 +64,16 @@ network-security.eld
 
 # 备份目录 (本地用,不进版本库)
 backups/
+
+# Agent handoffs / local secrets (never push)
+.agent-handoff/
+*.authinfo
+*.authinfo.gpg
+authinfo
+authinfo.gpg
+.netrc
+.netrc.gpg
+*.pem
+*.key
+secrets.el
+local.el

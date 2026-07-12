@@ -186,8 +186,10 @@
   :straight t
   :commands (agent-shell
              agent-shell-xai-start-grok
-             +agent-shell-start-grok)
-  :bind (("C-c C-g" . +agent-shell-start-grok))
+             +agent-shell-start-grok
+             +agent-shell-resume-grok)
+  :bind (("C-c C-g" . +agent-shell-start-grok)
+         ("C-c M-g" . +agent-shell-resume-grok))
   :preface
   (defconst +agent-shell-grok-bin-dir
     (expand-file-name "~/.grok/bin")
@@ -239,29 +241,63 @@ Prefer `agent-shell-make-environment-variables' with `:inherit-env t'.")
 Ensure `grok' is on PATH (typically ~/.grok/bin). Run `grok login' once, or set XAI_API_KEY.
 Docs: https://docs.x.ai/build/overview"))
 
-  (defun agent-shell-xai-start-grok ()
-    "Start an interactive Grok Build agent shell."
-    (interactive)
+  (defun agent-shell-xai-start-grok (&optional new-shell)
+    "Start or reuse a Grok Build agent shell.
+With prefix arg NEW-SHELL, always open a new shell buffer.
+Session choice (new vs resume) is controlled by
+`agent-shell-session-strategy' (default `prompt' = pick like TUI /resume)."
+    (interactive "P")
     (require 'shell-maker)
     (require 'acp)
     (require 'agent-shell)
     (agent-shell--dwim :config (agent-shell-xai-make-grok-config)
-                       :new-shell t))
+                       :new-shell (and new-shell t)))
+
+  (defun +agent-shell-resume-grok ()
+    "Resume a Grok session by ID (Emacs stand-in for TUI `/resume').
+Lists sessions via `grok sessions list', then starts agent-shell with
+ACP session/load|resume for the chosen id."
+    (interactive)
+    (require 'agent-shell)
+    (+agent-shell-ensure-grok-on-path)
+    (unless (executable-find "grok")
+      (user-error "Cannot find `grok' on PATH"))
+    (let* ((default-directory (or (when-let* ((p (project-current)))
+                                    (project-root p))
+                                  default-directory))
+           (raw (shell-command-to-string "grok sessions list --limit 40 2>/dev/null"))
+           (lines (seq-filter
+                   (lambda (l)
+                     (and (not (string-empty-p l))
+                          (not (string-match-p "\\`SESSION ID" l))
+                          (not (string-match-p "\\`[- ]*$" l))
+                          (string-match-p
+                           "\\`[0-9a-f]\\{8\\}-[0-9a-f]\\{4\\}-" l)))
+                   (split-string raw "\n" t)))
+           (choice (if lines
+                       (completing-read "Resume Grok session: " lines nil t)
+                     (user-error "No Grok sessions found for this directory (try TUI `grok' first)")))
+           (session-id (car (split-string choice))))
+      (agent-shell-resume-session session-id)))
 
   (defalias '+agent-shell-start-grok #'agent-shell-xai-start-grok)
 
   :init
   (+agent-shell-ensure-grok-on-path)
-  ;; 普通右分窗，不要用 side-window。
-  ;; side-window 下 C-x 1 / delete-other-windows 会报
-  ;; "Cannot make side window the only window"，且容易删不掉主窗。
+  ;; 普通右分窗。必须把 agent-shell-mode 从 popper reference 列表移除
+  ;; （见 init-window.el），否则 popper 的 display-buffer-alist 会抢在
+  ;; agent-shell-display-action 之前，把 Grok 钉到底部弹窗。
   (setq agent-shell-display-action
         '((display-buffer-reuse-window
            display-buffer-in-direction)
           (direction . right)
           (window-width . 0.42)))
-  ;; C-c C-c 默认是 interrupt（打断当前 turn），不是关闭会话。
-  (setq agent-shell-confirm-interrupt nil)
+  ;; C-c C-c = interrupt 当前 turn（不是关窗口）。必须确认，否则误触会
+  ;; 让长任务以 stop_reason=cancelled 中途结束（会话日志已复现）。
+  (setq agent-shell-confirm-interrupt t)
+  ;; TUI `/resume' 等价：启动时选历史会话 / 新建（非 TUI 全屏 picker）。
+  (setq agent-shell-session-strategy 'prompt
+        agent-shell-session-restore-verbosity 'last)
 
   :config
   (+agent-shell-ensure-grok-on-path)
@@ -277,10 +313,63 @@ Docs: https://docs.x.ai/build/overview"))
   ;; Enable @file and /slash completion (ACP availableCommands).
   (setq agent-shell-file-completion-enabled t)
 
+  ;; agent-shell 上游 stop-reason 表没有 rate_limit；免费额度耗尽时 UI 只显示
+  ;; "Stop for unknown reason: rate_limit"，看起来像“跑到一半自己停了”。
+  ;; 证据：~/.grok/sessions/.../updates.jsonl 中 stop_reason=rate_limit 且
+  ;; retry_state.reason 含 free-usage-exhausted。
+  (defadvice! +agent-shell-stop-reason-description-a (stop-reason)
+    "Describe ACP stop reasons that upstream omits (e.g. rate_limit)."
+    :override #'agent-shell--stop-reason-description
+    (pcase stop-reason
+      ("end_turn" "Finished")
+      ("max_tokens" "Max token limit reached")
+      ("max_turn_requests" "Exceeded request limit")
+      ("refusal" "Refused")
+      ("cancelled" "Cancelled (C-c C-c interrupts the turn; use C-c C-q to close)")
+      ("rate_limit" "Rate limited / free usage exhausted — wait for quota reset or upgrade")
+      (_ (format "Stop for unknown reason: %s" stop-reason))))
+
+  ;; Grok emits retry_state on method `_x.ai/session/update` (not standard
+  ;; `session/update`). Upstream agent-shell only handles `session/update`,
+  ;; so 429 / free-usage messages were silently dropped.
+  (defadvice! +agent-shell-handle-retry-state-a (fn &rest args)
+    "Render Grok `retry_state' ACP notifications in the shell buffer."
+    :around #'agent-shell--on-notification
+    (let* ((state (plist-get args :state))
+           (notif (plist-get args :acp-notification))
+           (method (and notif (map-elt notif 'method)))
+           (update (and notif (map-nested-elt notif '(params update))))
+           (kind (and (listp update) (map-elt update 'sessionUpdate))))
+      (if (not (and state
+                    (member method '("session/update" "_x.ai/session/update"))
+                    (equal kind "retry_state")))
+          (apply fn args)
+        (let ((reason (or (map-elt update 'reason)
+                          (map-elt update 'message)
+                          ""))
+              (rtype (or (map-elt update 'type) "retry")))
+          (agent-shell--update-fragment
+           :state state
+           :block-id (format "retry-state-%s-%s"
+                             (or (map-elt state :request-count) 0)
+                             rtype)
+           :label-left (propertize
+                        (pcase rtype
+                          ("retrying" "Retrying after API error")
+                          ("exhausted" "API quota exhausted")
+                          (_ (format "API retry (%s)" rtype)))
+                        'font-lock-face 'agent-shell-section-heading)
+           :body (string-trim (format "%s" reason))
+           :create-new t
+           :expanded t)))))
+
   (defun +agent-shell-quit (&optional kill)
     "Bury the agent-shell window, or with prefix KILL the session buffer.
-`C-c C-c' only interrupts an in-flight turn; use this (or `C-c C-q')
-to dismiss/close the Grok session."
+
+Key bindings (Grok / agent-shell buffer):
+  C-c C-c  interrupt current turn (asks for confirmation)
+  C-c C-q  bury window (session process stays alive)
+  C-u C-c C-q  kill buffer and session process"
     (interactive "P")
     (unless (derived-mode-p 'agent-shell-mode)
       (user-error "Not in an agent-shell buffer"))
@@ -293,7 +382,9 @@ to dismiss/close the Grok session."
       (quit-window nil (selected-window))))
 
   ;; 关闭会话：C-c C-q bury；C-u C-c C-q 杀掉 buffer/进程。
+  ;; 恢复会话（替代 TUI /resume）：C-c M-g 或在 shell 内 C-c C-r。
   (keymap-set agent-shell-mode-map "C-c C-q" #'+agent-shell-quit)
+  (keymap-set agent-shell-mode-map "C-c C-r" #'+agent-shell-resume-grok)
   ;; 避免 zoom 对 agent 窗反复 resize 触发奇怪的 window 错误。
   (with-eval-after-load 'zoom
     (cl-pushnew 'agent-shell-mode zoom-ignored-major-modes)))

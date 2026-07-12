@@ -109,7 +109,10 @@
           "^\\*shell.*\\*.*$"  shell-mode
           "^\\*terminal.*\\*.*$" term-mode
           "^\\*eldoc.*\\*.*$" eldoc-mode
-          agent-shell-mode
+          ;; NOT agent-shell-mode: Grok sessions are long-lived right panes
+          ;; (see agent-shell-display-action in init-ai.el).  Treating them as
+          ;; popper popups forces bottom placement, lets C-g close the session
+          ;; via +popper-close-window-hack, and fights agent-shell's own layout.
 
           "\\*package update results\\*$" "\\*Package-Lint\\*$"
           "\\*[Wo]*Man.*\\*$"
