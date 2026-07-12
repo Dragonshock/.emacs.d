@@ -92,7 +92,6 @@
   :hook (after-init . minibuffer-depth-indicate-mode))
 ;; Keep the cursor out of the read-only portions of the minibuffer
 (setq minibuffer-prompt-properties '(read-only t
-                                               intangible t
                                                cursor-intangible t
                                                face minibuffer-prompt))
 (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)

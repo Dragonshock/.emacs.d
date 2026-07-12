@@ -17,10 +17,6 @@
   (setq chirp-show-avatars nil
         chirp-show-tweet-media nil))
 
-(with-eval-after-load "eglot"
-  (push '(verilog-mode . ("/Users/roifewu/code/vide/target/debug/vide")) eglot-server-programs)
-  )
-
 (setq eglot-x-enable-snippet-text-edit nil)
 
 (defun cargo-xtask-install-server ()

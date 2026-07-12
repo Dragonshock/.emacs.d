@@ -158,3 +158,142 @@
   ;; 启用内置 Emacs MCP 工具(xref-find-references / xref-find-apropos /
   ;; treesit-info / imenu-list-symbols / project-info)暴露给 Claude。
   (claude-code-ide-emacs-tools-setup))
+
+
+;; ── agent-shell + Grok Build (ACP, 无 TUI) ─────────────────────────
+;;
+;; Grok Build 官方支持 `grok agent stdio`（Agent Client Protocol）。
+;; agent-shell 用原生 Emacs buffer 驱动 agent，不走 Ghostel/终端 TUI。
+;; 与 claude-code-ide（Ghostel+MCP）/ codex-ide（app-server）并存：
+;;   C-c C-'  Claude Code IDE
+;;   C-c C-;  Codex IDE（session buffer 内）
+;;   C-c C-g  打开 Grok Build (agent-shell)
+;;   在 Grok buffer 内：
+;;     C-c C-c  中断当前 turn（不是关闭窗口）
+;;     C-c C-q  关闭/bury 窗口；C-u C-c C-q 杀掉会话 buffer
+;;
+;; 上游尚无一等 `agent-shell-xai.el`（issue #708）；这里用与 Kiro 同模式的
+;; 自定义 agent config，待官方模块合并后可删本地 wrapper。
+;; Dependencies of agent-shell (MELPA). Declared explicitly so straight
+;; installs them even before agent-shell is first required.
+(use-package shell-maker
+  :straight t)
+
+(use-package acp
+  :straight t)
+
+(use-package agent-shell
+  :straight t
+  :commands (agent-shell
+             agent-shell-xai-start-grok
+             +agent-shell-start-grok)
+  :bind (("C-c C-g" . +agent-shell-start-grok))
+  :preface
+  (defconst +agent-shell-grok-bin-dir
+    (expand-file-name "~/.grok/bin")
+    "Directory where the Grok Build installer places the `grok' binary.")
+
+  (defun +agent-shell-ensure-grok-on-path ()
+    "Ensure `~/.grok/bin' is on `exec-path' and process PATH."
+    (when (file-directory-p +agent-shell-grok-bin-dir)
+      (add-to-list 'exec-path +agent-shell-grok-bin-dir)
+      (let ((path (getenv "PATH")))
+        (unless (and path (string-match-p (regexp-quote +agent-shell-grok-bin-dir) path))
+          (setenv "PATH" (concat +agent-shell-grok-bin-dir path-separator (or path "")))))))
+
+  (defvar agent-shell-xai-grok-acp-command
+    '("grok" "agent" "-m" "grok-4.5" "stdio")
+    "Command and args for Grok Build ACP.
+Examples:
+  (\"grok\" \"agent\" \"stdio\")
+  (\"grok\" \"agent\" \"-m\" \"grok-4.5\" \"stdio\")
+  (\"grok\" \"agent\" \"--always-approve\" \"stdio\")")
+
+  (defvar agent-shell-xai-grok-environment nil
+    "Extra environment for the Grok ACP process.
+Prefer `agent-shell-make-environment-variables' with `:inherit-env t'.")
+
+  (defun agent-shell-xai-make-grok-config ()
+    "Create a Grok Build agent configuration for `agent-shell'."
+    (agent-shell-make-agent-config
+     :identifier 'grok-build
+     :mode-line-name "Grok"
+     :buffer-name "Grok"
+     :shell-prompt "Grok> "
+     :shell-prompt-regexp "Grok> "
+     :client-maker
+     (lambda (buffer)
+       (+agent-shell-ensure-grok-on-path)
+       (unless (executable-find (car agent-shell-xai-grok-acp-command))
+         (user-error
+          "Cannot find `grok' on PATH. Install Grok Build CLI and ensure ~/.grok/bin is available (see https://docs.x.ai)"))
+       (agent-shell--make-acp-client
+        :command (car agent-shell-xai-grok-acp-command)
+        :command-params (cdr agent-shell-xai-grok-acp-command)
+        :environment-variables
+        (or agent-shell-xai-grok-environment
+            (agent-shell-make-environment-variables :inherit-env t))
+        :context-buffer buffer))
+     :install-instructions
+     "Install Grok Build: curl -fsSL https://x.ai/cli/install.sh | bash
+Ensure `grok' is on PATH (typically ~/.grok/bin). Run `grok login' once, or set XAI_API_KEY.
+Docs: https://docs.x.ai/build/overview"))
+
+  (defun agent-shell-xai-start-grok ()
+    "Start an interactive Grok Build agent shell."
+    (interactive)
+    (require 'shell-maker)
+    (require 'acp)
+    (require 'agent-shell)
+    (agent-shell--dwim :config (agent-shell-xai-make-grok-config)
+                       :new-shell t))
+
+  (defalias '+agent-shell-start-grok #'agent-shell-xai-start-grok)
+
+  :init
+  (+agent-shell-ensure-grok-on-path)
+  ;; 普通右分窗，不要用 side-window。
+  ;; side-window 下 C-x 1 / delete-other-windows 会报
+  ;; "Cannot make side window the only window"，且容易删不掉主窗。
+  (setq agent-shell-display-action
+        '((display-buffer-reuse-window
+           display-buffer-in-direction)
+          (direction . right)
+          (window-width . 0.42)))
+  ;; C-c C-c 默认是 interrupt（打断当前 turn），不是关闭会话。
+  (setq agent-shell-confirm-interrupt nil)
+
+  :config
+  (+agent-shell-ensure-grok-on-path)
+
+  ;; Register Grok among known agents (upstream has no first-class module yet).
+  (add-to-list 'agent-shell-agent-configs
+               (agent-shell-xai-make-grok-config)
+               t)
+
+  ;; Always use Grok for `M-x agent-shell' (no agent picker).
+  (setq agent-shell-preferred-agent-config 'grok-build)
+
+  ;; Enable @file and /slash completion (ACP availableCommands).
+  (setq agent-shell-file-completion-enabled t)
+
+  (defun +agent-shell-quit (&optional kill)
+    "Bury the agent-shell window, or with prefix KILL the session buffer.
+`C-c C-c' only interrupts an in-flight turn; use this (or `C-c C-q')
+to dismiss/close the Grok session."
+    (interactive "P")
+    (unless (derived-mode-p 'agent-shell-mode)
+      (user-error "Not in an agent-shell buffer"))
+    (if kill
+        (let ((buf (current-buffer)))
+          (when-let* ((win (get-buffer-window buf)))
+            (quit-window t win))
+          (when (buffer-live-p buf)
+            (kill-buffer buf)))
+      (quit-window nil (selected-window))))
+
+  ;; 关闭会话：C-c C-q bury；C-u C-c C-q 杀掉 buffer/进程。
+  (keymap-set agent-shell-mode-map "C-c C-q" #'+agent-shell-quit)
+  ;; 避免 zoom 对 agent 窗反复 resize 触发奇怪的 window 错误。
+  (with-eval-after-load 'zoom
+    (cl-pushnew 'agent-shell-mode zoom-ignored-major-modes)))

@@ -132,7 +132,11 @@
       ,(or +mode-line-project-crumb
            `(:propertize "%b" face ,meta-face))
       " "
-      (:eval (breadcrumb-imenu-crumbs))
+      ;; Guard: breadcrumb-imenu-crumbs throws args-out-of-range in
+      ;; special buffers (agent-shell, comint, etc.) during redisplay.
+      (:eval (when (or buffer-file-name
+                       (derived-mode-p 'prog-mode 'text-mode 'org-mode 'conf-mode))
+               (ignore-errors (breadcrumb-imenu-crumbs))))
       (:propertize +mode-line-remote-host-name
                    face +mode-line-host-name-active-face)
       " "

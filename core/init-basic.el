@@ -28,7 +28,8 @@
  ;; Will improve long line display performance
  bidi-inhibit-bpa t
  bidi-paragraph-direction 'left-to-right
- bidi-display-reordering 'left-to-right
+ ;; boolean: non-nil enables reordering (do not use a direction symbol here)
+ bidi-display-reordering t
 
  ;; smaller threshold to improve long line performance
  long-line-threshold 1000

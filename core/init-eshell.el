@@ -271,48 +271,5 @@ If no project is found, create a temporary Eshell instance in the current direct
             (all-completions "" (pcomplete-completions))))))
 
 
-(use-package ghostel
-  :straight t
-  :preface
-  (defun +ghostel-send-C-k-and-kill ()
-    "Send `C-k' to ghostel.
-Like normal Emacs `C-k'.  Kill to end of line and put content in kill-ring."
-    (interactive)
-    (kill-ring-save (point) (line-end-position))
-    (ghostel-send-key "k" "ctrl"))
-
-  :bind (("C-x m" . ghostel)
-         :map ghostel-semi-char-mode-map
-         ("C-k"  . +ghostel-send-C-k-and-kill)
-         ;; ;; I'm used to go up/down the shell history with M-n/p from eshell
-         ;; ;; Simulate this behavior in ghostel by sending C-p and C-n
-         ("M-p" . (lambda () (interactive) (ghostel-send-key "p" "ctrl")))
-         ("M-n" . (lambda () (interactive) (ghostel-send-key "n" "ctrl")))
-         :map project-prefix-map
-         ("m" . ghostel-project)
-         ("M" . ghostel-project-list-buffers))
-  :init
-  (setq ghostel-module-directory
-        (expand-file-name "ghostel/" user-emacs-directory)
-        ghostel-module-auto-install 'download
-        ghostel-enable-osc52 t)
-
-  :config
-  (defadvice! +ghostel-project-popup-buffer-name (_orig root)
-    :around 'ghostel--project-buffer-name
-    "Name `ghostel-project' buffers as Popper popup buffers for ROOT."
-    (let* ((project-name (file-name-nondirectory
-                          (directory-file-name root)))
-           (remote (file-remote-p root))
-           (remote-suffix (when remote
-                            (format "@%s" (string-trim remote "/" ":")))))
-      (format "Ghostel-popup: %s%s" project-name (or remote-suffix ""))))
-
-  (add-to-list 'project-switch-commands '(ghostel-project "Ghostel") t)
-  (add-to-list 'project-switch-commands '(ghostel-project-list-buffers "Ghostel buffers") t)
-  (add-to-list 'ghostel-eval-cmds '("magit-status-setup-buffer" magit-status-setup-buffer)))
-
-
-(use-package ghostel-eshell
-  :straight nil
-  :hook (eshell-load . ghostel-eshell-visual-command-mode))
+;; Ghostel lives in `init-ghostel.el` (loaded earlier). Eshell still uses
+;; `ghostel-project` from `+eshell-toggle' with a prefix argument.

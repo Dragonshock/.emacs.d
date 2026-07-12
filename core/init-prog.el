@@ -25,12 +25,8 @@
           (with-silent-modifications
             (comint-truncate-buffer))))))
 
-  (add-hook! compilation-filter-hook
-    (defun +compilation--colorize-h ()
-      "Apply ANSI color codes to the compilation buffer."
-      (require 'ansi-color)
-      (let ((inhibit-read-only t))
-        (ansi-color-apply-on-region compilation-filter-start (point)))))
+  ;; Emacs hand-rolled ansi-color-apply-on-region (Emacs 28+).
+  (add-hook 'compilation-filter-hook #'ansi-color-compilation-filter)
   )
 
 
@@ -63,7 +59,7 @@
   :preface
   (defconst +eglot-auto-start-modes
     '(c-mode c++-mode rust-mode python-mode java-mode
-             c-ts-mode c++-ts-mode rust-ts-mode python-ts-mode)
+             c-ts-mode c++-ts-mode rust-ts-mode python-ts-mode java-ts-mode)
     "Major modes where Eglot should start automatically.")
   :init
   (dolist (mode +eglot-auto-start-modes)
@@ -76,14 +72,13 @@
   :config
   (setq eglot-events-buffer-config '(:size 0 :format full)
         eglot-autoshutdown t
+        eglot-extend-to-xref t
         ;; eglot-report-progress 'messages
         eglot-documentation-renderer 'markdown-ts-view-mode
         eglot-code-action-indications nil)
 
-  ;; eglot has it's own strategy by default
-  (setq-local eldoc-documentation-strategy 'eldoc-documentation-compose-eagerly)
   (setq-default eglot-workspace-configuration
-                '((:pyls . (:plugins (:jedi_completion (:fuzzy t))))
+                '((:pylsp . (:plugins (:jedi_completion (:fuzzy t))))
                   (:rust-analyzer . (:cargo (:allFeatures t :allTargets t :features "full")
                                             :checkOnSave :json-false
                                             :completion (:termSearch (:enable t)
@@ -122,12 +117,14 @@
                                         (md5 (expand-file-name project-root))))))
       `("env" ,(concat "JAVA_HOME=" jdtls-java-home)
         "jdtls" "--jvm-arg=-Xmx16G" "-data" ,data-dir)))
-  (push '(java-mode . jdtls-command-contact) eglot-server-programs)
+  (push '((java-mode java-ts-mode) . jdtls-command-contact) eglot-server-programs)
 
-  ;; we call eldoc manually
   (add-hook! eglot-managed-mode-hook
-    (defun +eglot-disable-eldoc-mode ()
+    (defun +eglot-setup-managed-buffer ()
+      "Per-buffer Eglot setup: eldoc strategy; we call eldoc manually."
       (when (eglot-managed-p)
+        (setq-local eldoc-documentation-strategy
+                    'eldoc-documentation-compose-eagerly)
         (eldoc-mode -1))))
   )
 
@@ -153,7 +150,6 @@
   (setq eldoc-echo-area-display-truncation-message t
         eldoc-echo-area-prefer-doc-buffer t
         eldoc-echo-area-use-multiline-p nil
-        eglot-extend-to-xref t
         eldoc-help-at-pt t))
 
 

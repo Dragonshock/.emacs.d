@@ -65,7 +65,8 @@
      ;; Ensure $ works with Consult commands, which add disambiguation suffixes
      ((string-suffix-p "$" pattern) `(orderless-regexp . ,(concat (substring pattern 0 -1) "[\x200000-\x300000]*$")))
      ((string= "!" pattern) `(orderless-literal . ""))
-     ((string-prefix-p "!" pattern) `(orderless-without-literal . ,(substring pattern 1)))
+     ;; Prefer orderless-not (README); without-literal is narrower.
+     ((string-prefix-p "!" pattern) `(orderless-not . ,(substring pattern 1)))
      ((string-prefix-p "%" pattern) `(char-fold-to-regexp . ,(substring pattern 1)))
      ((string-suffix-p "%" pattern) `(char-fold-to-regexp . ,(substring pattern 0 -1)))
      ((string-prefix-p "^" pattern) `(orderless-literal-prefix . ,(substring pattern 1)))
@@ -212,8 +213,15 @@
 
 (use-package corfu
   :straight (:files (:defaults "extensions/*.el"))
-  :hook (((prog-mode conf-mode yaml-mode shell-mode eshell-mode text-mode codex-ide-session-mode) . corfu-mode)
+  :hook (((prog-mode conf-mode yaml-mode shell-mode eshell-mode text-mode
+                     codex-ide-session-mode agent-shell-mode)
+          . corfu-mode)
          ((eshell-mode shell-mode) . (lambda () (setq-local corfu-auto nil)))
+         ;; agent-shell: auto after 1 char so `/` and `@` completion pops quickly
+         (agent-shell-mode . (lambda ()
+                               (setq-local corfu-auto t
+                                           corfu-auto-prefix 1
+                                           corfu-auto-delay 0.05)))
          (minibuffer-setup . +corfu-enable-in-minibuffer))
   :bind (:map corfu-map
               ("TAB" . corfu-complete)

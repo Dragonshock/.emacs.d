@@ -121,7 +121,9 @@
                                   (project-dired "Dired")
                                   (project-eshell "Eshell")
                                   (project-search "Search")
-                                  (magit-status "Magit")))
+                                  (magit-status "Magit")
+                                  (ghostel-project "Ghostel")
+                                  (ghostel-project-list-buffers "Ghostel buffers")))
 
   )
 

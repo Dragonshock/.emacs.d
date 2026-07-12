@@ -108,8 +108,8 @@
           "^Eshell-popup: .*$" eshell-mode
           "^\\*shell.*\\*.*$"  shell-mode
           "^\\*terminal.*\\*.*$" term-mode
-          "^\\*vterm.*\\*.*$"  vterm-mode
           "^\\*eldoc.*\\*.*$" eldoc-mode
+          agent-shell-mode
 
           "\\*package update results\\*$" "\\*Package-Lint\\*$"
           "\\*[Wo]*Man.*\\*$"
@@ -198,7 +198,8 @@
   :straight t
   :hook (window-setup . zoom-mode)
   :config
-  (setq zoom-ignored-major-modes '(ediff-mode vundo-mode minibuffer-mode speedbar-mode))
+  (setq zoom-ignored-major-modes
+        '(ediff-mode vundo-mode minibuffer-mode speedbar-mode agent-shell-mode))
 
   (defun +zoom-fix-window-size-h ()
     (setq-local window-size-fixed t))

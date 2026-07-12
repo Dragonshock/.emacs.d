@@ -1,180 +1,397 @@
-## Prerequisite
+# .emacs.d
 
-- Font
-  + `MonoLisaCode` / `MonoLisaText` (primary)
-  + `LXGW WenKai Mono Screen` (CJK)
-  + `Apple Color Emoji` / `Noto Color Emoji` (emoji)
-- `rg`
-- `fd`
-- `aspell`
-- `readability-cli`
-- `difft` (difftastic, structural diff)
+<p align="center">
+  <strong>Dragonshock's personal Emacs configuration</strong><br/>
+  modular · straight.el · use-package · Emacs 31
+</p>
 
-## Overview
+<p align="center">
+  <a href="https://www.gnu.org/software/emacs/"><img src="https://img.shields.io/badge/Emacs-31-7F5AB6?style=flat-square&logo=gnuemacs&logoColor=white" alt="Emacs 31"></a>
+  <a href="https://github.com/radian-software/straight.el"><img src="https://img.shields.io/badge/packages-straight.el-2ea44f?style=flat-square" alt="straight.el"></a>
+  <a href="https://github.com/jwiegley/use-package"><img src="https://img.shields.io/badge/config-use--package-blue?style=flat-square" alt="use-package"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey?style=flat-square" alt="Platform">
+  <img src="https://img.shields.io/badge/license-personal-orange?style=flat-square" alt="License">
+</p>
 
-This is a personal Emacs configuration (`~/.emacs.d`) using `straight.el` for package management and `use-package` for declarative package configuration. All init files use `lexical-binding: t`. Platform: macOS (Darwin) primary; Linux secondary.
+一套面向 **Emacs 31** 的模块化个人配置：启动优化、现代化补全、Tree-sitter + Eglot、Ghostel 终端，以及 gptel / Claude Code / Codex 等 AI 工作流。主平台为 **macOS**，Linux 为次要支持。
+
+> 本仓库 fork / 演进自 [roife/.emacs.d](https://github.com/roife/.emacs.d)，并持续按个人工作流定制。
+
+---
+
+## Highlights
+
+| | |
+|---|---|
+| **启动** | `early-init` GC / 帧参数 / native-comp；模块按序加载；启动耗时打印到 `*Messages*` |
+| **补全** | Vertico + Orderless + Marginalia + Consult + Embark + Corfu + Cape + Tempel |
+| **编辑** | Eglot (+ booster)、Flymake、Tree-sitter、Citre、Puni、Expreg、Dogears |
+| **终端** | [Ghostel](https://github.com/roife/ghostel)（Ghostty VT 引擎）+ compile / comint / eshell 集成 |
+| **VCS** | Magit · Forge · diff-hl · consult-gh · Difftastic |
+| **AI** | gptel (DeepSeek) · gptel-magit · Claude Code IDE · Codex IDE |
+| **写作** | Org (modern / appear / valign) · AUCTeX · markdown-ts · Scheme / Geiser |
+
+---
+
+## Table of contents
+
+- [Screenshots](#screenshots)
+- [Requirements](#requirements)
+- [Install](#install)
+- [Layout](#layout)
+- [Startup flow](#startup-flow)
+- [Keybindings](#keybindings)
+- [Feature map](#feature-map)
+- [Conventions](#conventions)
+- [Customize](#customize)
+- [Notes](#notes)
+
+---
+
+## Screenshots
+
+> 欢迎自行截图后放到 `docs/screenshots/` 并在此引用。当前仓库未附带预览图。
+
+```text
+docs/screenshots/
+├── dark.png      # doric-valley
+└── light.png     # doric-beach
+```
+
+---
+
+## Requirements
+
+### Emacs
+
+- **Emacs 31+**（开发测试版本：`31.0.90` / emacs-plus）
+- 推荐启用 native-comp
+
+### Fonts
+
+| Role | Family |
+|------|--------|
+| Default / fixed | **MonoLisaCode** |
+| Variable pitch | **MonoLisaText** |
+| CJK | **LXGW WenKai Mono Screen** |
+| Emoji (macOS) | **Apple Color Emoji** (rescale `0.79`) |
+| Emoji (other) | **Noto Color Emoji** |
+
+### CLI tools
+
+| Tool | Used for |
+|------|----------|
+| [`rg`](https://github.com/BurntSushi/ripgrep) | search / xref |
+| [`fd`](https://github.com/sharkdp/fd) | file find / dired |
+| `aspell` | spell-check |
+| [`difft`](https://github.com/Wilfred/difftastic) | structural diff in Magit |
+| `readability-cli` | cleaner EWW pages |
+| `zstd` *(optional)* | undo-fu-session compression |
+| `gls` *(optional, macOS)* | GNU `ls` for dired |
+| `tdlib` *(optional)* | telega |
+| C toolchain *(first install)* | `emacs-reader` native module |
+
+```bash
+# macOS (Homebrew) example
+brew install emacs-plus@31 ripgrep fd aspell difftastic zstd coreutils
+# optional
+brew install tdlib
+```
+
+### Theme path
+
+主题使用 [doric-themes](https://github.com/protesilaos/doric-themes)，当前通过本地路径加载：
+
+```elisp
+:load-path "/Users/dragon/code/doric-themes"
+```
+
+克隆本配置后请改成你自己的路径，或改回 straight 安装。
+
+默认明暗主题：
+
+| Appearance | Theme |
+|------------|--------|
+| Light | `doric-beach` |
+| Dark | `doric-valley` |
+
+macOS 下会跟随 `ns-system-appearance` 自动切换。
+
+---
+
+## Install
+
+```bash
+# Backup any existing config
+mv ~/.emacs.d ~/.emacs.d.bak 2>/dev/null
+
+git clone https://github.com/Dragonshock/.emacs.d.git ~/.emacs.d
+```
+
+1. 安装上方字体与 CLI 依赖  
+2. 修改 `core/init-ui.el` 中的 `doric-themes` `:load-path`（或改用 straight）  
+3. 首次启动 Emacs：`straight.el` 会自动 bootstrap 并拉取包（可能较久）  
+4. 需要 AI 时，在 `auth-source`（如 `~/.authinfo.gpg`）配置 DeepSeek / 相关 API key  
+
+```text
+machine api.deepseek.com login apikey password sk-...
+```
+
+---
+
+## Layout
+
+```text
+.emacs.d/
+├── early-init.el      # 启动前：GC、帧、package.el、闪屏抑制
+├── init.el            # +init-files 注册表 + 按序 load-file
+├── core/              # 全部业务模块（init-*.el）
+│   ├── init-util.el   # add-hook! / defadvice! 等宏
+│   ├── init-straight.el
+│   ├── init-basic.el
+│   ├── init-ui.el
+│   ├── init-ghostel.el
+│   ├── init-completion.el
+│   ├── init-prog.el
+│   ├── init-ai.el
+│   └── ...
+├── tempel-templates   # Tempel 模板
+└── scripts/           # 辅助脚本（如 telega tdlib）
+```
+
+模块顺序由 `init.el` 中的 **`+init-files`** 唯一决定（后加载可依赖先加载）。
+
+| Module | Responsibility |
+|--------|----------------|
+| `init-util` | 自定义宏 |
+| `init-straight` | straight + use-package 默认值 |
+| `init-basic` | 文件/备份/滚动/TRAMP/GCMH/history |
+| `init-ui` | 字体、主题、ligature、scrollview |
+| `init-xterm` | TTY / Kitty graphics / kkp |
+| `init-ghostel` | 终端模拟器 |
+| `init-mac` | macOS 专用（系统外观、词典） |
+| `init-completion` | Vertico / Corfu / Consult / Embark … |
+| `init-tools` | project、undo、isearch、avy … |
+| `init-keybinding` | Super 键、中文标点翻译 |
+| `init-highlight` | 括号、TODO、pulse、symbol-overlay |
+| `init-edit` | 编辑增强、electric-pair、embrace |
+| `init-window` | ace-window、popper、zoom |
+| `init-dired` | dired 全家桶 |
+| `init-eshell` | Eshell 增强 |
+| `init-prog` | LSP / treesit / 语言模式 |
+| `init-scheme` | Geiser |
+| `init-writing` | Markdown / AUCTeX |
+| `init-org` | Org 外观与导出 |
+| `init-vcs` | Magit / Forge / diff-hl |
+| `init-ai` | gptel / Claude / Codex |
+| `init-chat` | telega |
+| `init-pdf` | emacs-reader |
+| `init-elfeed` | RSS |
+| `init-test` | 个人实验 / rust-analyzer 辅助（**不是**单元测试） |
+
+注释掉的模块：`init-ime`、`init-modal`。
+
+---
 
 ## Startup flow
 
-1. **`early-init.el`** — Runs before the UI initializes. Raises GC threshold to `most-positive-fixnum`, enables native-comp JIT, defers `package.el`, temporarily nulls `file-name-handler-alist` (restored on `emacs-startup-hook`), suppresses startup flashing (via `inhibit-redisplay`/`inhibit-message`, cleared on `window-setup-hook`), sets frame defaults in `default-frame-alist` (160×60, tab-bar on, no menu/tool/scroll bars, `ns-transparent-titlebar` on macOS), and silences `load-file` during init via temporary `define-advice`.
-2. **`init.el`** — Defines `+init-files`, an ordered list of init modules, then loads each from `core/` via `load-file`. `init-mac` is wrapped in `(when (eq system-type 'darwin) ...)`. This list is the **canonical registry** of all modules.
-3. **`core/init-util.el`** (first in load order) — Defines custom macros (`add-hook!`, `defadvice!`, etc.) used by every other module. Always loaded before anything else.
-4. **`core/init-straight.el`** (second) — Bootstraps `straight.el` and configures `use-package` defaults: `use-package-always-defer` is `t` in interactive sessions, `use-package-always-demand` is `t` for daemon frames. Must load before any file that uses `use-package`.
-5. Remaining `core/init-*.el` loaded in `+init-files` order. Later files depend on earlier ones — load order is load-bearing (e.g. `init-ui` defines `+load-theme` before `init-mac` hooks it into `ns-system-appearance-change-functions`).
+```mermaid
+flowchart TD
+  A[early-init.el] --> B[init.el]
+  B --> C[core/init-util]
+  C --> D[core/init-straight]
+  D --> E[core modules in +init-files order]
+  E --> F[window-setup-hook timings]
+```
 
-### The `+init-files` list (canonical, in order)
+1. **`early-init.el`** — 提高 GC 阈值、native-comp、关闭 package.el 启动初始化、设置 `default-frame-alist`（160×60、tab-bar、无 menu/tool/scroll bar）、抑制启动闪烁  
+2. **`init.el`** — 按 `+init-files` `load-file` 每个模块  
+3. **交互会话** — `use-package-always-defer` 为 `t`（延迟加载）；daemon 下 `use-package-always-demand` 为 `t`  
 
-`init-util`, `init-straight`, `init-basic`, `init-ui`, `init-xterm`, `init-ghostel`, `init-mac` (Darwin only), `init-completion`, `init-tools`, `init-keybinding`, `init-highlight`, `init-edit`, `init-spell`, `init-window`, `init-dired`, `init-eshell`, `init-prog`, `init-scheme`, `init-writing`, `init-org`, `init-vcs`, `init-browser`, `init-ibuffer`, `init-dict`, `init-modeline`, `init-tabbar`, `init-ai`, `init-chat`, `init-pdf`, `init-test`.
+启动后在 `*Messages*` 可见类似：
 
-Commented out: `init-ime`, `init-modal`.
+```text
+window-setup: x.xxxs, after-init: y.yyys
+```
 
-Note: `init-elfeed` is loaded last in `+init-files` (not commented out) despite the `.elc` being present on disk.
-
-**Note:** Despite the name, `init-test.el` is **not** a test suite and **is loaded** — it contains JDTLS (Java LSP) contact config, extra `eglot-server-programs` entries (verilog, java), and a `cargo-xtask-install-server` helper for rust-analyzer development. There is no test suite in this config (see "Verification" below). It loads **last** in `+init-files`.
-
-## Custom macros (defined in `core/init-util.el`)
-
-These are adapted from DOOM Emacs and used throughout:
-
-- **`add-hook!`** — Add N functions to M hooks with optional `:local`, `:append`, `:depth`, `:remove`, `:call-immediately`, `:unless-daemonp-call-immediately`. Functions can be inline `defun` forms.
-- **`defadvice!`** — Define a named function and `advice-add` it to specified places. Syntax: `(defadvice! NAME ARGLIST [WHERE PLACES...] BODY)` where WHERE is a keyword like `:around`/`:after`/`:before`.
-- **`+advice-pp-to-prin1!`** — Advise a function to temporarily replace `pp` with `prin1`, reducing cache file sizes (used for `saveplace`, `recentf`).
-- **`defun-call!`** — Define a function and optionally call it immediately with `:call-with ARGS`.
-- **`+temp-buffer-p`** — Returns t if a buffer's name starts with a space (Emacs convention for temp buffers). Used as a guard to prevent modes from activating in temp buffers.
-- **`+unfill-region`** — Inverse of `fill-region`: replaces newlines with spaces in the region.
-
-## Key conventions
-
-- **`+` prefix**: Custom/private functions use a `+` prefix (e.g. `+setup-fonts`, `+load-theme`, `+disable-frame-chrome`). This distinguishes project-defined functions from third-party ones.
-- **Advice naming**: Functions defined with `defadvice!` use a suffix indicating the advice type — `-a` for `:around`, `-h` for hook functions. Example: `+disable-autosave-notification-a`.
-- **`:unless-daemonp-call-immediately`**: Common `add-hook!` pattern — code runs immediately in interactive sessions but defers for daemon frames (where the frame may not exist yet). Used for font setup, theme loading, etc.
-- Paths are relative to `user-emacs-directory` (`.emacs.d/`).
-- Autosave files go to `autosaves/`, backup files to `backups/` (both gitignored).
-- The custom file is `custom.el` (gitignored, not the default location).
-- Lexical binding is declared on line 1 of every file via `;;; -*- lexical-binding: t -*-` or `;; -*- lexical-binding: t; -*-`.
-- Most packages use `:straight t`; built-in packages use `:straight nil` (or `:straight (:type built-in)`).
-- **`:straight nil` for sub-packages**: When a package ships extensions in subdirectories (vertico, corfu, ghostel), those extensions use `:straight nil` with `:after <parent>` — they're already installed by the parent package.
-- **`:straight (:host github :repo "user/repo")`**: For packages not on MELPA/ELPA, or forked packages.
-- **`with-eval-after-load` for cross-module integration**: When one package extends another that may not be loaded yet, use `with-eval-after-load` rather than a hard `:after` dependency. Used for savehist↔corfu, diff-hl↔magit, project↔ghostel.
-- **Local-path packages**: `doric-themes` is loaded from `/Users/dragon/Documents/Emacs` via `:load-path`, not from a package archive. (`gptel-magit` previously used a local `~/code/gptel-magit/` `:load-path` too, but is now straight-installed from GitHub `roife/gptel-magit`.)
-
-## Theme and UI (`core/init-ui.el`)
-
-- **Theme**: Uses `doric-themes` — `doric-fire` (dark) and `doric-tiger` (light). Loaded from a local path (`/Users/dragon/Documents/Emacs`), not straight.el. `:demand t`.
-- **Theme auto-detection**: On macOS, uses `ns-system-appearance` to detect dark/light mode. On other platforms, defaults to dark for GUI, and matches terminal `background-mode` for TTY. The `+load-theme` function is defined in `init-ui.el`.
-- **Theme auto-switching on macOS**: `init-mac.el` hooks into `ns-system-appearance-change-functions` to call `+load-theme` when system dark/light mode changes. This means `init-ui.el` must load before `init-mac.el`.
-- **Fonts**: Primary: `MonoLisaCode` (size 14 on macOS, 26 elsewhere); `MonoLisaText` for `variable-pitch`. CJK (`han`, `cjk-misc`): `LXGW WenKai Mono Screen`. Emoji: `Apple Color Emoji` (macOS, rescaled 0.79) or `Noto Color Emoji` (other platforms).
-- **UI features**: ligature-mode (in prog/markdown/org modes), scrollview (scroll progress in fringe, from `roife/scrollview.el`), window-divider-mode, pixelwise resize, custom fringe bitmaps.
-
-## Ghostel terminal emulator (`core/init-ghostel.el`)
-
-Ghostel replaces `ansi-term` as the primary terminal emulator. It uses Ghostty's Zig-based VT engine via a native dynamic module. By default, the native module auto-downloads a prebuilt binary (`ghostel-module-auto-install` = `'download`) — no build tools needed. Bound to `C-x m`; `ghostel-project` / `ghostel-project-list-buffers` are registered on `project-switch-commands` (after `project` loads).
-
-**Sub-packages** (loaded via `:straight nil` — they ship with the main `ghostel` package):
-- **`ghostel-compile`** — Routes `M-x compile` / `project-compile` output through Ghostel buffers instead of `*compilation*`. Enabled globally via `ghostel-compile-global-mode` on `after-init`.
-- **`ghostel-comint`** — Routes comint-based REPLs (`run-python`, `run-scheme`, `sql-*`) through Ghostel. Enabled globally on `after-init`.
-- **`ghostel-eshell`** — When a visual command (htop, less, vim) runs in Eshell, it transparently spawns a Ghostel buffer and returns to Eshell when the command exits. Hooked on `eshell-load`.
-
-**Input modes** (5 modes, toggled via `C-c` prefixes; see the file's commentary for the full table): `semi-char` (default, `C-c C-j`), `char` (`C-c M-d`, all keys to terminal), `emacs` (`C-c C-e`, read-only), `copy` (`C-c C-t`, frozen for selection), `line` (`C-c C-l`, local editing).
-
-**TRAMP integration**: When `default-directory` is a TRAMP path (`/ssh:host:/path/`), `M-x ghostel` starts a remote shell. `ghostel-tramp-shells` configures the shell per TRAMP method (ssh/scp use login-shell→bash fallback; docker/podman use `/bin/sh`). `ghostel-tramp-shell-integration` is scoped to `("ssh" "scp")`; `ghostel-ssh-install-terminfo` is `'auto` (follows integration setting).
-
-## AI integration (`core/init-ai.el`)
-
-All DeepSeek backends share one API key sourced from `auth-source` via `gptel-api-key-from-auth-source`.
-
-- **`gptel`** — LLM chat client. Two DeepSeek backends:
-  - `DeepSeek-thinking` (default `gptel-backend`, `:stream t`, `:request-params '(:thinking (:type "enabled"))`) — used for chat. Model: `deepseek-v4-flash` (the var `gptel-model`). Default chat format: `org-mode`. `gptel-confirm-tool-calls` is nil. Hooks: `gptel-auto-scroll` (post-stream), `gptel-end-of-response` (post-response).
-  - `+gptel-rewrite-translate-to-chinese` — translates the active region to Simplified Chinese via `gptel-rewrite`. Bound to `C-c r t` and `T` in `embark-region-map` (loads `gptel-rewrite` on demand).
-- **`gptel-agent`** — `:after gptel`, calls `gptel-agent-update` at config time.
-- **`gptel-quick`** — `karthink/gptel-quick`, `:after (gptel embark)`. One-line queries from `embark-general-map` (`?`). Separate `DeepSeek-quick` backend with thinking **disabled**, model `deepseek-v4-flash`, 500-word cap, Chinese "一句话不分行解释：" system message.
-- **`gptel-magit`** — AI-generated commit messages in Magit. Conventional Commits style (`gptel-magit-commit-prompt`), `gptel-magit-body-length` 72. Now straight-installed from GitHub `roife/gptel-magit` (the earlier local `~/code/gptel-magit/` recipe is gone). Installed on `magit-mode-hook`.
-- **`codex-ide`** — `dgillis/emacs-codex-ide`. `codex-ide-session-mode` is also referenced (as a major mode) in `init-completion.el` — corfu and cape enable in buffers of that mode (see the hook lists there).
-- **`claude-code-ide`** — `manzaltu/claude-code-ide.el`, `:after (ghostel project)`. Bridges Emacs ↔ Claude Code CLI via MCP so Claude sees current file/selection/xref/diagnostics; diffs open in `ediff`. Terminal backend is `ghostel` (uses this config's native module), laid out as a right side-window that doesn't steal focus. Bound to `C-c C-'` (`claude-code-ide-menu`). `claude-code-ide-enable-execute-code` is `t` (lets Claude eval Elisp via the `executeCode` MCP tool); `claude-code-ide-emacs-tools-setup` exposes built-in Emacs MCP tools (xref, treesit-info, imenu-list-symbols, project-info). Diagnostics backend is `auto` (auto-detects flymake, which is what `init-prog` uses).
-
-Note: `agent-shell` (Codex via ACP) remains commented out in `init-tools.el`.
-
-## Tree-sitter (`core/init-prog.el`)
-
-`treesit-enabled-modes` is set to `t` (enable all built-in tree-sitter modes), `treesit-auto-install-grammar` is `'always` (grammars auto-install from GitHub on first use), and `treesit-font-lock-level` is 4 (maximum). Individual language packages (`rust-mode`, `go-mode`, etc.) are declared separately; `rust-mode` sets `rust-mode-treesitter-derive t` to use the ts mode. Note: `typst-ts-mode` is commented out.
-
-## Package ecosystem
-
-| Concern | Packages |
-|---|---|
-| Completion UI | vertico (+ `extensions/*.el`: directory, quick, multiform), corfu (+ history, popupinfo, quick extensions), orderless, marginalia |
-| Completion commands/tools | consult, consult-dir, consult-eglot, embark, embark-consult, avy-embark-collect, cape, tempel, tempel-collection, eglot-tempel |
-| LSP | eglot, eglot-booster, consult-eglot; JDTLS contact fn in `init-test.el` |
-| VC | magit, forge, diff-hl, magit-todos, browse-at-remote, git-link, abridge-diff, git-modes, smerge-mode; difftastic via custom `+magit-*-with-difftastic` fns |
-| AI | gptel, gptel-agent, gptel-quick, gptel-magit, codex-ide, claude-code-ide |
-| Programming | citre (ctags), dumb-jump (xref fallback), quickrun, indent-bars, flymake, geiser + geiser-racket, treesit, envrc (direnv), cargo, rust-playground, rmsbolt, skewer-mode, webpaste |
-| Terminal | ghostel, ghostel-compile, ghostel-comint, ghostel-eshell |
-| Writing | org-mode, markdown-mode, auctex (LaTeX), cdlatex, reftex, pangu-spacing |
-| Org extensions | org-modern, org-modern-indent, org-appear, org-pomodoro, valign |
-| UI | doric-themes (local path), ligature, scrollview, breadcrumb (header-line), custom modeline |
-| Editing | ws-butler, edit-indirect, puni, embrace, easy-kill, mwim, beginend, dogears, vundo, undo-fu-session, undo-hl |
-| Windows | ace-window, winner, popper, zoom, auto-dim-other-buffers |
-| Persistence | saveplace, recentf, savehist |
-| Remote | tramp (ssh), exec-path-from-shell |
-| Communication | telega, telega-dired-dwim |
-| PDF | reader (MonadicSheep/emacs-reader, Codeberg, native `render-core.dylib` built via `make`; `pdf-tools` is commented out) |
-| Dictionary | osx-dictionary (macOS), google-this (`C-, w`) |
-| Terminal graphics | kitty-graphics (cashmeredev/kitty-graphics.el, tty-setup hook for inline images) |
-| Language modes | go-mode, haskell-mode, rust-mode, swift-mode, verilog-mode, web-mode, yaml-mode, toml-mode, csv-mode/rainbow-csv, graphviz-dot-mode, llvm-mode, agda (when `agda-mode` executable present) |
-| macOS | osx-dictionary |
+---
 
 ## Keybindings
 
-### Global (defined in `core/init-keybinding.el`)
-Super-key (`s-`) bindings: `s-s` save, `s-x` kill-region, `s-c` copy-region-as-kill, `s-v` yank, `s-z` undo, `s-Z` undo-redo, `s-a` mark-whole-buffer, `s-w` tab-close, `s-t` tab-new, `s-o` other-window, `s-,` xref-go-back.
+### Super (macOS ⌘)
 
-### Search/navigation (defined in consult `:bind` in `core/init-completion.el`)
-- `s-l` consult-line, `s-f` consult-ripgrep, `s-d` consult-fd, `s-g` consult-goto-line
-- `C-c i` consult-imenu, `C-c I` consult-imenu-multi
+| Key | Command |
+|-----|---------|
+| `s-s` | save-buffer |
+| `s-x` / `s-c` / `s-v` | kill / copy / yank |
+| `s-z` / `s-Z` | undo / undo-redo |
+| `s-a` | mark-whole-buffer |
+| `s-w` / `s-t` | tab-close / tab-new |
+| `s-o` | other-window |
+| `s-,` | xref-go-back |
+| `s-.` | embark-dwim |
 
-### Embark (defined in `core/init-completion.el`)
-- `C-.` embark-act, `s-.` embark-dwim, `M-.` embark-dwim (set globally via `keymap-global-set`, overrides default `xref-find-definitions`)
-- `C-h B` embark-bindings
+### Search & navigation
 
-### Custom `C-,` prefix (leader-like)
-`C-,` is used as an ad-hoc prefix across modules: `C-, o` browse-url-at-point, `C-, e` browse-url-emacs (`init-tools`), `C-, w` google-this (`init-dict`), `C-, g l/c/h` git-link variants (`init-vcs`), `C-, .`/`C-, ,`/`C-, l` avy-goto (`init-keybinding`), `C-, j`/`C-, c` link-hint open/copy.
+| Key | Command |
+|-----|---------|
+| `M-s l` | consult-line |
+| `M-s r` | consult-ripgrep |
+| `M-s d` | consult-fd |
+| `C-c i` / `C-c I` | consult-imenu / multi |
+| `C-.` | embark-act |
+| `M-.` | embark-dwim |
+| `M-s e` | embrace-commander |
 
-### VC (defined in `core/init-vcs.el`)
-- `C-x g` magit
-- `C-, g l` git-link, `C-, g c` git-link-commit, `C-, g h` git-link-homepage
-- Magit transient extensions: `D` difftastic-diff (dwim), `S` difftastic-show (via `+magit-diff-with-difftastic` / `+magit-show-with-difftastic`)
+### `C-,` ad-hoc prefix
 
-### Terminal
-- `C-x m` ghostel (defined in `core/init-ghostel.el`)
+| Key | Command |
+|-----|---------|
+| `C-, .` / `C-, ,` / `C-, l` | avy-goto-char / char-2 / line |
+| `C-, j` / `C-, c` | link-hint open / copy |
+| `C-, g l` / `c` / `h` | git-link / commit / homepage |
+| `C-, w` | google-this |
 
-### Programming (defined in `core/init-prog.el`)
-- `C-c r` quickrun
-- `C-c c j` citre-jump (fallback to `xref-find-definitions`), `C-c c k` citre-jump-back, `C-c c p` citre-peek, `C-c c a` citre-ace-peek, `C-c c u` citre-update-this-tags-file
-- `C-c f ]` flymake-goto-next-error, `C-c f [` flymake-goto-prev-error, `C-c f b` flymake-show-buffer-diagnostics
-- In eglot-mode-map: `M-RET` eglot-code-actions, `M-/` eglot-find-typeDefinition, `M-?` xref-find-references
+### Project · Magit · Terminal · AI
 
-### macOS
-- `C-c d i` osx-dictionary-search-input, `C-c d d` osx-dictionary-search-pointer
+| Key | Command |
+|-----|---------|
+| `C-x p m` | magit-status |
+| `C-x p t` / `T` | ghostel-project / list buffers |
+| `C-x g` | magit |
+| `C-x m` | ghostel |
+| `C-c C-'` | claude-code-ide-menu |
+| `C-c r t` | gptel rewrite → 简体中文 |
 
-### Chinese punctuation translation
-Chinese punctuation is translated to English equivalents in keybindings via `key-translation-map` for `C-`, `M-`, `s-`, and `H-` prefixes (defined in `init-keybinding.el`).
+### Programming
 
-## External dependencies
+| Key | Command |
+|-----|---------|
+| `C-c r` | quickrun |
+| `C-c c j/k/p/a/u` | citre jump / back / peek / ace / update |
+| `C-c f ]` / `[` / `b` | flymake next / prev / buffer |
+| `M-RET` *(eglot)* | code actions |
 
-Required: `rg` (ripgrep), `fd`, `aspell`, `readability-cli` (for `eww`), `difft`/`difftastic` (structural diff, used by `+magit-*-with-difftastic`). The `reader` PDF package runs a `:pre-build` (`make all`) to produce `render-core.dylib`, so a C toolchain is needed on first install. The `README.md` is stale — it lists `delta`, `Sarasa Gothic`, and `Symbola`, none of which the code references; `difftastic` is the active diff tool and the actual CJK font is `LXGW WenKai Mono Screen`. Fonts actually used: MonoLisaCode (primary), MonoLisaText (variable-pitch), LXGW WenKai Mono Screen (CJK), Apple Color Emoji / Noto Color Emoji (emoji). Optional: `gls` (GNU coreutils `ls`, for dired on macOS), `zstd` (for undo-fu-session compression), `tdlib` (for telega, via Homebrew `tdlib`), `agda-mode` (for agda), `raco` (for geiser-racket / SICP `#lang sicp`).
+中文标点在 `C-` / `M-` / `s-` / `H-` 前缀下会通过 `key-translation-map` 映射为英文标点，避免输入法干扰绑定。
 
-## Adding a new package
+---
 
-Add a `use-package` form in the relevant `core/init-*.el`. If it needs a new init file, add its symbol to `+init-files` in `init.el` (order matters — later files can depend on earlier ones). Avoid adding to the front of the list (before `init-straight.el`) since `use-package` isn't configured yet.
+## Feature map
 
-For sub-packages that ship with a parent package (like vertico extensions, corfu extensions, ghostel sub-modules), use `:straight nil` with `:after <parent>`.
+### Completion stack
 
-## Verification
+```text
+Vertico ── Orderless ── Marginalia
+   │
+Consult / Embark ── actions & search
+   │
+Corfu + Cape + Tempel ── in-buffer completion / snippets
+```
 
-There is no test suite. Manual verification — load Emacs and exercise the changed functionality. `init.el` registers a `window-setup-hook` lambda that prints `window-setup` and `after-init` timings to `*Messages*`, useful for spotting startup regressions. (There is no `efs/display-startup-time` function — that earlier note was inaccurate.) For finer-grained startup profiling, use `M-x emacs-init-time` or wrap suspect forms in `(benchmark-run ...)`.
+### Programming
 
-When verifying a change to one module, you can reload just that file in a running Emacs (`M-x load-file RET core/init-FOO.el RET`) rather than restarting, since `use-package` forms are idempotent for most settings. Note `use-package-always-defer` is `t` in interactive sessions, so a package's `:config` block only runs after the package is first loaded — exercise the feature that triggers it (e.g., open a `python-ts-mode` file to load `python-ts-mode`'s config) before assuming a change took effect.
+- **LSP**: built-in Eglot + `eglot-booster`（`io-only`）+ `consult-eglot`
+- **Diagnostics**: Flymake（行尾短提示）
+- **Tree-sitter**: `treesit-enabled-modes t`，grammar `always` 自动安装，font-lock level 4
+- **Rust**: `rust-mode-treesitter-derive`、cargo minor mode
+- **Jump**: Citre + dumb-jump fallback + xref（ripgrep）
 
-## Scheme (`core/init-scheme.el`)
+### Ghostel
 
-Scheme REPL via Geiser. Default implementation is Racket (`scheme-program-name`); `geiser-active-implementations` covers Racket, Guile, and MIT. `geiser-racket` is installed separately (`:after geiser`). Geiser auto-starts in `scheme-mode` (`geiser-mode-start-repl-p` t). Eval bindings in `scheme-mode-map`: `C-c C-z` switch-to-repl, `C-c C-b` eval-buffer, `C-c C-r` eval-region, `C-M-x` eval-definition, `C-c C-e` eval-last-sexp, `C-c C-d` doc-at-point. For SICP, use Racket with `#lang sicp` (install via `raco pkg install sicp`).
+- 绑定 `C-x m`；项目终端 `C-x p t`
+- 子模式：`ghostel-compile` / `ghostel-comint` / `ghostel-eshell`
+- TRAMP 远程 shell、OSC 52 剪贴板、Kitty 图形能力
+- 输入模式：semi-char / char / emacs / copy / line
+
+### AI
+
+| Package | Role |
+|---------|------|
+| **gptel** | DeepSeek chat（thinking 默认开）、org 会话 |
+| **gptel-quick** | Embark `?` 一句话解释 |
+| **gptel-magit** | Conventional Commits 风格提交说明 |
+| **claude-code-ide** | Claude Code CLI + MCP + Ghostel 侧栏 |
+| **codex-ide** | OpenAI Codex IDE 集成 |
+
+### Org & writing
+
+- `org-modern` + `org-modern-indent` + `org-appear` + `valign`
+- LaTeX preview（dvisvgm）、CJK 强调正则 hack
+- AUCTeX / cdlatex / reftex；`markdown-ts-mode`
+
+### Windows & UI
+
+- Popper 弹出窗口、Zoom 主窗、ace-window 编号
+- 自定义 modeline + breadcrumb header-line
+- tab-bar、window-divider、ligature、scrollview fringe
+
+---
+
+## Conventions
+
+| Pattern | Meaning |
+|---------|---------|
+| `+name` | 本配置自定义函数 / 变量 |
+| `*-a` / `*-h` | `defadvice!` 命名：around / hook |
+| `lexical-binding: t` | 每个文件首行声明 |
+| `:straight t` | 第三方包 |
+| `:straight (:type built-in)` / `nil` | 内置或父包附带扩展 |
+| `custom.el` | Customize 落盘（gitignore） |
+| `autosaves/` · `backups/` | 自动保存与备份（gitignore） |
+
+核心宏（`core/init-util.el`，风格接近 Doom）：
+
+- `add-hook!` — 多 hook / 多函数，支持 `:local`、`:append`、`:call-immediately`、`:unless-daemonp-call-immediately`
+- `defadvice!` — 定义并挂载 advice
+- `+advice-pp-to-prin1!` — 缩小 saveplace / recentf 等缓存体积
+
+---
+
+## Customize
+
+### 新增包
+
+在对应 `core/init-*.el` 增加 `use-package`；若需新模块：
+
+1. 新建 `core/init-foo.el`
+2. 把 `'init-foo` 加入 `init.el` 的 `+init-files`（**顺序敏感**；勿放在 `init-straight` 之前）
+
+### 常用旋钮
+
+| Want | Where |
+|------|--------|
+| 主题明暗 | `core/init-ui.el` → `+light-theme` / `+dark-theme` |
+| 字号 | `core/init-ui.el` → `+font-size` |
+| AI 模型 / backend | `core/init-ai.el` |
+| 自动 Eglot 语言 | `core/init-prog.el` → `+eglot-auto-start-modes` |
+| 模块开关 | `init.el` → `+init-files`（注释即可禁用） |
+
+### 热重载单个模块
+
+```text
+M-x load-file RET core/init-FOO.el RET
+```
+
+注意：`use-package-always-defer` 为 `t` 时，`:config` 要等真正加载该包后才会再跑。
+
+---
+
+## Notes
+
+- **`init-test.el` 不是测试套件**，会正常加载，里面是个人实验与工具函数。  
+- **无自动化测试**；验证方式：启动 Emacs，看 `*Messages*` 耗时，手动点功能。  
+- 本地路径（主题、机器相关绝对路径）clone 后需要按机器改写。  
+- 上游参考：[roife/.emacs.d](https://github.com/roife/.emacs.d)
+
+---
+
+## License
+
+个人配置，按需自取。第三方包遵循各自许可证。  
+若你基于本配置衍生，欢迎 star / fork，并保留对上游 roife 配置的致谢。
+
+---
+
+<p align="center">
+  <sub>Built for thinking with code · Emacs 31</sub>
+</p>

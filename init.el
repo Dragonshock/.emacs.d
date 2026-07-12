@@ -18,7 +18,7 @@
                      'init-basic
                      'init-ui
                      'init-xterm
-                     ;; 'init-ghostel
+                     'init-ghostel
                      (when (eq system-type 'darwin) 'init-mac)
                      'init-completion
                      'init-tools
