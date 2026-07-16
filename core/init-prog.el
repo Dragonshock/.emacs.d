@@ -99,6 +99,8 @@
                                                                              :punctuation (:enable t :specialization (:enable t)))
                                             :workspace (:symbol (:search (:kind "all_symbols"
                                                                                 :scope "workspace_and_dependencies")))
+                                            :references (:excludeImports t
+                                                         :excludeTests t)
                                             :lru (:capacity 1024)
                                             :diagnostics (:enable :json-false)))
                   (:typescript . (:preferences (:importModuleSpecifierPreference "non-relative")))

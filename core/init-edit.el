@@ -201,7 +201,7 @@
 ;; [dogears] Jump to the last edit location
 (use-package dogears
   :straight t
-  :hook (after-init . dogears-mode)
+  :defer 0.1
   :bind (:map global-map
               ("M-g d" . dogears-go)
               ("M-g M-b" . dogears-back)
@@ -223,7 +223,8 @@
                             pop-global-mark
                             xref-go-back
                             xref-find-definitions
-                            xref-find-references)))
+                            xref-find-references))
+  (dogears-mode 1))
 
 
 ;; [expreg]

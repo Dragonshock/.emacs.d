@@ -142,6 +142,78 @@
           ("Updated" 10 t nil updated nil)))
   )
 
+;; [magh.el] Section-oriented GitHub frontend powered by the `gh' CLI
+(use-package magh
+  :straight nil
+  :load-path "~/code/gh.el"
+  :bind (("C-, g g" . magh)
+         ("C-, g G" . magh-dispatch)
+         ("C-, g d" . magh-repo-status)
+         ("C-, g D" . magh-repo-status-other)
+         ("C-, g H" . magh-user-status)
+         ("C-, g i" . magh-issue-list)
+         ("C-, g p" . magh-pr-list)
+         ("C-, g v" . magh-review-requests)
+         ("C-, g w" . magh-run-list)
+         ("C-, g e" . magh-release-list)
+         ("C-, g /" . magh-search-dispatch)
+         ("C-, g t" . magh-browse-repository)
+         ("C-, g n" . magh-notifications-dispatch)
+         ("C-, g r" . magh-command)
+         ("C-, g a" . magh-api-request))
+  :config
+  (setq magh-list-limit 50
+        magh-client-cache-ttl 30
+        magh-confirm-destructive-actions t
+        magh-notifications-unread-only t
+        magh-notifications-group-by 'repository
+        magh-view-inline-images t)
+
+  ;; Keep user-maintained GitHub shortcuts across Emacs sessions.  savehist is
+  ;; enabled from init-basic.el's after-init hook in non-daemon sessions.
+  (with-eval-after-load 'savehist
+    (dolist (variable '(magh-known-repositories
+                        magh-favorite-organizations
+                        magh-workflow-template-repositories))
+      (add-to-list 'savehist-additional-variables variable))))
+
+
+;; [magh-magit] Lightweight asynchronous magh.el summaries in Magit status
+(use-package magh-magit
+  :straight nil
+  :load-path "~/code/gh.el"
+  :after magit
+  :demand t
+  :config
+  (setq magh-magit-dispatch-key "@"
+        magh-magit-status-sections '(pr issue run)
+        magh-magit-summary-scope 'repository
+        magh-magit-list-limit 10
+        magh-magit-cache-ttl 30
+        ;; Forge owns its PR and Issue sections; magh.el still shows Actions.
+        magh-hide-forge-duplicates t)
+  (magh-magit-mode 1))
+
+
+;; Structured actions for magh.el candidates in Embark.
+(use-package magh-embark
+  :straight nil
+  :load-path "~/code/gh.el"
+  :after embark
+  :demand t
+  :config
+  (magh-embark-mode 1))
+
+
+;; Keep magh.el's native Issue/PR viewer, with an explicit Forge -> magh.el bridge.
+(use-package magh-forge
+  :straight nil
+  :load-path "~/code/gh.el"
+  :after forge
+  :commands (magh-forge-open-current-topic-in-magh)
+  :bind (:map forge-topic-mode-map
+              ("C-c C-g" . magh-forge-open-current-topic-in-magh)))
+
 
 ;; Show TODOs in magit
 (use-package magit-todos
@@ -189,36 +261,36 @@
   :hook (magit-diff-visit-file . abridge-diff-mode))
 
 
-;; [consult-gh] Interface for GitHub `gh'
-(use-package consult-gh
-  :straight (consult-gh :type git :host github :repo "armindarvish/consult-gh"
-                        :files ("*.el"))
-  :after consult
-  :config
-  (setq consult-gh-default-clone-directory "~/code/"
-        consult-gh-preview-key "C-o"
-        consult-gh-repo-action #'consult-gh--repo-browse-files-action
-        consult-gh-confirm-before-clone t
-        consult-gh-notifications-show-unread-only nil
-        consult-gh-prioritize-local-folder nil
-        consult-gh-preview-major-mode 'org-mode)
-
-  (add-to-list 'savehist-additional-variables 'consult-gh--known-orgs-list)
-  (add-to-list 'savehist-additional-variables 'consult-gh--known-repos-list)
-  (consult-gh-enable-default-keybindings))
-
-;; Install `consult-gh-embark' for embark actions
-(use-package consult-gh-embark
-  :straight nil
-  :after consult-gh
-  :config
-  (consult-gh-embark-mode +1))
-
-
-;; Install `consult-gh-forge' for forge actions
-(use-package consult-gh-forge
-  :straight nil
-  :after consult-gh
-  :config
-  (consult-gh-forge-mode +1)
-  (setq consult-gh-forge-timeout-seconds 10))
+;; ;; [consult-gh] Interface for GitHub `gh'
+;; (use-package consult-gh
+;;   :straight (consult-gh :type git :host github :repo "armindarvish/consult-gh"
+;;                         :files ("*.el"))
+;;   :after consult
+;;   :config
+;;   (setq consult-gh-default-clone-directory "~/code/"
+;;         consult-gh-preview-key "C-o"
+;;         consult-gh-repo-action #'consult-gh--repo-browse-files-action
+;;         consult-gh-confirm-before-clone t
+;;         consult-gh-notifications-show-unread-only nil
+;;         consult-gh-prioritize-local-folder nil
+;;         consult-gh-preview-major-mode 'org-mode)
+;;
+;;   (add-to-list 'savehist-additional-variables 'consult-gh--known-orgs-list)
+;;   (add-to-list 'savehist-additional-variables 'consult-gh--known-repos-list)
+;;   (consult-gh-enable-default-keybindings))
+;;
+;; ;; Install `consult-gh-embark' for embark actions
+;; (use-package consult-gh-embark
+;;   :straight nil
+;;   :after consult-gh
+;;   :config
+;;   (consult-gh-embark-mode +1))
+;;
+;;
+;; ;; Install `consult-gh-forge' for forge actions
+;; (use-package consult-gh-forge
+;;   :straight nil
+;;   :after consult-gh
+;;   :config
+;;   (consult-gh-forge-mode +1)
+;;   (setq consult-gh-forge-timeout-seconds 10))

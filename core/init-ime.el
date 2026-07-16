@@ -15,24 +15,19 @@
 
 (use-package liberime
   :straight (liberime :type git :host github :repo "emacs-rime/liberime")
-  :demand t
   :init
   (setq liberime-auto-build t
         liberime-user-data-dir "~/Library/Rime/"))
 
 (use-package rimel
   :straight (rimel :type git :host github :repo "emacs-rime/rimel")
-  :after liberime
-  :demand t
   :custom-face
   (rimel-candidate-label-face ((t (:inherit font-lock-comment-face :height 0.85))))
   (rimel-page-indicator-face ((t (:inherit font-lock-comment-face :height 0.85))))
   (rimel-highlight-face ((t (:inherit hl-line))))
   :init
-  (setq default-input-method "rimel")
-  :bind ("C-SPC" . toggle-input-method)
-  :config
-  (setq rimel-show-candidate 'posframe
+  (setq default-input-method "rimel"
+        rimel-show-candidate 'posframe
         rimel-inline-preedit t
         rimel-candidate-show-preedit nil
         rimel-posframe-style 'horizontal
@@ -45,7 +40,11 @@
                                    rimel-predicate-org-in-src-block-p
                                    rimel-predicate-org-latex-mode-p
                                    rimel-predicate-tex-math-or-command-p))
-  )
+  :bind ("C-SPC" . toggle-input-method))
+
+(register-input-method "rimel" "Chinese" #'rimel-activate
+                       (if (char-displayable-p 12563) (char-to-string 12563) "中")
+                       "Rimel - Rime input method via liberime")
 
 ;; [sis] automatically switch input source
 (use-package sis
