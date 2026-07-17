@@ -94,6 +94,16 @@
   :hook (find-file . editorconfig-mode))
 
 
+;; [apheleia] Format buffers asynchronously without moving point
+(use-package apheleia
+  :straight t
+  :commands (apheleia-format-buffer)
+  :bind (("C-c f f" . apheleia-format-buffer))
+  :hook (after-init . apheleia-global-mode)
+  :config
+  (setq apheleia-hide-log-buffers t))
+
+
 ;; [ediff] Diff & patch
 (use-package ediff
   :hook ((ediff-before-setup . +ediff-save-window-config)
@@ -202,7 +212,7 @@
 ;; [dogears] Jump to the last edit location
 (use-package dogears
   :straight t
-  :hook (after-init . dogears-mode)
+  :defer 0.1
   :bind (:map global-map
               ("M-g d" . dogears-go)
               ("M-g M-b" . dogears-back)
@@ -224,7 +234,8 @@
                             pop-global-mark
                             xref-go-back
                             xref-find-definitions
-                            xref-find-references)))
+                            xref-find-references))
+  (dogears-mode 1))
 
 
 ;; [expreg]

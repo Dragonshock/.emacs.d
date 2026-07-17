@@ -69,8 +69,9 @@ included; for the final argument the leading separator is included."
                   (cons beg trimmed-end)))))))))))
 
 ;; [meow] Modal editing
-(use-package meow
-  :straight t
+(use-package meow-core
+  :straight meow
+  :demand t
   :custom-face
   (meow-normal-indicator ((t (:inherit (font-lock-function-name-face bold :inverse-video t)))))
   (meow-insert-indicator ((t (:inherit (font-lock-keyword-face bold :inverse-video t)))))
@@ -81,7 +82,6 @@ included; for the final argument the leading separator is included."
   :preface
   (defun +meow-enable-global-mode-once ()
     "Enable Meow after a usable frame exists."
-    (require 'meow)
     (+meow-bind-keys)
     (meow-global-mode 1)
     (meow-esc-mode -1))
@@ -203,3 +203,8 @@ included; for the final argument the leading separator is included."
            (vundo-mode . motion)))
       (add-to-list 'meow-mode-state-list state))
     ))
+
+;; These optional interfaces are not needed to make Meow usable.  Load each
+;; from its own library only when its command is invoked.
+(autoload 'meow-cheatsheet "meow-cheatsheet" nil t)
+(autoload 'meow-tutor "meow-tutor" nil t)

@@ -247,12 +247,13 @@ If no project is found, create a temporary Eshell instance in the current direct
 
 ;; [esh-tldr] Browse local tldr pages
 (use-package esh-tldr
-  :straight (:host github :repo "roife/esh-tldr")
+  :straight (:local-repo "~/code/tldr.el/"
+                                        ;:host github :repo "roife/esh-tldr"
+                         )
   :commands (esh-tldr esh-tldr-dwim consult-esh-tldr)
   :bind ("C-h t" . esh-tldr-dwim)
-  ;; :hook ((shell-mode eshell-mode comint-mode) . esh-tldr-capf-setup)
-  ;; :config
-  ;; (setq esh-tldr-use-tempel t)
+  :config
+  (setq esh-tldr-use-tempel t)
   )
 
 

@@ -225,7 +225,7 @@
   (setq savehist-additional-variables '(mark-ring global-mark-ring
                                                   search-ring
                                                   regexp-search-ring)
-    savehist-autosave-interval 1000)
+        savehist-autosave-interval 1000)
 
   (with-eval-after-load 'vertico
     (add-to-list 'savehist-additional-variables 'vertico-repeat-history))
@@ -308,19 +308,19 @@
 (use-package tramp
   :config
   (setq tramp-default-method "ssh"
-    tramp-auto-save-directory (expand-file-name "tramp-autosaves/" user-emacs-directory)
-    tramp-backup-directory-alist backup-directory-alist
-    remote-file-name-inhibit-cache 60))
+        tramp-auto-save-directory (expand-file-name "tramp-autosaves/" user-emacs-directory)
+        tramp-backup-directory-alist backup-directory-alist
+        remote-file-name-inhibit-cache 60))
 
 
 ;; [minibuffer]
 (use-package minibuffer
   :config
   (setq minibuffer-depth-indicate-mode t
-    minibuffer-default-prompt-format " [%s]" ; shorten " (default %s)" => " [%s]"
-    minibuffer-electric-default-mode t
-    ; One frame one minibuffer.
-    minibuffer-follows-selected-frame nil))
+        minibuffer-default-prompt-format " [%s]" ; shorten " (default %s)" => " [%s]"
+        minibuffer-electric-default-mode t
+                                        ; One frame one minibuffer.
+        minibuffer-follows-selected-frame nil))
 
 
 ;; [repeat] Enable repeatable commands

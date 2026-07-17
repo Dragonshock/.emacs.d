@@ -40,13 +40,13 @@
         (make-directory dst t)
         (dolist (f (directory-files src t directory-files-no-dot-files-regexp))
           (let ((target (expand-file-name (file-name-nondirectory f) dst)))
-          (cond
-           ((file-directory-p f)
-            ;; 递归复制子目录（如 cold_word_drop/）
-            (unless (file-symlink-p target)
-              (copy-directory f target t t t)))
-           ((file-regular-p f)
-            (copy-file f target t t))))))))
+            (cond
+             ((file-directory-p f)
+              ;; 递归复制子目录（如 cold_word_drop/）
+              (unless (file-symlink-p target)
+                (copy-directory f target t t t)))
+             ((file-regular-p f)
+              (copy-file f target t t))))))))
   (add-hook 'liberime-after-start-hook #'+liberime-sync-lua-scripts))
 
 (use-package rimel
@@ -58,28 +58,30 @@
   (rimel-page-indicator-face ((t (:inherit font-lock-comment-face :height 0.85))))
   (rimel-highlight-face ((t (:inherit hl-line))))
   :init
-  (setq default-input-method "rimel")
-  :bind ("C-SPC" . toggle-input-method)
-  :config
-  (setq rimel-show-candidate 'posframe
+  (setq default-input-method "rimel"
+        rimel-show-candidate 'posframe
         rimel-inline-preedit t
         rimel-candidate-show-preedit nil
         rimel-posframe-style 'horizontal
         rimel-posframe-properties nil
         rimel-candidate-label-format "%d "
         rimel-page-indicator-format "%d%s"
+        ;; 未启用 rimel-predicate-after-alphabet-char-p：该断言会在光标前是英文字母时
+        ;; 禁用中文，对不用 evil/meow 的纯 Emacs 用户会导致“英文后无法开始中文输入”。
         rimel-disable-predicates '(rimel-predicate-prog-in-code-p
                                    rimel-predicate-current-uppercase-letter-p
                                    rimel-predicate-org-in-src-block-p
                                    rimel-predicate-org-latex-mode-p
                                    rimel-predicate-tex-math-or-command-p))
+  :bind ("C-SPC" . toggle-input-method)
+  :config
   ;; 兜底：独立 rime 目录首次部署后选中雾凇拼音方案。
-  ;; 注意：未启用 rimel-predicate-after-alphabet-char-p —— 该断言会在光标前
-  ;; 是英文字母时禁用中文，对不用 evil/meow 的纯 Emacs 用户会导致"在任何英文
-  ;; 文本后都无法开始中文输入"。代码区仍由 prog-in-code-p 守卫，大写字母仍由
-  ;; current-uppercase-letter-p 守卫，中英切换靠 C-SPC + sis 自动。
   (with-eval-after-load 'liberime
     (liberime-try-select-schema "rime_ice")))
+
+(register-input-method "rimel" "Chinese" #'rimel-activate
+                       (if (char-displayable-p 12563) (char-to-string 12563) "中")
+                       "Rimel - Rime input method via liberime")
 
 ;; [sis] automatically switch input source
 (use-package sis
