@@ -303,7 +303,6 @@
   ;; Cape's recommended silence wrapper: see Cape README "Example 8".
   (advice-add 'dabbrev-capf :around #'cape-wrap-silent))
 
-
 ;;; Snippets
 
 (use-package tempel
