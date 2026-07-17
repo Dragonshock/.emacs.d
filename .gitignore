@@ -77,3 +77,6 @@ authinfo.gpg
 *.key
 secrets.el
 local.el
+
+# history
+geiser-history.racket
