@@ -294,7 +294,14 @@
                 (append completion-at-point-functions (list #'cape-file #'cape-dabbrev)))
 
   (defun +completion-add-tex-capfs ()
-    (+completion-add-capfs #'cape-tex)))
+    (+completion-add-capfs #'cape-tex))
+
+  :config
+  ;; Built-in `dabbrev-capf' signals `user-error' when point is not after a word
+  ;; (e.g. empty line / punctuation in COMMIT_EDITMSG). Magit adds it via
+  ;; `git-commit-setup-capf'; Corfu auto-completion then surfaces the error.
+  ;; Cape's recommended silence wrapper: see Cape README "Example 8".
+  (advice-add 'dabbrev-capf :around #'cape-wrap-silent))
 
 
 ;;; Snippets

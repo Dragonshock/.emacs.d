@@ -13,10 +13,21 @@
       (user-error "Select a region to translate"))
     (require 'gptel-rewrite)
     (gptel--suffix-rewrite "Translate into fluent Simplified Chinese."))
+
+  (defun +gptel-fill-rewritten-text (beg end)
+    "Hard-wrap rewritten text to `fill-column'.
+
+Intended for `gptel-post-rewrite-functions'.  Runs in the temporary
+buffer that holds the rewrite result before it is shown as an overlay."
+    (fill-region beg end))
   :init
   (setq gptel-model 'deepseek-v4-flash
         gptel-default-mode 'org-mode
         gptel-confirm-tool-calls nil)
+  ;; Fill rewrite results (including +gptel-rewrite-translate-to-chinese)
+  ;; so LLM output is hard-wrapped to fill-column.  See gptel issue #564.
+  ;; In :init so it is registered even if only gptel-rewrite is required.
+  (add-hook 'gptel-post-rewrite-functions #'+gptel-fill-rewritten-text)
   :config
   (setq-default gptel-backend
                 (gptel-make-deepseek "DeepSeek-thinking"
@@ -164,11 +175,13 @@
 ;;
 ;; Grok Build 官方支持 `grok agent stdio`（Agent Client Protocol）。
 ;; agent-shell 用原生 Emacs buffer 驱动 agent，不走 Ghostel/终端 TUI。
-;; 与 claude-code-ide（Ghostel+MCP）/ codex-ide（app-server）并存：
+;; 与 claude-code-ide（Ghostel+MCP）/ codex-ide（app-server）/ grok-ide 并存：
 ;;   C-c C-'  Claude Code IDE
 ;;   C-c C-;  Codex IDE（session buffer 内）
-;;   C-c C-g  打开 Grok Build (agent-shell)
-;;   在 Grok buffer 内：
+;;   C-c C-g  打开 Grok Build (agent-shell，通用 ACP shell)
+;;   C-c C-j  打开 Grok IDE（init-grok.el，原生 buffer 客户端）
+;;   C-c M-j  Grok IDE resume
+;;   在 agent-shell Grok buffer 内：
 ;;     C-c C-c  中断当前 turn（不是关闭窗口）
 ;;     C-c C-q  关闭/bury 窗口；C-u C-c C-q 杀掉会话 buffer
 ;;

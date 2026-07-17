@@ -199,7 +199,7 @@
 ;;   (modus-themes-load-theme 'modus-operandi))
 
 (defvar +light-theme 'doric-beach) ;; doom-gruvbox-light doric-tiger
-(defvar +dark-theme 'doric-valley)        ;; doom-gruvbox doric-lion
+(defvar +dark-theme 'doric-water)        ;; doom-gruvbox doric-lion
 
 ;; (defvar +light-theme 'modus-operandi) ;; modus-operandi-tinted
 ;; (defvar +dark-theme 'modus-vivendi)    ;; modus-vivendi-tinted
