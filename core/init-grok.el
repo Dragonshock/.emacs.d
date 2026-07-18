@@ -4,12 +4,16 @@
 ;; grok-ide：基于 `grok agent stdio` 的原生 Emacs 客户端（非 TUI）。
 ;; 源码在本机仓库 `~/Desktop/Grok-Build-ide/grok-ide`（开发中，不走 straight）。
 ;;
-;; 与现有 AI 入口并存（见 init-ai.el）：
-;;   C-c C-'  Claude Code IDE
-;;   C-c C-;  Codex IDE（session buffer 内）
-;;   C-c C-g  Grok via agent-shell（通用 ACP shell）
-;;   C-c C-j  Grok IDE（本文件：codex-ide 风格的原生客户端）
-;;   C-c M-j  Grok IDE resume（磁盘会话）
+;; 键位（Grok 唯一原生入口；agent-shell / codex-ide 已停用）：
+;;   C-c C-g      开/聚焦 Grok 会话
+;;   C-u C-c C-g  源码一键：钉 origin + 选区上下文 + 立刻提交（可空英文默认句）
+;;   C-c M-g      resume 磁盘会话
+;;   session 内：
+;;     RET / S-RET   submit-or-newline / 强制换行
+;;     C-c C-c/C-k   interrupt
+;;     C-c C-r       status（非 resume）
+;;     C-c C-;       set model
+;;     C-c C-a       toggle always-approve
 ;;
 ;; 前置：
 ;;   - Emacs 28.1+（本机 31 OK）
@@ -47,18 +51,18 @@
 
 (use-package grok-ide
   :commands (grok-ide
+             grok-ide-one-shot
              grok-ide-new-session
              grok-ide-resume
              grok-ide-list-sessions
              grok-ide-stop
              grok-ide-show-log
+             grok-ide-status
              grok-ide-set-model
              grok-ide-toggle-always-approve)
   :preface
   (defun +grok-ide-submit-or-newline ()
-    "Submit one-line Grok prompts with RET; otherwise insert a newline.
-
-Mirror of `+codex-ide-submit-or-newline' in init-ai.el."
+    "Submit one-line Grok prompts with RET; otherwise insert a newline."
     (interactive)
     (let* ((session (and (boundp 'grok-ide--session) grok-ide--session))
            (start (and session (grok-ide-session-input-marker session)))
@@ -69,28 +73,26 @@ Mirror of `+codex-ide-submit-or-newline' in init-ai.el."
                (not (string-match-p "\n" text)))
           (grok-ide-submit)
         (newline))))
-  :bind (("C-c C-j" . grok-ide)
-         ("C-c M-j" . grok-ide-resume)
+  :bind (("C-c C-g" . grok-ide)
+         ("C-c M-g" . grok-ide-resume)
          :map grok-ide-session-mode-map
          ("RET" . +grok-ide-submit-or-newline)
          ("<return>" . +grok-ide-submit-or-newline)
          ("S-<return>" . newline)
          ("C-c C-;" . grok-ide-set-model)
-         ("C-c C-a" . grok-ide-toggle-always-approve))
+         ("C-c C-a" . grok-ide-toggle-always-approve)
+         ("C-c C-r" . grok-ide-status))
   :init
   (+grok-ide-ensure-path)
 
-  ;; ── 与 codex-ide（init-ai.el）对齐的习惯 ─────────────────────────
-  ;; codex-ide 默认关闭 MCP bridge；grok-ide 的 Emacs MCP 工具是可选增强，
-  ;; 这里默认开启（需要 server-start / emacsclient）。
+  ;; Hybrid editor context: light metadata on every submit; region via C-u C-c C-g.
+  ;; MCP bridge remains a live supplement for buffer tools.
   (setq grok-ide-cli-path (or (and (progn (+grok-ide-ensure-path) t)
                                    (executable-find "grok"))
                               "grok")
         grok-ide-model "grok-4.5"
         grok-ide-always-approve nil
-        ;; 对齐 codex-ide-emacs-context-policy = nil：默认不注入文本 context，
-        ;; 依赖 Emacs MCP bridge 拉 live 上下文，避免 transcript 被 context 污染。
-        grok-ide-include-editor-context nil
+        grok-ide-include-editor-context t
         grok-ide-show-thinking t
         grok-ide-show-end-turn nil
         grok-ide-fs-write-enabled nil
@@ -123,7 +125,7 @@ Mirror of `+codex-ide-submit-or-newline' in init-ai.el."
     (when (fboundp 'grok-ide-mcp-bridge-ensure-server)
       (grok-ide-mcp-bridge-ensure-server)))
 
-  ;; 右侧分窗展示（对齐 agent-shell 习惯；名称形如 *grok-ide[dir]*）。
+  ;; 右侧分窗展示；名称形如 *grok-ide[dir]*。
   (setq display-buffer-alist
         (cons
          '("\\`\\*grok-ide"

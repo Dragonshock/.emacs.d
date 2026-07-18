@@ -214,7 +214,7 @@
 (use-package corfu
   :straight (:files (:defaults "extensions/*.el"))
   :hook (((prog-mode conf-mode yaml-mode shell-mode eshell-mode text-mode
-                     codex-ide-session-mode agent-shell-mode)
+                     agent-shell-mode grok-ide-session-mode)
           . corfu-mode)
          ((eshell-mode shell-mode) . (lambda () (setq-local corfu-auto nil)))
          ;; agent-shell: auto after 1 char so `/` and `@` completion pops quickly
