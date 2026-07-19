@@ -24,9 +24,11 @@
       jka-compr-verbose init-file-debug
       native-comp-async-report-warnings-errors init-file-debug
       native-comp-warning-on-missing-source init-file-debug
-      native-comp-async-on-battery-power nil
       warning-suppress-types '((defvaralias) (lexical-binding))
       warning-inhibit-types '((files missing-lexbind-cookie)))
+;; Emacs 31+: avoid native-comp on battery when non-nil would pause.
+(when (boundp 'native-comp-async-on-battery-power)
+  (setq native-comp-async-on-battery-power nil))
 
 ;; Process read size: set the real runtime value in init-basic.el
 ;; (4MB for LSP). Keep a modest floor here so early subprocesses are fine.
@@ -70,11 +72,11 @@
 (push '(vertical-scroll-bars) default-frame-alist)
 (push '(internal-border-width . 0) default-frame-alist)
 (push '(width . 160) default-frame-alist)
-(push '(height . 60) default-frame-alist)
+(push '(height . 80) default-frame-alist)
 ;; (push '(undecorated-round . t) default-frame-alist)
 (when (featurep 'ns)
   (push '(ns-transparent-titlebar . t) default-frame-alist))
-; Set these to nil so users don't have to toggle the modes twice to reactivate.
+                                        ; Set these to nil so users don't have to toggle the modes twice to reactivate.
 (setq menu-bar-mode nil
       tool-bar-mode nil
       scroll-bar-mode nil

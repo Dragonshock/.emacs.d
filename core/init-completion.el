@@ -90,8 +90,10 @@
                                         (eglot-capf (styles orderless)))
         orderless-style-dispatchers '(+orderless-dispatch)
         orderless-component-separator #'orderless-escapable-split
-        completions-sort 'historical
-        completion-pcm-leading-wildcard t))
+        completions-sort 'historical)
+  ;; Present on some newer builds; skip when unbound (Emacs 30.2).
+  (when (boundp 'completion-pcm-leading-wildcard)
+    (setq completion-pcm-leading-wildcard t)))
 
 
 (use-package marginalia
@@ -185,8 +187,8 @@
 
 (use-package avy-embark-collect
   :straight (:host github :repo "oantolin/embark"
-             :local-repo "embark"
-             :files ("avy-embark-collect.el"))
+                   :local-repo "embark"
+                   :files ("avy-embark-collect.el"))
   :after (embark avy)
   :bind (:map embark-collect-mode-map
               ("j" . avy-embark-collect-choose)
@@ -273,11 +275,6 @@
   :bind (:map corfu-map
               ("C-, ," . corfu-quick-complete)))
 
-
-;; ;; cape-company-to-capf 需要 company，虽然不用 company-mode 但需作为库加载
-;; (use-package company
-;;   :straight t
-;;   :defer t)
 
 (use-package cape
   :straight t

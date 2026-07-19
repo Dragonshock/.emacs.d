@@ -215,9 +215,12 @@ If no project is found, create a temporary Eshell instance in the current direct
   :commands (eshell/z))
 
 
-(use-package esh-autosuggest
-  :straight t
-  :hook (eshell-mode . esh-autosuggest-mode))
+;; `esh-autosuggest' pulls in Company solely for fish-like history ghost text
+;; and fights the Corfu stack in eshell (see package README). Prefer Corfu +
+;; capf / shell history instead.
+;; (use-package esh-autosuggest
+;;   :straight t
+;;   :hook (eshell-mode . esh-autosuggest-mode))
 
 
 (use-package esh-help
@@ -247,14 +250,12 @@ If no project is found, create a temporary Eshell instance in the current direct
 
 ;; [esh-tldr] Browse local tldr pages
 (use-package esh-tldr
-  :straight (:local-repo "~/code/tldr.el/"
-                                        ;:host github :repo "roife/esh-tldr"
-                         )
+  :straight (:host github :repo "roife/esh-tldr")
   :commands (esh-tldr esh-tldr-dwim consult-esh-tldr)
   :bind ("C-h t" . esh-tldr-dwim)
   :config
-  (setq esh-tldr-use-tempel t)
-  )
+  (setq esh-tldr-use-tempel t))
+
 
 
 (use-package eshell-did-you-mean

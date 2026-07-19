@@ -14,8 +14,10 @@
       (ibuffer-visit-buffer)))
 
   (setq ibuffer-show-empty-filter-groups nil
-        ibuffer-use-other-window t
-        ibuffer-human-readable-size t)
+        ibuffer-use-other-window t)
+  ;; Emacs 31+: human-readable size column.
+  (when (boundp 'ibuffer-human-readable-size)
+    (setq ibuffer-human-readable-size t))
   )
 
 ;; [ibuffer-project] Group ibuffer's list by project root

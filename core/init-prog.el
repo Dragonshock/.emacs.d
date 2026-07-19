@@ -72,10 +72,12 @@
   :config
   (setq eglot-events-buffer-config '(:size 0 :format full)
         eglot-autoshutdown t
-        eglot-extend-to-xref t
-        ;; eglot-report-progress 'messages
-        eglot-documentation-renderer 'markdown-ts-view-mode
-        eglot-code-action-indications nil)
+        eglot-extend-to-xref t)
+  ;; Emacs 31+: markdown-ts documentation renderer + code-action fringe hints.
+  (when (boundp 'eglot-documentation-renderer)
+    (setq eglot-documentation-renderer 'markdown-ts-view-mode))
+  (when (boundp 'eglot-code-action-indications)
+    (setq eglot-code-action-indications nil))
 
   (setq-default eglot-workspace-configuration
                 '((:pylsp . (:plugins (:jedi_completion (:fuzzy t))))
@@ -151,8 +153,10 @@
   :config
   (setq eldoc-echo-area-display-truncation-message t
         eldoc-echo-area-prefer-doc-buffer t
-        eldoc-echo-area-use-multiline-p nil
-        eldoc-help-at-pt t))
+        eldoc-echo-area-use-multiline-p nil)
+  ;; Emacs 31+: show eldoc at point without an explicit eldoc command.
+  (when (boundp 'eldoc-help-at-pt)
+    (setq eldoc-help-at-pt t)))
 
 
 ;; [help]
@@ -398,9 +402,31 @@
 (use-package treesit
   :when (treesit-available-p)
   :init
-  (setq treesit-enabled-modes t
-        treesit-auto-install-grammar 'always
-        treesit-font-lock-level 4))
+  (setq treesit-font-lock-level 4)
+  ;; Emacs 31+: global treesit mode switch + auto grammar install.
+  (when (>= emacs-major-version 31)
+    (when (boundp 'treesit-enabled-modes)
+      (setq treesit-enabled-modes t))
+    (when (boundp 'treesit-auto-install-grammar)
+      (setq treesit-auto-install-grammar 'always)))
+  ;; Emacs 30: remap classic modes to treesit variants when the grammar
+  ;; is already installed (see `tree-sitter/' and `treesit-language-available-p').
+  ;; Rust stays on `rust-mode' + `rust-mode-treesitter-derive'.
+  (defun +treesit-remap-when-ready (mode ts-mode language)
+    "Remap MODE to TS-MODE when LANGUAGE grammar is available."
+    (when (and (fboundp ts-mode)
+               (treesit-language-available-p language))
+      (add-to-list 'major-mode-remap-alist (cons mode ts-mode))))
+  (+treesit-remap-when-ready 'python-mode 'python-ts-mode 'python)
+  (+treesit-remap-when-ready 'yaml-mode 'yaml-ts-mode 'yaml)
+  (+treesit-remap-when-ready 'js-json-mode 'json-ts-mode 'json)
+  (+treesit-remap-when-ready 'json-mode 'json-ts-mode 'json)
+  (+treesit-remap-when-ready 'sh-mode 'bash-ts-mode 'bash)
+  (+treesit-remap-when-ready 'js-mode 'js-ts-mode 'javascript)
+  (+treesit-remap-when-ready 'css-mode 'css-ts-mode 'css)
+  (+treesit-remap-when-ready 'c-mode 'c-ts-mode 'c)
+  (+treesit-remap-when-ready 'c++-mode 'c++-ts-mode 'cpp)
+  (+treesit-remap-when-ready 'java-mode 'java-ts-mode 'java))
 
 
 ;; [indent-bars] Show indent guides

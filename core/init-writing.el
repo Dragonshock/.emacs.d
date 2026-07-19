@@ -23,10 +23,17 @@
   :straight t)
 
 
-(use-package markdown-ts-mode
-  :straight (:type built-in)
-  :mode (("\\.md\\'" . markdown-ts-mode)
-         ("\\.markdown\\'" . markdown-ts-mode)))
+;; `markdown-ts-mode' is built-in only from Emacs 31. On 30.2 use
+;; MELPA `markdown-mode' so .md files still open.
+(if (locate-library "markdown-ts-mode")
+    (use-package markdown-ts-mode
+      :straight (:type built-in)
+      :mode (("\\.md\\'" . markdown-ts-mode)
+             ("\\.markdown\\'" . markdown-ts-mode)))
+  (use-package markdown-mode
+    :straight t
+    :mode (("\\.md\\'" . markdown-mode)
+           ("\\.markdown\\'" . markdown-mode))))
 
 
 ;; [typst-ts-mode]

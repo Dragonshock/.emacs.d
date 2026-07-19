@@ -34,9 +34,9 @@
 
 
 ;; []
-;; NOTE: Emacs 31 turns on `xterm-mouse-mode' by default in compatible
-;; terminals (including kitty).  This hook is kept as a fallback for
-;; non-compatible terminals.
+;; NOTE: Emacs 31 may enable `xterm-mouse-mode' by default in compatible
+;; terminals (including kitty).  Keep this hook for Emacs 30 and as a
+;; fallback for non-compatible terminals.
 (use-package term/xterm
   :straight nil
   :hook (tty-setup . xterm-mouse-mode)
