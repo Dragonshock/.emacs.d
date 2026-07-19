@@ -80,3 +80,10 @@ local.el
 
 # history
 geiser-history.racket
+
+# Local agent / scratch (do not publish)
+.agents/
+.scratch/
+AGENTS.md
+docs/
+skills-lock.json
