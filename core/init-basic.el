@@ -28,8 +28,7 @@
  ;; Will improve long line display performance
  bidi-inhibit-bpa t
  bidi-paragraph-direction 'left-to-right
- ;; boolean: non-nil enables reordering (do not use a direction symbol here)
- bidi-display-reordering t
+ bidi-display-reordering 'left-to-right
 
  ;; smaller threshold to improve long line performance
  long-line-threshold 1000
@@ -343,12 +342,10 @@
 
 
 ;; [environment variables]
-;; emacs-plus formula injects PATH via site-start (`ns-emacs-plus-injected-path`
-;; / EMACS_PLUS_PATH). That does not cover JAVA_HOME and friends, so we still
-;; copy those from a login shell when needed — just skip re-importing PATH.
 (use-package exec-path-from-shell
   :straight t
   :unless (or noninteractive (daemonp) (not (display-graphic-p)))
+  :hook (after-init . exec-path-from-shell-initialize)
   :init
   (setq exec-path-from-shell-arguments '("-l")
         exec-path-from-shell-variables

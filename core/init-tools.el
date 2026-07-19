@@ -27,11 +27,8 @@
 ;; [speedbar]
 (use-package speedbar
   :init
-  ;; Emacs 31+: prefer a side window over a separate frame.
-  (when (boundp 'speedbar-prefer-window)
-    (setq speedbar-prefer-window t))
-  (when (boundp 'speedbar-window-default-width)
-    (setq speedbar-window-default-width 30)))
+  (setq speedbar-prefer-window t
+        speedbar-window-default-width 30))
 
 
 ;; [goto-addr] Click to open URL
@@ -108,16 +105,12 @@
   :bind (("C-c h TAB" . hs-cycle)
          ("C-c h `" . hs-toggle-all))
   :config
-  ;; Emacs 31+: fringe indicator style and "N lines hidden" display.
-  (when (boundp 'hs-indicator-type)
-    (setq hs-indicator-type nil))
-  (when (boundp 'hs-display-lines-hidden)
-    (setq hs-display-lines-hidden t)))
+  (setq hs-indicator-type nil
+        hs-display-lines-hidden t))
 
 
 ;; [project] Project manager
 (use-package project
-  :straight (:type built-in)
   :bind (:map project-prefix-map
               ("m" . magit-status))
   :config
@@ -127,9 +120,7 @@
                                   (project-dired "Dired")
                                   (project-eshell "Eshell")
                                   (project-search "Search")
-                                  (magit-status "Magit")
-                                  (ghostel-project "Ghostel")
-                                  (ghostel-project-list-buffers "Ghostel buffers")))
+                                  (magit-status "Magit")))
 
   )
 

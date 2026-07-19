@@ -3,14 +3,10 @@
 ;; [vc-mode] Version control interface
 (use-package vc
   :config
-  (setq vc-allow-async-revert t)
-  ;; Emacs 31+ VC polish options (noop/free vars on 30.2 if unbound).
-  (when (boundp 'vc-auto-revert-mode)
-    (setq vc-auto-revert-mode t))
-  (when (boundp 'vc-allow-rewriting-published-history)
-    (setq vc-allow-rewriting-published-history t))
-  (when (boundp 'vc-dir-auto-hide-up-to-date)
-    (setq vc-dir-auto-hide-up-to-date 'revert)))
+  (setq vc-allow-async-revert t
+        vc-auto-revert-mode t
+        vc-allow-rewriting-published-history t
+        vc-dir-auto-hide-up-to-date 'revert))
 
 
 ;; [git-link] Get remote repo URL for buffer location
@@ -146,16 +142,7 @@
           ("Updated" 10 t nil updated nil)))
   )
 
-;; [magh.el] Magit-style GitHub frontend powered by the `gh' CLI.
-;; Source: https://github.com/roife/magh.el  (NOT sigma/gh.el)
-;; Clone:  git clone https://github.com/roife/magh.el.git ~/code/gh.el
-(defconst +magh-directory (expand-file-name "~/code/gh.el")
-  "Checkout of roife/magh.el used via :load-path.")
-
-(defconst +magh-available-p
-  (file-exists-p (expand-file-name "magh.el" +magh-directory))
-  "Non-nil when magh.el is present under `+magh-directory'.")
-
+;; [magh.el] Section-oriented GitHub frontend powered by the `gh' CLI
 (use-package magh
   :straight nil
   :load-path +magh-directory

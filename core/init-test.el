@@ -17,6 +17,10 @@
   (setq chirp-show-avatars nil
         chirp-show-tweet-media nil))
 
+(with-eval-after-load "eglot"
+  (push '(verilog-mode . ("/Users/roifewu/code/vide/target/debug/vide")) eglot-server-programs)
+  )
+
 (setq eglot-x-enable-snippet-text-edit nil)
 
 (defun cargo-xtask-install-server ()
@@ -38,11 +42,11 @@
   "Restart Eglot in the current buffer and switch to the Eglot log buffer."
   (interactive)
   (when-let* ((project-name (when (project-current)
-                             (file-name-nondirectory
-                              (directory-file-name
-                               (project-root (project-current))))))
+                              (file-name-nondirectory
+                               (directory-file-name
+                                (project-root (project-current))))))
               (log-buffer-name (format "*EGLOT (%s/(rust-ts-mode rust-mode)) events*"
-                                      project-name)))
+                                       project-name)))
     (let ((eglot-log-window (catch 'found
                               (dolist (win (window-list))
                                 (when (string-equal (buffer-name (window-buffer win))

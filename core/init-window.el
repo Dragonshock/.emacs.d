@@ -108,11 +108,8 @@
           "^Eshell-popup: .*$" eshell-mode
           "^\\*shell.*\\*.*$"  shell-mode
           "^\\*terminal.*\\*.*$" term-mode
+          "^\\*vterm.*\\*.*$"  vterm-mode
           "^\\*eldoc.*\\*.*$" eldoc-mode
-          ;; NOT agent-shell-mode: Grok sessions are long-lived right panes
-          ;; (see agent-shell-display-action in init-ai.el).  Treating them as
-          ;; popper popups forces bottom placement, lets C-g close the session
-          ;; via +popper-close-window-hack, and fights agent-shell's own layout.
 
           "\\*package update results\\*$" "\\*Package-Lint\\*$"
           "\\*[Wo]*Man.*\\*$"
@@ -201,8 +198,7 @@
   :straight t
   :hook (window-setup . zoom-mode)
   :config
-  (setq zoom-ignored-major-modes
-        '(ediff-mode vundo-mode minibuffer-mode speedbar-mode agent-shell-mode))
+  (setq zoom-ignored-major-modes '(ediff-mode vundo-mode minibuffer-mode speedbar-mode))
 
   (defun +zoom-fix-window-size-h ()
     (setq-local window-size-fixed t))
@@ -252,4 +248,4 @@
         (set-face-attribute 'auto-dim-other-buffers-hide nil
                             :foreground dim
                             :background dim))))
-)
+  )

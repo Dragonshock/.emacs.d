@@ -19,4 +19,4 @@
 (global-set-key (kbd "s-w") #'tab-close)
 (global-set-key (kbd "s-t") #'tab-new)
 (global-set-key (kbd "s-o") #'other-window)
-(global-set-key (kbd "s-,") #'xref-go-back)
+(global-set-key (kbd "s-,") nil)
