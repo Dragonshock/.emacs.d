@@ -89,9 +89,11 @@
   :hook ((prog-mode markdown-mode) . ws-butler-mode))
 
 
-;; [editorconfig] Respect project-local formatting rules
+;; [editorconfig] Respect project-local formatting rules (built into Emacs 30+)
 (use-package editorconfig
-  :hook (find-file . editorconfig-mode))
+  :straight (:type built-in)
+  ;; Global minor mode; once on, applies via dir-local / coding hooks.
+  :hook (after-init . editorconfig-mode))
 
 
 ;; [apheleia] Format buffers asynchronously without moving point

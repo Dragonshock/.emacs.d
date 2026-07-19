@@ -343,13 +343,22 @@
 
 
 ;; [environment variables]
+;; emacs-plus formula injects PATH via site-start (`ns-emacs-plus-injected-path`
+;; / EMACS_PLUS_PATH). That does not cover JAVA_HOME and friends, so we still
+;; copy those from a login shell when needed — just skip re-importing PATH.
 (use-package exec-path-from-shell
   :straight t
   :unless (or noninteractive (daemonp) (not (display-graphic-p)))
-  :hook (after-init . exec-path-from-shell-initialize)
   :init
   (setq exec-path-from-shell-arguments '("-l")
-        exec-path-from-shell-variables '("PATH" "HOMEBREW" "JAVA_HOME" "JDTLS_JAVA_HOME" "MANPATH")))
+        exec-path-from-shell-variables
+        (let ((vars '("HOMEBREW" "JAVA_HOME" "JDTLS_JAVA_HOME" "MANPATH")))
+          (if (bound-and-true-p ns-emacs-plus-injected-path)
+              vars
+            (cons "PATH" vars))))
+  :config
+  (when exec-path-from-shell-variables
+    (exec-path-from-shell-initialize)))
 
 
 ;; [backup walker] A utility to view Emacs backup files.
