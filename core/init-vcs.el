@@ -3,10 +3,14 @@
 ;; [vc-mode] Version control interface
 (use-package vc
   :config
-  (setq vc-allow-async-revert t
-        vc-auto-revert-mode t
-        vc-allow-rewriting-published-history t
-        vc-dir-auto-hide-up-to-date 'revert))
+  (setq vc-allow-async-revert t)
+  ;; Emacs 31+ VC polish options (noop/free vars on 30.2 if unbound).
+  (when (boundp 'vc-auto-revert-mode)
+    (setq vc-auto-revert-mode t))
+  (when (boundp 'vc-allow-rewriting-published-history)
+    (setq vc-allow-rewriting-published-history t))
+  (when (boundp 'vc-dir-auto-hide-up-to-date)
+    (setq vc-dir-auto-hide-up-to-date 'revert)))
 
 
 ;; [git-link] Get remote repo URL for buffer location
@@ -142,10 +146,20 @@
           ("Updated" 10 t nil updated nil)))
   )
 
-;; [magh.el] Section-oriented GitHub frontend powered by the `gh' CLI
+;; [magh.el] Magit-style GitHub frontend powered by the `gh' CLI.
+;; Source: https://github.com/roife/magh.el  (NOT sigma/gh.el)
+;; Clone:  git clone https://github.com/roife/magh.el.git ~/code/gh.el
+(defconst +magh-directory (expand-file-name "~/code/gh.el")
+  "Checkout of roife/magh.el used via :load-path.")
+
+(defconst +magh-available-p
+  (file-exists-p (expand-file-name "magh.el" +magh-directory))
+  "Non-nil when magh.el is present under `+magh-directory'.")
+
 (use-package magh
   :straight nil
-  :load-path "~/code/gh.el"
+  :load-path +magh-directory
+  :if +magh-available-p
   :bind (("C-, g g" . magh)
          ("C-, g G" . magh-dispatch)
          ("C-, g d" . magh-repo-status)
@@ -181,7 +195,8 @@
 ;; [magh-magit] Lightweight asynchronous magh.el summaries in Magit status
 (use-package magh-magit
   :straight nil
-  :load-path "~/code/gh.el"
+  :load-path +magh-directory
+  :if +magh-available-p
   :after magit
   :demand t
   :config
@@ -198,7 +213,8 @@
 ;; Structured actions for magh.el candidates in Embark.
 (use-package magh-embark
   :straight nil
-  :load-path "~/code/gh.el"
+  :load-path +magh-directory
+  :if +magh-available-p
   :after embark
   :demand t
   :config
@@ -208,7 +224,8 @@
 ;; Keep magh.el's native Issue/PR viewer, with an explicit Forge -> magh.el bridge.
 (use-package magh-forge
   :straight nil
-  :load-path "~/code/gh.el"
+  :load-path +magh-directory
+  :if +magh-available-p
   :after forge
   :commands (magh-forge-open-current-topic-in-magh)
   :bind (:map forge-topic-mode-map
