@@ -176,7 +176,7 @@
 
 (use-package avy-embark-collect
   :straight (:host github :repo "oantolin/embark"
-             :files ("avy-embark-collect.el"))
+                   :files ("avy-embark-collect.el"))
   :after (embark avy)
   :bind (:map embark-collect-mode-map
               ("j" . avy-embark-collect-choose)
