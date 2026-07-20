@@ -15,7 +15,9 @@
              chirp-profile-following-users)
   :config
   (setq chirp-show-avatars nil
-        chirp-show-tweet-media nil))
+        chirp-show-tweet-media nil
+        chirp-tweet-separator ""
+        chirp-tweet-separator-indent 0))
 
 (with-eval-after-load "eglot"
   (push '(verilog-mode . ("/Users/roifewu/code/vide/target/debug/vide")) eglot-server-programs)

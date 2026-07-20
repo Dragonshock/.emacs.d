@@ -3,16 +3,67 @@
 (use-package gptel
   :straight t
   :commands (gptel-api-key-from-auth-source
-             +gptel-rewrite-translate-to-chinese)
-  :bind (("C-c r t" . +gptel-rewrite-translate-to-chinese))
+             +gptel-rewrite-translate-to-chinese
+             +gptel-rewrite-summarize)
+  :bind (("C-c r t" . +gptel-rewrite-translate-to-chinese)
+         ("C-c r s" . +gptel-rewrite-summarize))
   :preface
-  (defun +gptel-rewrite-translate-to-chinese (_beg _end)
-    "Translate the active region to Chinese with `gptel-rewrite'."
-    (interactive "r")
-    (unless (use-region-p)
-      (user-error "Select a region to translate"))
+  (defun +gptel-rewrite-export (&optional overlays)
+    "Export OVERLAYS to a new buffer without changing their source.
+When OVERLAYS is nil, export all pending rewrites in the current buffer."
+    (interactive)
     (require 'gptel-rewrite)
-    (gptel--suffix-rewrite "Translate into fluent Simplified Chinese."))
+    (setq overlays (or overlays gptel--rewrite-overlays))
+    (unless overlays
+      (user-error "No pending rewrites to export"))
+    (let* ((source-buffer (current-buffer))
+           (source-name (buffer-name source-buffer))
+           (prepared-buffer
+            (gptel--rewrite-prepare-buffer overlays))
+           (prepared-point
+            (with-current-buffer prepared-buffer
+              (- (point) (point-min))))
+           (contents
+            (with-current-buffer prepared-buffer
+              (buffer-substring-no-properties (point-min) (point-max))))
+           (export-buffer
+            (generate-new-buffer
+             (format "*gptel rewrite export: %s*" source-name))))
+      (with-current-buffer export-buffer
+        (funcall gptel-default-mode)
+        (insert contents)
+        (goto-char (+ (point-min)
+                      (min prepared-point (- (point-max) (point-min)))))
+        (setq-local header-line-format
+                    (format " Exported rewrite from %s" source-name))
+        (visual-line-mode 1)
+        (set-buffer-modified-p nil))
+      (pop-to-buffer export-buffer)))
+
+  (defun +gptel-rewrite-region-or-buffer (prompt)
+    "Rewrite the active region, or the whole buffer, according to PROMPT."
+    (require 'gptel-rewrite)
+    (if (use-region-p)
+        (gptel--suffix-rewrite prompt)
+      (when (= (point-min) (point-max))
+        (user-error "Buffer is empty"))
+      (save-mark-and-excursion
+        (set-mark (point-max))
+        (goto-char (point-min))
+        (activate-mark)
+        (gptel--suffix-rewrite prompt))))
+
+  (defun +gptel-rewrite-translate-to-chinese ()
+    "Translate the active region, or the whole buffer, to Chinese."
+    (interactive)
+    (+gptel-rewrite-region-or-buffer
+     "Translate into fluent Chinese."))
+
+  (defun +gptel-rewrite-summarize ()
+    "Summarize the active region, or the whole buffer when no region is active."
+    (interactive)
+    (+gptel-rewrite-region-or-buffer
+     "Summarize in Chinese while preserving details and key information."))
   :init
   (setq gptel-model 'deepseek-v4-flash
         gptel-default-mode 'org-mode
@@ -26,8 +77,13 @@
 
   (add-hook 'gptel-post-stream-hook 'gptel-auto-scroll)
   (add-hook 'gptel-post-response-functions 'gptel-end-of-response)
+  (with-eval-after-load 'gptel-rewrite
+    (keymap-set gptel-rewrite-actions-map "C-c C-x" #'+gptel-rewrite-export)
+    (transient-append-suffix 'gptel-rewrite 'gptel--suffix-rewrite-accept
+      '("X" "Export rewrites" +gptel-rewrite-export)))
   (with-eval-after-load 'embark
-    (keymap-set embark-region-map "T" #'+gptel-rewrite-translate-to-chinese))
+    (keymap-set embark-region-map "T" #'+gptel-rewrite-translate-to-chinese)
+    (keymap-set embark-region-map "S" #'+gptel-rewrite-summarize))
   )
 
 (use-package gptel-agent

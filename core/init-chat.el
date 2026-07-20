@@ -138,7 +138,40 @@
              (not telega--sort-criteria)
              (not telega--sort-inverted))
         ""
-      (apply orig-fn args))))
+      (apply orig-fn args)))
+
+  ;; HACK: workaround with beginend
+  (with-eval-after-load 'beginend
+    (defun beginend-telega-mode-goto-beginning ()
+      "Go to the first button in the Telega root view."
+      (interactive)
+      (beginend--double-tap-begin
+       (goto-char (max (point-min)
+                       (1- telega-root-view--ewocs-marker)))
+       (telega-button-forward 1 nil 'no-error)))
+
+    (defun beginend-telega-mode-goto-end ()
+      "Go to the last button in the Telega root view."
+      (interactive)
+      (beginend--double-tap-end
+       (telega-button-backward 1 nil 'no-error)))
+
+    (defvar beginend-telega-mode-map
+      (let ((map (make-sparse-keymap)))
+        (beginend--defkey map
+                          #'beginend-telega-mode-goto-beginning
+                          #'beginend-telega-mode-goto-end)
+        map)
+      "Keymap for `beginend-telega-mode'.")
+
+    (define-minor-mode beginend-telega-mode
+      "Make buffer boundary commands aware of the Telega root view."
+      :lighter " be"
+      :keymap beginend-telega-mode-map)
+
+    (add-to-list 'beginend-modes
+                 '(telega-root-mode-hook . beginend-telega-mode)))
+  )
 
 
 (use-package telega-dired-dwim
