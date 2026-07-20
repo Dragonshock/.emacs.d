@@ -144,8 +144,7 @@
 
 ;; [magh.el] Section-oriented GitHub frontend powered by the `gh' CLI
 (use-package magh
-  :straight nil
-  :load-path "~/code/gh.el"
+  :straight (:host github :repo "roife/magh.el")
   :bind (("C-, g g" . magh)
          ("C-, g G" . magh-dispatch)
          ("C-, g d" . magh-repo-status)
@@ -180,8 +179,7 @@
 
 ;; [magh-magit] Lightweight asynchronous magh.el summaries in Magit status
 (use-package magh-magit
-  :straight nil
-  :load-path "~/code/gh.el"
+  :straight (:host github :repo "roife/magh.el")
   :after magit
   :demand t
   :config
@@ -197,8 +195,7 @@
 
 ;; Structured actions for magh.el candidates in Embark.
 (use-package magh-embark
-  :straight nil
-  :load-path "~/code/gh.el"
+  :straight (:host github :repo "roife/magh.el")
   :after embark
   :demand t
   :config
@@ -207,8 +204,7 @@
 
 ;; Keep magh.el's native Issue/PR viewer, with an explicit Forge -> magh.el bridge.
 (use-package magh-forge
-  :straight nil
-  :load-path "~/code/gh.el"
+  :straight (:host github :repo "roife/magh.el")
   :after forge
   :commands (magh-forge-open-current-topic-in-magh)
   :bind (:map forge-topic-mode-map
