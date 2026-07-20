@@ -77,7 +77,7 @@
   (setq eglot-events-buffer-config '(:size 0 :format full)
         eglot-autoshutdown t
         ;; eglot-report-progress 'messages
-        eglot-documentation-renderer 'markdown-ts-view-mode
+        eglot-documentation-renderer 'gfm-view-mode
         eglot-code-action-indications nil)
 
   ;; eglot has it's own strategy by default

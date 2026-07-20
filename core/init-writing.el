@@ -23,10 +23,24 @@
   :straight t)
 
 
-(use-package markdown-ts-mode
-  :straight (:type built-in)
-  :mode (("\\.md\\'" . markdown-ts-mode)
-         ("\\.markdown\\'" . markdown-ts-mode)))
+;; [markdown-mode] Classic Markdown major mode (Emacs 30 has no built-in
+;; markdown-ts-mode; that arrives in Emacs 31). Use GFM for .md, and mirror
+;; org-style display: hide markup, scale headers, native code fontification.
+(use-package markdown-mode
+  :straight t
+  :mode (("\\.md\\'" . gfm-mode)
+         ("\\.markdown\\'" . markdown-mode))
+  :init
+  (setq markdown-fontify-code-blocks-natively t
+        markdown-fontify-whole-heading-line t
+        markdown-header-scaling t
+        markdown-header-scaling-values '(1.8 1.5 1.3 1.15 1.05 1.0)
+        markdown-hide-markup t
+        markdown-hide-urls t
+        markdown-list-indent-width 2)
+  :config
+  (when (executable-find "pandoc")
+    (setq markdown-command "pandoc")))
 
 
 ;; [typst-ts-mode]

@@ -142,7 +142,18 @@
           ("Updated" 10 t nil updated nil)))
   )
 
-;; [magh.el] Section-oriented GitHub frontend powered by the `gh' CLI
+;; [magh.el] Magit-style GitHub frontend powered by the `gh' CLI.
+;; Source: https://github.com/roife/magh.el  (NOT sigma/gh.el)
+;; Clone:  git clone https://github.com/roife/magh.el.git ~/code/gh.el
+;; Note: magh.el Package-Requires Emacs 31.1+; skip on older builds.
+(defconst +magh-directory (expand-file-name "~/code/gh.el")
+  "Checkout of roife/magh.el used via :load-path.")
+
+(defconst +magh-available-p
+  (and (>= emacs-major-version 31)
+       (file-exists-p (expand-file-name "magh.el" +magh-directory)))
+  "Non-nil when magh.el is present and this Emacs is new enough.")
+
 (use-package magh
   :straight nil
   :load-path +magh-directory

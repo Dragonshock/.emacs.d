@@ -13,21 +13,10 @@
       (user-error "Select a region to translate"))
     (require 'gptel-rewrite)
     (gptel--suffix-rewrite "Translate into fluent Simplified Chinese."))
-
-  (defun +gptel-fill-rewritten-text (beg end)
-    "Hard-wrap rewritten text to `fill-column'.
-
-Intended for `gptel-post-rewrite-functions'.  Runs in the temporary
-buffer that holds the rewrite result before it is shown as an overlay."
-    (fill-region beg end))
   :init
   (setq gptel-model 'deepseek-v4-flash
         gptel-default-mode 'org-mode
         gptel-confirm-tool-calls nil)
-  ;; Fill rewrite results (including +gptel-rewrite-translate-to-chinese)
-  ;; so LLM output is hard-wrapped to fill-column.  See gptel issue #564.
-  ;; In :init so it is registered even if only gptel-rewrite is required.
-  (add-hook 'gptel-post-rewrite-functions #'+gptel-fill-rewritten-text)
   :config
   (setq-default gptel-backend
                 (gptel-make-deepseek "DeepSeek-thinking"
