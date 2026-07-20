@@ -14,10 +14,8 @@
       (ibuffer-visit-buffer)))
 
   (setq ibuffer-show-empty-filter-groups nil
-        ibuffer-use-other-window t)
-  ;; Emacs 31+: human-readable size column.
-  (when (boundp 'ibuffer-human-readable-size)
-    (setq ibuffer-human-readable-size t))
+        ibuffer-use-other-window t
+        ibuffer-human-readable-size t)
   )
 
 ;; [ibuffer-project] Group ibuffer's list by project root
@@ -37,7 +35,7 @@
                            (mode . eww-buffers-mode)
                            (mode . eww-search-annotations-mode)))
           (elfeed-filter '(or (mode . elfeed-show-mode)
-                               (mode . elfeed-search-mode)))
+                              (mode . elfeed-search-mode)))
           (telega-filter '(or (mode . telega-chat-mode)
                               (mode . telega-root-mode)
                               (mode . telega-image-mode)

@@ -25,8 +25,12 @@
           (with-silent-modifications
             (comint-truncate-buffer))))))
 
-  ;; Emacs hand-rolled ansi-color-apply-on-region (Emacs 28+).
-  (add-hook 'compilation-filter-hook #'ansi-color-compilation-filter)
+  (add-hook! compilation-filter-hook
+    (defun +compilation--colorize-h ()
+      "Apply ANSI color codes to the compilation buffer."
+      (require 'ansi-color)
+      (let ((inhibit-read-only t))
+        (ansi-color-apply-on-region compilation-filter-start (point)))))
   )
 
 
@@ -59,7 +63,7 @@
   :preface
   (defconst +eglot-auto-start-modes
     '(c-mode c++-mode rust-mode python-mode java-mode
-             c-ts-mode c++-ts-mode rust-ts-mode python-ts-mode java-ts-mode)
+             c-ts-mode c++-ts-mode rust-ts-mode python-ts-mode)
     "Major modes where Eglot should start automatically.")
   :init
   (dolist (mode +eglot-auto-start-modes)
@@ -72,15 +76,14 @@
   :config
   (setq eglot-events-buffer-config '(:size 0 :format full)
         eglot-autoshutdown t
-        eglot-extend-to-xref t)
-  ;; Emacs 31+: markdown-ts documentation renderer + code-action fringe hints.
-  (when (boundp 'eglot-documentation-renderer)
-    (setq eglot-documentation-renderer 'markdown-ts-view-mode))
-  (when (boundp 'eglot-code-action-indications)
-    (setq eglot-code-action-indications nil))
+        ;; eglot-report-progress 'messages
+        eglot-documentation-renderer 'gfm-view-mode
+        eglot-code-action-indications nil)
 
+  ;; eglot has it's own strategy by default
+  (setq-local eldoc-documentation-strategy 'eldoc-documentation-compose-eagerly)
   (setq-default eglot-workspace-configuration
-                '((:pylsp . (:plugins (:jedi_completion (:fuzzy t))))
+                '((:pyls . (:plugins (:jedi_completion (:fuzzy t))))
                   (:rust-analyzer . (:cargo (:allFeatures t :allTargets t :features "full")
                                             :checkOnSave :json-false
                                             :completion (:termSearch (:enable t)
@@ -97,7 +100,7 @@
                                             :workspace (:symbol (:search (:kind "all_symbols"
                                                                                 :scope "workspace_and_dependencies")))
                                             :references (:excludeImports t
-                                                         :excludeTests t)
+                                                                         :excludeTests t)
                                             :lru (:capacity 1024)
                                             :diagnostics (:enable :json-false)))
                   (:typescript . (:preferences (:importModuleSpecifierPreference "non-relative")))
@@ -108,7 +111,7 @@
                                                :path "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/"
                                                :default t)])
                             :import (:gradle (:enabled t
-                                              :wrapper (:enabled t)))
+                                                       :wrapper (:enabled t)))
                             :autobuild (:enabled :json-false)
                             :extendedClientCapabilities (:classFileContentsSupport t)))))
 
@@ -121,14 +124,12 @@
                                         (md5 (expand-file-name project-root))))))
       `("env" ,(concat "JAVA_HOME=" jdtls-java-home)
         "jdtls" "--jvm-arg=-Xmx16G" "-data" ,data-dir)))
-  (push '((java-mode java-ts-mode) . jdtls-command-contact) eglot-server-programs)
+  (push '(java-mode . jdtls-command-contact) eglot-server-programs)
 
+  ;; we call eldoc manually
   (add-hook! eglot-managed-mode-hook
-    (defun +eglot-setup-managed-buffer ()
-      "Per-buffer Eglot setup: eldoc strategy; we call eldoc manually."
+    (defun +eglot-disable-eldoc-mode ()
       (when (eglot-managed-p)
-        (setq-local eldoc-documentation-strategy
-                    'eldoc-documentation-compose-eagerly)
         (eldoc-mode -1))))
   )
 
@@ -153,10 +154,9 @@
   :config
   (setq eldoc-echo-area-display-truncation-message t
         eldoc-echo-area-prefer-doc-buffer t
-        eldoc-echo-area-use-multiline-p nil)
-  ;; Emacs 31+: show eldoc at point without an explicit eldoc command.
-  (when (boundp 'eldoc-help-at-pt)
-    (setq eldoc-help-at-pt t)))
+        eldoc-echo-area-use-multiline-p nil
+        eglot-extend-to-xref t
+        eldoc-help-at-pt t))
 
 
 ;; [help]
@@ -402,31 +402,9 @@
 (use-package treesit
   :when (treesit-available-p)
   :init
-  (setq treesit-font-lock-level 4)
-  ;; Emacs 31+: global treesit mode switch + auto grammar install.
-  (when (>= emacs-major-version 31)
-    (when (boundp 'treesit-enabled-modes)
-      (setq treesit-enabled-modes t))
-    (when (boundp 'treesit-auto-install-grammar)
-      (setq treesit-auto-install-grammar 'always)))
-  ;; Emacs 30: remap classic modes to treesit variants when the grammar
-  ;; is already installed (see `tree-sitter/' and `treesit-language-available-p').
-  ;; Rust stays on `rust-mode' + `rust-mode-treesitter-derive'.
-  (defun +treesit-remap-when-ready (mode ts-mode language)
-    "Remap MODE to TS-MODE when LANGUAGE grammar is available."
-    (when (and (fboundp ts-mode)
-               (treesit-language-available-p language))
-      (add-to-list 'major-mode-remap-alist (cons mode ts-mode))))
-  (+treesit-remap-when-ready 'python-mode 'python-ts-mode 'python)
-  (+treesit-remap-when-ready 'yaml-mode 'yaml-ts-mode 'yaml)
-  (+treesit-remap-when-ready 'js-json-mode 'json-ts-mode 'json)
-  (+treesit-remap-when-ready 'json-mode 'json-ts-mode 'json)
-  (+treesit-remap-when-ready 'sh-mode 'bash-ts-mode 'bash)
-  (+treesit-remap-when-ready 'js-mode 'js-ts-mode 'javascript)
-  (+treesit-remap-when-ready 'css-mode 'css-ts-mode 'css)
-  (+treesit-remap-when-ready 'c-mode 'c-ts-mode 'c)
-  (+treesit-remap-when-ready 'c++-mode 'c++-ts-mode 'cpp)
-  (+treesit-remap-when-ready 'java-mode 'java-ts-mode 'java))
+  (setq treesit-enabled-modes t
+        treesit-auto-install-grammar 'always
+        treesit-font-lock-level 4))
 
 
 ;; [indent-bars] Show indent guides

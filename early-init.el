@@ -24,15 +24,12 @@
       jka-compr-verbose init-file-debug
       native-comp-async-report-warnings-errors init-file-debug
       native-comp-warning-on-missing-source init-file-debug
+      native-comp-async-on-battery-power nil
       warning-suppress-types '((defvaralias) (lexical-binding))
       warning-inhibit-types '((files missing-lexbind-cookie)))
-;; Emacs 31+: avoid native-comp on battery when non-nil would pause.
-(when (boundp 'native-comp-async-on-battery-power)
-  (setq native-comp-async-on-battery-power nil))
 
-;; Process read size: set the real runtime value in init-basic.el
-;; (4MB for LSP). Keep a modest floor here so early subprocesses are fine.
-(setq read-process-output-max (* 1024 1024))
+;; Increase process read size before any package can start subprocesses.
+(setq read-process-output-max (* 64 1024))
 
 ;; In noninteractive sessions, prioritize .el file. It saves IO time
 (setq load-prefer-newer noninteractive)

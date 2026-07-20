@@ -27,13 +27,13 @@
                        (push '("\\\\}" . ?}) prettify-symbols-alist)
                        (push '("\\vec{" . (?  (Bc . Bl) ?{ (Bc . Br) ?⃗)) prettify-symbols-alist)
                        (push '("\\ " . ?‿) prettify-symbols-alist)
-                   ;;     (push '("\\(" . ?‹) prettify-symbols-alist)
-                   ;;           (push '("\\)" . ?›) prettify-symbols-alist)
-                   ;;     (push '("\\)，" . (?  (Bc . Bl) ?， (Bc . Br) ?›)) prettify-symbols-alist)
-                   ;; (push '("\\)。" . (?  (Bc . Bl) ?。 (Bc . Br) ?›)) prettify-symbols-alist)
-                   ;; (push '("\\)；" . (?  (Bc . Bl) ?； (Bc . Br) ?›)) prettify-symbols-alist)
-                   ;; (push '("\\[" . ?«) prettify-symbols-alist)
-                   ;; (push '("\\]" . ?») prettify-symbols-alist)
+                       ;;     (push '("\\(" . ?‹) prettify-symbols-alist)
+                       ;;           (push '("\\)" . ?›) prettify-symbols-alist)
+                       ;;     (push '("\\)，" . (?  (Bc . Bl) ?， (Bc . Br) ?›)) prettify-symbols-alist)
+                       ;; (push '("\\)。" . (?  (Bc . Bl) ?。 (Bc . Br) ?›)) prettify-symbols-alist)
+                       ;; (push '("\\)；" . (?  (Bc . Bl) ?； (Bc . Br) ?›)) prettify-symbols-alist)
+                       ;; (push '("\\[" . ?«) prettify-symbols-alist)
+                       ;; (push '("\\]" . ?») prettify-symbols-alist)
                        (prettify-symbols-mode))))
   :config
   (setq
@@ -129,11 +129,11 @@
 
    org-appear-trigger 'always)          ; manual
 
-  ;; (add-hook! org-mode-hook :call-immediately
-  ;;   (defun +org-add-appear-hook ()
-  ;;     (add-hook 'meow-insert-enter-hook #'org-appear-manual-start nil t)
-  ;;     (add-hook 'meow-insert-exit-hook #'org-appear-manual-stop nil t))))
-  )
+  (add-hook! org-mode-hook :call-immediately
+    (defun +org-add-appear-hook ()
+      (add-hook 'meow-insert-enter-hook #'org-appear-manual-start nil t)
+      (add-hook 'meow-insert-exit-hook #'org-appear-manual-stop nil t))))
+
 
 (use-package org-modern
   :straight t

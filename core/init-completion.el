@@ -65,8 +65,7 @@
      ;; Ensure $ works with Consult commands, which add disambiguation suffixes
      ((string-suffix-p "$" pattern) `(orderless-regexp . ,(concat (substring pattern 0 -1) "[\x200000-\x300000]*$")))
      ((string= "!" pattern) `(orderless-literal . ""))
-     ;; Prefer orderless-not (README); without-literal is narrower.
-     ((string-prefix-p "!" pattern) `(orderless-not . ,(substring pattern 1)))
+     ((string-prefix-p "!" pattern) `(orderless-without-literal . ,(substring pattern 1)))
      ((string-prefix-p "%" pattern) `(char-fold-to-regexp . ,(substring pattern 1)))
      ((string-suffix-p "%" pattern) `(char-fold-to-regexp . ,(substring pattern 0 -1)))
      ((string-prefix-p "^" pattern) `(orderless-literal-prefix . ,(substring pattern 1)))
@@ -90,10 +89,8 @@
                                         (eglot-capf (styles orderless)))
         orderless-style-dispatchers '(+orderless-dispatch)
         orderless-component-separator #'orderless-escapable-split
-        completions-sort 'historical)
-  ;; Present on some newer builds; skip when unbound (Emacs 30.2).
-  (when (boundp 'completion-pcm-leading-wildcard)
-    (setq completion-pcm-leading-wildcard t)))
+        completions-sort 'historical
+        completion-pcm-leading-wildcard t))
 
 
 (use-package marginalia
@@ -215,15 +212,8 @@
 
 (use-package corfu
   :straight (:files (:defaults "extensions/*.el"))
-  :hook (((prog-mode conf-mode yaml-mode shell-mode eshell-mode text-mode
-                     agent-shell-mode grok-ide-session-mode)
-          . corfu-mode)
+  :hook (((prog-mode conf-mode yaml-mode shell-mode eshell-mode text-mode codex-ide-session-mode) . corfu-mode)
          ((eshell-mode shell-mode) . (lambda () (setq-local corfu-auto nil)))
-         ;; agent-shell: auto after 1 char so `/` and `@` completion pops quickly
-         (agent-shell-mode . (lambda ()
-                               (setq-local corfu-auto t
-                                           corfu-auto-prefix 1
-                                           corfu-auto-delay 0.05)))
          (minibuffer-setup . +corfu-enable-in-minibuffer))
   :bind (:map corfu-map
               ("TAB" . corfu-complete)
@@ -291,14 +281,8 @@
                 (append completion-at-point-functions (list #'cape-file #'cape-dabbrev)))
 
   (defun +completion-add-tex-capfs ()
-    (+completion-add-capfs #'cape-tex))
+    (+completion-add-capfs #'cape-tex)))
 
-  :config
-  ;; Built-in `dabbrev-capf' signals `user-error' when point is not after a word
-  ;; (e.g. empty line / punctuation in COMMIT_EDITMSG). Magit adds it via
-  ;; `git-commit-setup-capf'; Corfu auto-completion then surfaces the error.
-  ;; Cape's recommended silence wrapper: see Cape README "Example 8".
-  (advice-add 'dabbrev-capf :around #'cape-wrap-silent))
 
 ;;; Snippets
 

@@ -6,12 +6,6 @@
                      (float-time (time-subtract nil before-init-time))
                      (float-time (time-subtract after-init-time before-init-time)))))
 
-;; Proxy
-;; (setq url-proxy-services
-;;       '(("no_proxy" . "^\\(localhost\\|10.*\\)")
-;;         ("http" . "127.0.0.1:7890")
-;;         ("https" . "127.0.0.1:7890")))
-
 (defvar +init-files (list
                      'init-util
                      'init-straight

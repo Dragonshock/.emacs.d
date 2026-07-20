@@ -215,12 +215,9 @@ If no project is found, create a temporary Eshell instance in the current direct
   :commands (eshell/z))
 
 
-;; `esh-autosuggest' pulls in Company solely for fish-like history ghost text
-;; and fights the Corfu stack in eshell (see package README). Prefer Corfu +
-;; capf / shell history instead.
-;; (use-package esh-autosuggest
-;;   :straight t
-;;   :hook (eshell-mode . esh-autosuggest-mode))
+(use-package esh-autosuggest
+  :straight t
+  :hook (eshell-mode . esh-autosuggest-mode))
 
 
 (use-package esh-help

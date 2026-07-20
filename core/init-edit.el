@@ -60,11 +60,6 @@
       (with-current-buffer buffer
         (+auto-revert-buffer-h))))
 
-  (defun +auto-revert-after-focus-change (&rest _)
-    "Auto-revert visible buffers after a frame focus change."
-    (when (frame-focus-state)
-      (+auto-revert-visible-buffers-h)))
-
   (define-minor-mode +auto-revert-mode
     "A lazy alternative to `global-auto-revert-mode'."
     :global t
@@ -73,14 +68,9 @@
     (let ((fn (if +auto-revert-mode #'add-hook #'remove-hook)))
       (funcall fn 'window-buffer-change-functions #'+auto-revert-window-buffer-h)
       (funcall fn 'window-selection-change-functions #'+auto-revert-selected-window-h)
+      (funcall fn 'focus-in-hook #'+auto-revert-visible-buffers-h)
       (funcall fn 'after-save-hook #'+auto-revert-visible-buffers-h)
-      (funcall fn 'server-switch-hook #'+auto-revert-buffer-h))
-    ;; `after-focus-change-function' is a function slot, not a normal hook.
-    (if +auto-revert-mode
-        (add-function :after after-focus-change-function
-                      #'+auto-revert-after-focus-change)
-      (remove-function after-focus-change-function
-                       #'+auto-revert-after-focus-change))))
+      (funcall fn 'server-switch-hook #'+auto-revert-buffer-h))))
 
 
 ;; [ws-butler] Remove trailing whitespace with lines touched
@@ -89,11 +79,9 @@
   :hook ((prog-mode markdown-mode) . ws-butler-mode))
 
 
-;; [editorconfig] Respect project-local formatting rules (built into Emacs 30+)
+;; [editorconfig] Respect project-local formatting rules
 (use-package editorconfig
-  :straight (:type built-in)
-  ;; Global minor mode; once on, applies via dir-local / coding hooks.
-  :hook (after-init . editorconfig-mode))
+  :hook (find-file . editorconfig-mode))
 
 
 ;; [apheleia] Format buffers asynchronously without moving point
@@ -206,8 +194,7 @@
 ;; [embrace] Add/change/delete pairs of symbol
 (use-package embrace
   :straight t
-  ;; Keep embark on C-.; avoid overwriting embark-act.
-  :bind ("M-s e" . embrace-commander)
+  :bind ("C-." . embrace-commander)
   :hook (org-mode . embrace-org-mode-hook)
   )
 
