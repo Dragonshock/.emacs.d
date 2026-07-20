@@ -143,9 +143,9 @@
          ([remap switch-to-buffer-other-window] . consult-buffer-other-window)
          ([remap switch-to-buffer-other-frame]  . consult-buffer-other-frame)
          ([remap yank-pop]                      . consult-yank-pop)
-         ("C-c l"                               . consult-line)
-         ("C-c p"                               . consult-ripgrep)
-         ("C-c t"                               . consult-fd)
+         ("C-c d l"                             . consult-line)
+         ("C-c d r"                             . consult-ripgrep)
+         ("C-c d f"                             . consult-fd)
          :map minibuffer-mode-map
          ("C-r"                                 . consult-history))
   :config

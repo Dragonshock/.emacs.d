@@ -201,7 +201,7 @@
 ;; [dogears] Jump to the last edit location
 (use-package dogears
   :straight t
-  :defer 0.1
+  :hook (after-init . dogears-mode)
   :bind (:map global-map
               ("M-g d" . dogears-go)
               ("M-g M-b" . dogears-back)
@@ -224,7 +224,26 @@
                             xref-go-back
                             xref-find-definitions
                             xref-find-references))
-  (dogears-mode 1))
+
+  (defadvice! +dogears--format-record-a (record)
+    :override #'dogears--format-record
+    (apply #'format
+           "%s %-3.3s %-30.30s %-30.30s %-0.15s %-s %0.0s%-s"
+           (dogears--format-record-list record)))
+
+  (defvar consult--source-dogears
+    (list :name "Dogears"
+          :narrow ?d
+          :category 'dogears
+          :items (lambda ()
+                   (mapcar (lambda (place)
+                             (propertize (dogears--format-record place)
+                                         'consult--candidate place))
+                           dogears-list))
+          :action (lambda (cand)
+                    (dogears-go (get-text-property 0 'consult--candidate cand)))))
+  (with-eval-after-load 'consult
+    (add-to-list 'consult-buffer-sources 'consult--source-dogears 'append)))
 
 
 ;; [expreg]

@@ -221,26 +221,40 @@
 (use-package savehist
   :hook (after-init . savehist-mode)
   :config
-  (setq savehist-additional-variables '(mark-ring global-mark-ring
-                                                  search-ring
-                                                  regexp-search-ring)
+  (setq savehist-additional-variables '(kill-ring
+                                        global-mark-ring
+                                        search-ring
+                                        regexp-search-ring
+                                        dogears-list)
         savehist-autosave-interval 1000)
 
   (with-eval-after-load 'vertico
     (add-to-list 'savehist-additional-variables 'vertico-repeat-history))
 
-  ;; HACK: Remove text properties from variables to reduce savehist cache size.
-  (add-hook! savehist-save-hook
-    (defun +savehist--remove-string-properties-h ()
-      (setq kill-ring (mapcar #'substring-no-properties
-                              (cl-remove-if-not #'stringp kill-ring))
-            search-ring (mapcar #'substring-no-properties search-ring)
-            regexp-search-ring (mapcar #'substring-no-properties regexp-search-ring)
-            register-alist (cl-loop for (reg . item) in register-alist
-                                    if (stringp item)
-                                    collect (cons reg (substring-no-properties item))
-                                    else collect (cons reg item)))))
-  )
+  (defvar dogears-list nil)
+  (defun +dogears--record-for-savehist (record)
+    (cons (substring-no-properties (car record))
+          (mapcar
+           (lambda (item)
+             (pcase item
+               (`(buffer . ,buffer)
+                (if (bufferp buffer)
+                    (cons 'buffer (buffer-name buffer))
+                  item))
+               (`(within . ,within)
+                (if (stringp within)
+                    (cons 'within (substring-no-properties within))
+                  item))
+               (_ item)))
+           (cdr record))))
+
+  (defadvice! +savehist-clean-values-a (save &rest args)
+    :around #'savehist-save
+    (let ((kill-ring (mapcar #'substring-no-properties kill-ring))
+          (search-ring (mapcar #'substring-no-properties search-ring))
+          (regexp-search-ring (mapcar #'substring-no-properties regexp-search-ring))
+          (dogears-list (mapcar #'+dogears--record-for-savehist dogears-list)))
+      (apply save args))))
 
 
 ;; [so-long] Workaround for long one-line file
