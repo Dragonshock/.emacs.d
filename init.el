@@ -36,7 +36,7 @@
                      'init-modeline
                      'init-tabbar
                      'init-ai
-                     'init-grok
+                     ;; 'init-grok
                      'init-chat
                      'init-pdf
                      'init-elfeed

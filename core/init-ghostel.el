@@ -29,18 +29,16 @@
   :straight t
   ;; ── 全局快捷键 ──
   ;; C-x p m 留给 magit-status（init-tools）；终端用 t/T。
-  :bind (("C-x m" . ghostel)                    ; 打开/切换 Ghostel 终端
-         :map project-prefix-map
-         ("t" . ghostel-project)                 ; 在当前项目目录打开
-         ("T" . ghostel-project-list-buffers)    ; 列出项目相关的 ghostel buffer
-         ;; 半字符模式下可用的 Emacs 快捷键
+  :bind (("C-x m" . ghostel)
          :map ghostel-semi-char-mode-map
-         ("C-s"  . consult-line)                 ; 搜索 scrollback
-         ("C-k"  . +ghostel-send-C-k-and-kill)   ; 像 Emacs C-k：杀到行尾并进 kill-ring
-         ("M-<backspace>" . ghostel-backward-kill-word)
-         ;; 模拟 eshell 的 M-p/M-n 历史浏览（发送 C-p/C-n 给终端）
+         ("C-k"  . +ghostel-send-C-k-and-kill)
+         ;; ;; I'm used to go up/down the shell history with M-n/p from eshell
+         ;; ;; Simulate this behavior in ghostel by sending C-p and C-n
          ("M-p" . (lambda () (interactive) (ghostel-send-key "p" "ctrl")))
-         ("M-n" . (lambda () (interactive) (ghostel-send-key "n" "ctrl"))))
+         ("M-n" . (lambda () (interactive) (ghostel-send-key "n" "ctrl")))
+         :map project-prefix-map
+         ("m" . ghostel-project)        ; 在当前项目目录打开
+         ("M" . ghostel-project-list-buffers)) ; 列出项目相关的 ghostel buffer
 
   :init
   ;; ── 原生模块自动安装策略 ──
