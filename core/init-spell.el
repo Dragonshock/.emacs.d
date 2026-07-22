@@ -44,7 +44,8 @@
               ("C-c s [" . flyspell-goto-prev-error)
               ("C-c s s" . flyspell-auto-correct-word)
               ("C-;" . nil)
-              ("C-," . nil))
+              ("C-," . nil)
+              ("C-." . nil))
   :config
   (setq flyspell-issue-message-flag nil
         flyspell-issue-welcome-flag nil

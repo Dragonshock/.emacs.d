@@ -4,17 +4,15 @@
 (use-package tab-bar
   ;; Turn on tab-bar-mode in early-init to speed-up
   ;; :hook (window-setup . tab-bar-mode)
-  ;; :bind (:map tab-bar-mode-map
-  ;;             ("M-w" . tab-close)
-  ;;             ("M-t" . tab-new)
-  ;;             ("M-o" . other-window))
+  :bind (("C-c t" . tab-switch))
   :config
   (setq tab-bar-separator ""
         tab-bar-new-tab-choice "*scratch*"
         tab-bar-tab-name-truncated-max 20
         tab-bar-auto-width nil
         tab-bar-close-button-show nil
-        tab-bar-tab-hints t)
+        tab-bar-tab-hints t
+        tab-bar-show nil)
 
   (customize-set-variable 'tab-bar-select-tab-modifiers '(meta))
 
