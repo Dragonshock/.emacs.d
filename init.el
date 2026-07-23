@@ -18,7 +18,6 @@
                      'init-keybinding
                      'init-highlight
                      'init-edit
-                     'init-spell
                      'init-window
                      'init-dired
                      'init-eshell

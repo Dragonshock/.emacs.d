@@ -5,5 +5,5 @@
   + `Sarasa Gothic`
 - `rg`
 - `fd`
-- `aspell`
+- `enchant` (AppleSpell provider)
 - `rime` / `fcitx5-rime`

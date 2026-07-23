@@ -94,6 +94,19 @@
   (setq apheleia-hide-log-buffers t))
 
 
+;; [jinx] Spell checker
+(use-package jinx
+  :straight t
+  :hook ((text-mode . jinx-mode)
+         (prog-mode . jinx-mode))
+  :bind (:map jinx-mode-map
+              ("C-c s ]" . jinx-next)
+              ("C-c s [" . jinx-previous)
+              ("C-c s s" . jinx-correct))
+  :custom
+  (jinx-languages "en"))
+
+
 ;; [ediff] Diff & patch
 (use-package ediff
   :hook ((ediff-before-setup . +ediff-save-window-config)
