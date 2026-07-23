@@ -418,7 +418,7 @@
         indent-bars-zigzag nil
         indent-bars-highlight-current-depth nil
         indent-bars-pattern "."
-        ;; indent-bars-prefer-character t
+        indent-bars-prefer-character t
         )
   )
 
