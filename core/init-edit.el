@@ -94,6 +94,19 @@
   (setq apheleia-hide-log-buffers t))
 
 
+;; [jinx] Spell checker
+(use-package jinx
+  :straight t
+  :hook ((text-mode . jinx-mode)
+         (prog-mode . jinx-mode))
+  :bind (:map jinx-mode-map
+              ("C-c s ]" . jinx-next)
+              ("C-c s [" . jinx-previous)
+              ("C-c s s" . jinx-correct))
+  :custom
+  (jinx-languages "en"))
+
+
 ;; [ediff] Diff & patch
 (use-package ediff
   :hook ((ediff-before-setup . +ediff-save-window-config)
@@ -230,6 +243,16 @@
     (apply #'format
            "%s %-3.3s %-30.30s %-30.30s %-0.15s %-s %0.0s%-s"
            (dogears--format-record-list record)))
+
+  (defadvice! +dogears--relevance-without-remote-access-a (fn record)
+    :around #'dogears--relevance
+    (let ((filename (map-elt (cdr record) 'filename)))
+      (if (and (stringp filename) (file-remote-p filename))
+          ;; In particular, do not ask Tramp to expand the remote `~' or
+          ;; let `project-current' inspect the remote directory.
+          (let (file-name-handler-alist)
+            (funcall fn record))
+        (funcall fn record))))
 
   (defvar consult--source-dogears
     (list :name "Dogears"

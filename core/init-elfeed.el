@@ -1,6 +1,5 @@
 ;;; -*- lexical-binding: t -*-
 
-
 ;; [elfeed] Read rss within Emacs
 (use-package elfeed
   :straight t
@@ -13,7 +12,10 @@
               ("k" . scroll-down-line))
   :config
   (setq elfeed-db-directory (expand-file-name "elfeed" user-emacs-directory)
-        elfeed-feeds '(;; emacs
+        elfeed-feeds `((,(concat "file://" (expand-file-name "rss/feed.atom"
+                                                             user-emacs-directory))
+                        hackernews ai zh)
+                       ;; emacs
                        ("https://karthinks.com/index.xml" karthinks)
                        ("https://emacsredux.com/atom.xml" redux)
                        ("https://egh0bww1.com/rss.xml" includeyy)
