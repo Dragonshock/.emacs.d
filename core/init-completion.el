@@ -257,6 +257,8 @@
   :straight t
   :hook (((TeX-mode LaTeX-mode org-mode markdown-mode) . +completion-add-tex-capfs))
   :init
+  (setq cape-dabbrev-buffer-function #'buffer-list)
+
   (defun +completion-add-capfs (&rest capfs)
     "Append CAPFS to the buffer-local `completion-at-point-functions'."
     (dolist (capf capfs)
