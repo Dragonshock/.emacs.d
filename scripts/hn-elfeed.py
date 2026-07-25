@@ -144,20 +144,27 @@ def request(
 
 def fetch_candidates() -> list[Candidate]:
     body, _, _ = request(HN_SEARCH_URL)
-    return [
-        Candidate(
-            int(item["objectID"]),
-            item["title"],
-            item["url"] or HN_COMMENTS_URL.format(story_id=item["objectID"]),
-            HN_COMMENTS_URL.format(story_id=item["objectID"]),
-            item["author"],
-            item["created_at"],
-            item["points"],
-            item["num_comments"],
+    candidates: list[Candidate] = []
+    for item in json.loads(body)["hits"]:
+        points = item.get("points") or 0
+        if points < 150:
+            continue
+        story_id = int(item["objectID"])
+        # Algolia omits "url" for Ask/Show HN and job posts (no external link).
+        article_url = item.get("url") or HN_COMMENTS_URL.format(story_id=story_id)
+        candidates.append(
+            Candidate(
+                story_id,
+                item["title"],
+                article_url,
+                HN_COMMENTS_URL.format(story_id=story_id),
+                item["author"],
+                item["created_at"],
+                points,
+                item.get("num_comments") or 0,
+            )
         )
-        for item in json.loads(body)["hits"]
-        if item.get("points", 0) >= 150
-    ]
+    return candidates
 
 
 def fetch_hn_item(story_id: int) -> dict[str, Any]:

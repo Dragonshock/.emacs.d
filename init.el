@@ -35,7 +35,7 @@
                      'init-modeline
                      'init-tabbar
                      'init-ai
-                     ;; 'init-grok
+                     'init-agent-shell
                      'init-chat
                      'init-pdf
                      'init-elfeed
