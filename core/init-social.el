@@ -28,8 +28,29 @@
       (telega-filters-push filter)
       (message "telega filter: %s" (if archive-p telega-filter-default 'archive))))
 
+  (defvar +telega-unread-summary-prompt
+    "你收到的是一批 Telegram 未读消息，每条格式为「发送者: 内容」。\
+请将其改写为一份中文结构化摘要，使用 org-mode 标题格式，结构如下：
+
+* 总览
+用一两句话概括这批消息整体在讲什么、大致氛围。
+
+* 重点关注
+挑出 3-5 条最重要或信息量最大的内容（重大新闻、结论、决定、\
+可执行信息），每条一行并注明发送者；链接、数字、版本号、时间等\
+关键细节必须原样保留。
+
+* 分类要点
+将其余内容按主题归类（类别名按实际内容起，如：技术讨论、新闻资讯、\
+产品发布、资源分享、闲聊），每类下用列表给出要点。同一话题多人讨论\
+时合并成一条并写明分歧；重复转发的相同内容只保留一次；纯表情、\
+打招呼和无信息量的寒暄直接忽略。
+
+规则：忠于原文，不虚构、不加评论；输出只包含以上结构。"
+    "用于 `+telega-summarize-unread' 的总结提示词。")
+
   (defun +telega-summarize-unread ()
-    "汇集当前聊天的全部未读消息，交给 `+gptel-rewrite-summarize' 总结。
+    "汇集当前聊天的全部未读消息，用专用提示词做归类式总结。
 直接从 TDLib 分页拉取（不依赖 chatbuf 已渲染的历史），未读几百条
 也能一次取全。文本汇入新 buffer 后自动触发总结。"
     (interactive)
@@ -64,7 +85,7 @@
         (user-error "没有取到未读消息"))
       (let ((buf (generate-new-buffer (format "*telega unread: %s*" title))))
         (with-current-buffer buf
-          (text-mode)
+          (org-mode)
           (dolist (msg msgs)
             (let ((sender (ignore-errors
                             (telega-msg-sender-title (telega-msg-sender msg))))
@@ -75,7 +96,7 @@
             (user-error "未读消息里没有可总结的文本内容"))
           (goto-char (point-min)))
         (pop-to-buffer buf)
-        (+gptel-rewrite-summarize))))
+        (+gptel-rewrite-region-or-buffer +telega-unread-summary-prompt))))
 
   :custom-face
   (telega-msg-heading ((t (:inherit hl-line :background unspecified))))
