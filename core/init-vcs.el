@@ -165,14 +165,6 @@
 ;; dropped magh); the recipe now points at the local backup clone
 ;; ~/code/gh.el, and straight/repos/magh.el fetches from it.
 ;; Note: magh.el Package-Requires Emacs 31.1+; skip on older builds.
-(defconst +magh-directory (expand-file-name "~/code/gh.el")
-  "Checkout of roife/magh.el used via :load-path.")
-
-(defconst +magh-available-p
-  (and (>= emacs-major-version 31)
-       (file-exists-p (expand-file-name "magh.el" +magh-directory)))
-  "Non-nil when magh.el is present and this Emacs is new enough.")
-
 (use-package magh
   :straight (:type git :repo "/Users/dragon/code/gh.el" :local-repo "magh.el")
   :bind (("C-, g g" . magh)
