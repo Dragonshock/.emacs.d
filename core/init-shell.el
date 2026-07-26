@@ -63,9 +63,15 @@ If no project is found, create a temporary Eshell instance in the current direct
           (if (eq (selected-window) win)
               (ignore-errors (delete-window win)) ;; Close window if already focused
             (select-window win)) ;; Focus the Eshell window if it exists but not selected
-        ;; If no Eshell window, create one
-        (let ((display-comint-buffer-action '(display-buffer-at-bottom
-                                              (inhibit-same-window . nil))))
+        ;; If no Eshell window, create one.
+        ;; `display-comint-buffer-action' was removed in Emacs 31 (obsolete
+        ;; since 30.1): letting it bound silently did nothing there.  Match
+        ;; the `(category . comint)' action eshell passes instead (Emacs 30+).
+        (let ((display-buffer-alist
+               (cons '((category . comint)
+                       (display-buffer-at-bottom)
+                       (inhibit-same-window . nil))
+                     display-buffer-alist)))
           (if arg
               (with-current-buffer (ghostel-project)
                 ;; display current buffer
