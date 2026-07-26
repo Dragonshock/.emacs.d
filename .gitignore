@@ -91,3 +91,7 @@ CONTEXT.md
 
 # bookmarks
 eww-bookmarks
+
+# Claude Code: 共享 .claude/settings.json 与 skills，本地覆盖不提交
+.claude/settings.local.json
+__pycache__/
