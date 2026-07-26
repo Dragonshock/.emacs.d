@@ -271,4 +271,6 @@ If no project is found, create a temporary Eshell instance in the current direct
 
 
 ;; Ghostel lives in `init-ghostel.el` (loaded earlier). Eshell still uses
-;; `ghostel-project` from `+eshell-toggle' with a prefix argument.
+;; `ghostel-project' from `+eshell-toggle' with a prefix argument.
+;; NOTE: upstream renamed that call to `ghostel'; the ghostel version pinned
+;; here still defines `ghostel-project', so keep the old name.

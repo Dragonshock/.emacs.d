@@ -7,7 +7,9 @@
 ;; [osx-dictionary] macOS native dictionary app
 (use-package osx-dictionary
   :straight t
-  :bind (("C-c d i" . osx-dictionary-search-input)
+  ;; `C-c d i' now belongs to `consult-imenu' (upstream), so search-input
+  ;; moved to `C-c d s'.
+  :bind (("C-c d s" . osx-dictionary-search-input)
          ("C-c d d" . osx-dictionary-search-pointer)))
 
 ;; [emt] CJK word motion via macOS NLP tokenizer (needs a native .dylib).

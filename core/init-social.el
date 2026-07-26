@@ -1,7 +1,4 @@
 ;; -*- lexical-binding: t; -*-
-;; (use-package language-detection
-;;   :straight t)
-
 (use-package telega
   :straight (:host github :repo "zevlg/telega.el"
                    :files (:defaults "contrib/*.el" "etc"))
@@ -178,3 +175,23 @@
   :straight nil
   :after telega
   :demand t)
+
+;; [chirp] twitter client
+(use-package chirp
+  :straight (:host github :repo "LuciusChen/chirp")
+  :commands (chirp-home
+             chirp-following
+             chirp-bookmarks
+             chirp-likes
+             chirp-me
+             chirp-list
+             chirp-search
+             chirp-thread
+             chirp-profile
+             chirp-profile-followers
+             chirp-profile-following-users)
+  :config
+  (setq chirp-show-avatars nil
+        chirp-show-tweet-media nil
+        chirp-tweet-separator ""
+        chirp-tweet-separator-indent 0))

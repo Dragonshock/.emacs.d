@@ -241,10 +241,6 @@
                 (if (bufferp buffer)
                     (cons 'buffer (buffer-name buffer))
                   item))
-               (`(within . ,within)
-                (if (stringp within)
-                    (cons 'within (substring-no-properties within))
-                  item))
                (_ item)))
            (cdr record))))
 
@@ -328,11 +324,13 @@
 
 ;; [minibuffer]
 (use-package minibuffer
+  ;; These are minor-mode commands: setting them with `setq' never activated
+  ;; them.  `minibuffer-depth-indicate-mode' is already enabled via the
+  ;; mb-depth hook in init-ui.el.
+  :hook (after-init . minibuffer-electric-default-mode)
   :config
-  (setq minibuffer-depth-indicate-mode t
-        minibuffer-default-prompt-format " [%s]" ; shorten " (default %s)" => " [%s]"
-        minibuffer-electric-default-mode t
-                                        ; One frame one minibuffer.
+  (setq minibuffer-default-prompt-format " [%s]" ; shorten " (default %s)" => " [%s]"
+        ;; One frame one minibuffer.
         minibuffer-follows-selected-frame nil))
 
 

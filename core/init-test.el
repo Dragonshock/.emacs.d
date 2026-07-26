@@ -1,23 +1,6 @@
 ;;; -*- lexical-binding: t -*-
 
-(use-package chirp
-  :straight (:host github :repo "LuciusChen/chirp")
-  :commands (chirp-home
-             chirp-following
-             chirp-bookmarks
-             chirp-likes
-             chirp-me
-             chirp-list
-             chirp-search
-             chirp-thread
-             chirp-profile
-             chirp-profile-followers
-             chirp-profile-following-users)
-  :config
-  (setq chirp-show-avatars nil
-        chirp-show-tweet-media nil
-        chirp-tweet-separator ""
-        chirp-tweet-separator-indent 0))
+;; chirp moved to init-social.el (upstream layout).
 
 (with-eval-after-load "eglot"
   (push '(verilog-mode . ("/Users/roifewu/code/vide/target/debug/vide")) eglot-server-programs)

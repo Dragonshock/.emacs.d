@@ -21,7 +21,7 @@
                      'init-edit
                      'init-window
                      'init-dired
-                     'init-eshell
+                     'init-shell
                      'init-prog
                      'init-scheme
                      'init-writing
@@ -33,11 +33,9 @@
                      ;; 'init-ime
                      ;; 'init-modal
                      'init-modeline
-                     'init-tabbar
                      'init-ai
                      'init-agent-shell
-                     'init-chat
-                     'init-pdf
+                     'init-social
                      'init-elfeed
                      'init-test
                      ))

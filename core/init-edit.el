@@ -76,7 +76,7 @@
 ;; [ws-butler] Remove trailing whitespace with lines touched
 (use-package ws-butler
   :straight t
-  :hook ((prog-mode markdown-mode) . ws-butler-mode))
+  :hook ((prog-mode markdown-ts-mode) . ws-butler-mode))
 
 
 ;; [editorconfig] Respect project-local formatting rules
@@ -94,17 +94,51 @@
   (setq apheleia-hide-log-buffers t))
 
 
-;; [jinx] Spell checker
+;; [jinx] Spell checker (needs Homebrew enchant + pkg-config to compile
+;; jinx-mod.dylib).  GUI Emacs often lacks /opt/homebrew on PATH, so
+;; ensure those paths before the module is built/loaded.
 (use-package jinx
   :straight t
-  :hook ((text-mode . jinx-mode)
-         (prog-mode . jinx-mode))
+  :hook ((text-mode . +jinx-mode-maybe)
+         (prog-mode . +jinx-mode-maybe))
   :bind (:map jinx-mode-map
-              ("C-c s ]" . jinx-next)
-              ("C-c s [" . jinx-previous)
-              ("C-c s s" . jinx-correct))
+              ("C-c f >" . jinx-next)
+              ("C-c f <" . jinx-previous)
+              ("C-c f ." . jinx-correct)
+              ("C-c f /" . jinx-correct-all))
+  :init
+  (defun +jinx-ensure-build-env ()
+    "Expose Homebrew tooling so jinx can compile/load jinx-mod.dylib."
+    (dolist (dir '("/opt/homebrew/bin" "/usr/local/bin"))
+      (when (file-directory-p dir)
+        (add-to-list 'exec-path dir)
+        (unless (string-match-p (regexp-quote dir) (or (getenv "PATH") ""))
+          (setenv "PATH" (concat dir path-separator (or (getenv "PATH") ""))))))
+    ;; #include <enchant.h> lives under include/enchant-2
+    (when (file-directory-p "/opt/homebrew/include/enchant-2")
+      (let ((inc "/opt/homebrew/include/enchant-2:/opt/homebrew/include"))
+        (setenv "CPATH" (concat inc path-separator (or (getenv "CPATH") "")))
+        (setenv "C_INCLUDE_PATH"
+                (concat inc path-separator (or (getenv "C_INCLUDE_PATH") "")))))
+    (when (file-directory-p "/opt/homebrew/lib")
+      (setenv "LIBRARY_PATH"
+              (concat "/opt/homebrew/lib" path-separator
+                      (or (getenv "LIBRARY_PATH") "")))))
+
+  (defun +jinx-mode-maybe ()
+    "Enable `jinx-mode', but never abort init if the native module fails."
+    (+jinx-ensure-build-env)
+    (condition-case err
+        (jinx-mode 1)
+      (error
+       (message "jinx: disabled (%s). Install: brew install enchant pkgconf"
+                (error-message-string err)))))
   :custom
-  (jinx-languages "en"))
+  (jinx-languages "en")
+  :config
+  (+jinx-ensure-build-env)
+  ;; Skip CJK runs (upstream fix); English-only dict otherwise flags 中文.
+  (add-to-list 'jinx-exclude-regexps '(t "\\cc")))
 
 
 ;; [ediff] Diff & patch
@@ -135,7 +169,7 @@
 
 ;; [elec-pair] Automatic parenthesis pairing
 (use-package elec-pair
-  :hook ((prog-mode conf-mode yaml-mode org-mode markdown-mode minibuffer-mode) . electric-pair-mode)
+  :hook ((prog-mode conf-mode yaml-mode org-mode markdown-ts-mode minibuffer-mode) . electric-pair-mode)
   :config
   (setq electric-pair-inhibit-predicate 'electric-pair-default-inhibit)
   )
@@ -174,8 +208,7 @@
 (use-package sudo-edit
   :straight t
   :config
-  (sudo-edit-indicator-mode t)
-  )
+  (sudo-edit-indicator-mode t))
 
 
 ;; [puni]
@@ -204,13 +237,6 @@
   (dtrt-indent-global-mode 1))
 
 
-;; [embrace] Add/change/delete pairs of symbol
-(use-package embrace
-  :straight t
-  :bind ("C-." . embrace-commander)
-  :hook (org-mode . embrace-org-mode-hook)
-  )
-
 ;; [dogears] Jump to the last edit location
 (use-package dogears
   :straight t
@@ -238,10 +264,19 @@
                             xref-find-definitions
                             xref-find-references))
 
+  (defadvice! +dogears--keep-record-style-only-a (fn &rest args)
+    :around #'dogears--place
+    (mapcar (lambda (item)
+              (cond ((stringp item) (substring-no-properties item))
+                    ((stringp (cdr item))
+                     (cons (car item) (substring-no-properties (cdr item))))
+                    (item)))
+            (apply fn args)))
+
   (defadvice! +dogears--format-record-a (record)
     :override #'dogears--format-record
     (apply #'format
-           "%s %-3.3s %-30.30s %-30.30s %-0.15s %-s %0.0s%-s"
+           "%s %-3.3s %-30.30s %-30.30s %-0.15s %0.0s %0.0s%-s"
            (dogears--format-record-list record)))
 
   (defadvice! +dogears--relevance-without-remote-access-a (fn record)

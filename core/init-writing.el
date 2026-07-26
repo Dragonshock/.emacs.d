@@ -10,7 +10,7 @@
 ;; stay full-width.
 (use-package visual-fill-column
   :straight t
-  :hook ((markdown-mode org-mode) . visual-fill-column-mode)
+  :hook ((markdown-ts-mode org-mode) . visual-fill-column-mode)
   :init
   (setq-default visual-fill-column-center-text t
                 visual-fill-column-width 92))
@@ -26,59 +26,35 @@
   :straight t)
 
 
-;; [markdown-mode] Reading-first GFM for Grok Build / docs output.
-;; Emacs 30 has no built-in markdown-ts-mode (arrives in 31). Classic
-;; markdown-mode keeps hide-markup, header scaling, native code blocks.
-(use-package markdown-mode
-  :straight t
-  :mode (("\\.md\\'" . gfm-mode)
-         ("\\.markdown\\'" . gfm-mode))
-  :init
-  (setq
-   ;; Display: org-like reading surface
-   markdown-fontify-code-blocks-natively t
-   markdown-fontify-whole-heading-line t
-   markdown-header-scaling t
-   ;; Milder than default-org-ish 1.8…; better for long agent reports
-   markdown-header-scaling-values '(1.55 1.35 1.2 1.1 1.05 1.0)
-   markdown-hide-markup t
-   markdown-hide-urls t
-   markdown-list-indent-width 2
-   ;; GFM task lists in plans / checklists
-   markdown-make-gfm-checkboxes-buttons t
-   ;; Unknown fences still get a sensible fallback
-   markdown-fontify-code-block-default-mode 'fundamental-mode
-   ;; View modes always hide markup
-   markdown-hide-markup-in-view-modes t)
+;; [markdown-ts-mode] Built into Emacs 31; replaces the third-party
+;; markdown-mode. Provides hide-markup, folding, inline images and native
+;; code-block fontification, which is what the old GFM setup was kept for.
+(use-package markdown-ts-mode
+  :straight (:type built-in)
+  :mode (("\\.md\\'" . markdown-ts-mode)
+         ("\\.markdown\\'" . markdown-ts-mode))
   :config
-  (when (executable-find "pandoc")
-    (setq markdown-command "pandoc"))
+  ;; Hide markup delimiters (**, #, []() ...) for a rendered look.
+  ;; buffer-local (:local t), so set the default value.
+  (setq-default markdown-ts-hide-markup t)
+  (setq
+   ;; Fold bodies on open, keep all heading levels visible
+   markdown-ts-default-folding 'fold-headings
+   ;; Show images inline below their links
+   markdown-ts-inline-images t
+   ;; Highlight fenced code blocks with the embedded language's mode
+   markdown-ts-fontify-code-blocks-natively t
+   ;; TAB/newline run in the code block's language when point is inside it
+   markdown-ts-enable-code-block-context-mode t
+   ;; org-table-like editing/auto-align when point is in a pipe table
+   markdown-ts-enable-table-mode t)
 
-  (defun +markdown-toggle-view ()
-    "Toggle between editable GFM and read-only `gfm-view-mode'.
-In view mode: SPC/DEL scroll, n/p headings, q quit buffer, ? help.
-Also bound to \\`e' in view mode (enter edit)."
-    (interactive)
-    (cond
-     ((derived-mode-p 'gfm-view-mode)
-      (gfm-mode)
-      (read-only-mode -1)
-      (message "Markdown: edit mode"))
-     ((derived-mode-p 'markdown-view-mode)
-      (markdown-mode)
-      (read-only-mode -1)
-      (message "Markdown: edit mode"))
-     ((derived-mode-p 'gfm-mode)
-      (gfm-view-mode)
-      (message "Markdown: view mode (SPC/n/p/q, e edit)"))
-     (t
-      (markdown-view-mode)
-      (message "Markdown: view mode (SPC/n/p/q, e edit)"))))
-
-  ;; Edit map + view map (gfm-view shares markdown-view-mode-map)
-  (define-key markdown-mode-map (kbd "C-c C-x C-v") #'+markdown-toggle-view)
-  (define-key markdown-view-mode-map (kbd "C-c C-x C-v") #'+markdown-toggle-view)
-  (define-key markdown-view-mode-map (kbd "e") #'+markdown-toggle-view))
+  ;; markdown-ts-mode gives all 6 heading levels the same face; inherit the
+  ;; Org level faces instead so they differ and follow the current theme.
+  (dotimes (i 6)
+    (set-face-attribute (intern (format "markdown-ts-heading-%d" (1+ i))) nil
+                        :inherit (intern (format "org-level-%d" (1+ i)))
+                        :weight 'unspecified)))
 
 
 ;; [typst-ts-mode]
