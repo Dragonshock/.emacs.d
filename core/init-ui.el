@@ -107,14 +107,13 @@
   (defun +setup-fonts ()
     "Setup fonts."
     (when (display-graphic-p)
-      (set-face-attribute 'default nil :font (font-spec :family "MonoLisaCode" :size +font-size))
-      (set-face-font 'fixed-pitch "MonoLisaCode")
-      (set-face-font 'fixed-pitch-serif "MonoLisaCode")
-      (set-face-font 'variable-pitch "MonoLisaText")
+      (set-face-attribute 'default nil :font (font-spec :family "Sarasa Mono SC" :size +font-size))
+      (set-face-font 'fixed-pitch "Sarasa Mono SC")
+      (set-face-font 'fixed-pitch-serif "Sarasa Mono Slab SC")
+      (set-face-font 'variable-pitch "Sarasa UI SC")
 
-      ;; Sarasa Mono SC, JetBrains Maple Mono, LXGW WenKai Mono Screen
       (dolist (charset '(han cjk-misc))
-        (set-fontset-font t charset (font-spec :family "LXGW WenKai Mono Screen")))
+        (set-fontset-font t charset (font-spec :family "Sarasa Mono SC")))
 
       ;; font for emoji, set as unicode to cover more chars
       (if (eq system-type 'darwin)
@@ -124,7 +123,7 @@
 
 ;; The initial frame is created with the system font, and
 ;; `frame-inhibit-implied-resize' keeps its pixel size when `+setup-fonts'
-;; switches to the larger MonoLisaCode, shrinking the 100x45 grid from
+;; switches to the configured font, changing the 100x45 grid from
 ;; early-init.el.  Re-apply the intended size with the final font, then
 ;; re-center (float left/top = proportional position, 0.5 = centered).
 ;; Later frames inherit the correct font, so only the initial one needs this.
