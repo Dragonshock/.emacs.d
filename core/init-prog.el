@@ -100,7 +100,7 @@
                                             :workspace (:symbol (:search (:kind "all_symbols"
                                                                                 :scope "workspace_and_dependencies")))
                                             :references (:excludeImports t
-                                                                         :excludeTests t)
+                                                         :excludeTests t)
                                             :lru (:capacity 1024)
                                             :diagnostics (:enable :json-false)))
                   (:typescript . (:preferences (:importModuleSpecifierPreference "non-relative")))
@@ -111,7 +111,7 @@
                                                :path "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/"
                                                :default t)])
                             :import (:gradle (:enabled t
-                                                       :wrapper (:enabled t)))
+                                              :wrapper (:enabled t)))
                             :autobuild (:enabled :json-false)
                             :extendedClientCapabilities (:classFileContentsSupport t)))))
 
@@ -423,7 +423,7 @@
         indent-bars-zigzag nil
         indent-bars-highlight-current-depth nil
         indent-bars-pattern "."
-        indent-bars-prefer-character t
+        ;; indent-bars-prefer-character t
         )
   )
 

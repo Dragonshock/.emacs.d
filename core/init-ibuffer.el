@@ -35,7 +35,7 @@
                            (mode . eww-buffers-mode)
                            (mode . eww-search-annotations-mode)))
           (elfeed-filter '(or (mode . elfeed-show-mode)
-                              (mode . elfeed-search-mode)))
+                               (mode . elfeed-search-mode)))
           (telega-filter '(or (mode . telega-chat-mode)
                               (mode . telega-root-mode)
                               (mode . telega-image-mode)

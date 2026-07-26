@@ -1,19 +1,16 @@
 ;;; -*- lexical-binding: t -*-
 
 
-;; [visual-line-mode] Soft line-wrapping (also covers markdown via text-mode)
-(add-hook 'text-mode-hook #'visual-line-mode)
-
-
-;; [visual-fill-column] Center a readable column for long prose (Grok plans,
-;; research notes, ADRs). Keep off generic text-mode so commit messages etc.
-;; stay full-width.
+;; [visual-fill-column] Center text in markdown and org
 (use-package visual-fill-column
   :straight t
-  :hook ((markdown-ts-mode org-mode) . visual-fill-column-mode)
-  :init
-  (setq-default visual-fill-column-center-text t
-                visual-fill-column-width 92))
+  :hook (text-mode . visual-fill-column-mode)
+  :config
+  (setq-default visual-fill-column-center-text t))
+
+
+;; [visual-line-mode] Soft line-wrapping
+(add-hook 'text-mode-hook 'visual-line-mode)
 
 
 ;; [edit-indirect] Edit code blocks indirectly
@@ -21,14 +18,10 @@
   :straight t)
 
 
-;; [pangu] Add pangu spaces (on-demand; not auto-hooked)
+;; [pangu] Add pangu spaces
 (use-package pangu-spacing
   :straight t)
 
-
-;; [markdown-ts-mode] Built into Emacs 31; replaces the third-party
-;; markdown-mode. Provides hide-markup, folding, inline images and native
-;; code-block fontification, which is what the old GFM setup was kept for.
 (use-package markdown-ts-mode
   :straight (:type built-in)
   :mode (("\\.md\\'" . markdown-ts-mode)

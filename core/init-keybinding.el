@@ -15,7 +15,7 @@
 (global-set-key (kbd "s-c") #'copy-region-as-kill)
 (global-set-key (kbd "s-z") #'undo)
 (global-set-key (kbd "s-Z") #'undo-redo)
-;; (global-set-key (kbd "s-f") #'isearch-forward)  ;; conuslt-line
+(global-set-key (kbd "s-f") #'isearch-forward)
 (global-set-key (kbd "s-w") #'tab-close)
 (global-set-key (kbd "s-t") #'tab-new)
 (global-set-key (kbd "s-o") #'other-window)

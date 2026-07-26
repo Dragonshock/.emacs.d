@@ -32,7 +32,7 @@
   :hook (tty-setup . xterm-mouse-mode)
   :init
   (setq xterm-extra-capabilities '(modifyOtherKeys reportBackground
-                                                   getSelection setSelection)
+                                   getSelection setSelection)
         xterm-set-window-title t)
 
   (defun +xterm-report-background ()

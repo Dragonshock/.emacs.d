@@ -18,9 +18,8 @@
 
 
 ;; [Fringes] Reduce the clutter in the fringes
-;; NOTE: `indicate-empty-lines' is deliberately enabled further down (eob
-;; markers); it used to be set to nil here and silently overridden.
-(setq indicate-buffer-boundaries nil)
+(setq indicate-buffer-boundaries nil
+      indicate-empty-lines nil)
 
 ;; Better fringe symbol
 (define-fringe-bitmap 'right-curly-arrow

@@ -1,10 +1,4 @@
-;;; init-org.el --- Org mode configuration -*- lexical-binding: t -*-
-
-;;; Commentary:
-;; Org mode with LaTeX preview, prettify-symbols, org-modern,
-;; org-appear, org-pomodoro, custom entities, and export settings.
-
-;;; Code:
+;;; -*- lexical-binding: t -*-
 
 ;; [org-fragtog] Preview and edit latex in md/org elegantly
 ;; (use-package org-fragtog
@@ -165,6 +159,3 @@
         org-html-validation-link nil
         org-latex-prefer-user-labels t
         org-export-with-latex t))
-
-(provide 'init-org)
-;;; init-org.el ends here
