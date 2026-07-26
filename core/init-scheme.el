@@ -12,7 +12,7 @@
 ;;
 ;; 学习工作流:
 ;;   1. 打开 ch1/ex-1.16.rkt，文件头写 #lang sicp
-;;   2. M-x run-geiser → racket（或打开文件后自动起 REPL）
+;;   2. M-x geiser → racket（或打开文件后自动起 REPL；run-geiser 为旧别名）
 ;;   3. C-c C-a 进入当前模块；C-c C-b 求值 buffer
 ;;
 ;; References:
