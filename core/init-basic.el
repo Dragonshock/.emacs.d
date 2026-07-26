@@ -309,8 +309,8 @@
  ("C-M-S-v" . +scroll-other-window-down)
  ("M-<up>" . +scroll-other-window-down)
 
- ("C-v" . +scroll-window-down)
- ("M-v" . +scroll-window))
+ ("C-v" . +scroll-window)
+ ("M-v" . +scroll-window-down))
 
 
 ;; [tramp] Edit file remotely

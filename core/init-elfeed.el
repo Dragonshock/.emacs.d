@@ -41,7 +41,7 @@
                        ;; v2ex
                        ("https://www.v2ex.com/feed/tab/all.xml" v2ex)
                        ("https://www.v2ex.com/feed/tab/tech.xml" v2ex tech)
-                       ;; ytb
+                       ;; youtube
                        ("https://www.youtube.com/feeds/videos.xml?channel_id=UCz0ONCn6eRcDJGsUzupc3TA" ytb-links)
                        ("https://www.youtube.com/feeds/videos.xml?channel_id=UCVTifvD7WFz1Z-AnEzUoUUA" ytb-fansuki)
                        ("https://www.youtube.com/feeds/videos.xml?channel_id=UCiQo406SKypmtAQXIHdZ6mA" ytb-birchpunk)

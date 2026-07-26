@@ -103,7 +103,7 @@
 (use-package embark
   :straight t
   :bind (("C-." . embark-act)           ; 对当前目标执行动作（同 emacsredux 作者键位）
-         ("M-;" . embark-dwim)          ; 对当前目标执行默认动作
+         ;; ("M-." . embark-dwim)          ; 对当前目标执行默认动作
          ("C-h B" . embark-bindings)    ; 列出所有 embark 绑定
          :map embark-file-map
          ("s" . sudo-edit)              ; 对文件: sudo 编辑
@@ -136,8 +136,8 @@
          ([remap list-registers]                . consult-register)
          ([remap goto-line]                     . consult-goto-line)          ; M-g g
          ([remap imenu]                         . consult-imenu)
-         ("C-c d i"                             . consult-imenu)
-         ("C-c d I"                             . consult-imenu-multi)
+         ("M-s i"                               . consult-imenu)
+         ("M-s I"                               . consult-imenu-multi)
          ([remap locate]                        . consult-locate)
          ([remap load-theme]                    . consult-theme)
          ([remap man]                           . consult-man)
@@ -146,11 +146,11 @@
          ([remap switch-to-buffer-other-window] . consult-buffer-other-window); C-x 4 b
          ([remap switch-to-buffer-other-frame]  . consult-buffer-other-frame) ; C-x 5 b
          ([remap yank-pop]                      . consult-yank-pop)           ; M-y
-         ("C-c d l"                             . consult-line)
-         ("C-c d r"                             . consult-ripgrep)
-         ("C-c d f"                             . consult-fd)
+         ("M-s l"                               . consult-line)
+         ("M-s r"                               . consult-ripgrep)
+         ("M-s d"                               . consult-fd)
          :map minibuffer-mode-map
-         ("C-r"                                 . consult-history))
+         ("M-r"                                 . consult-history))
   :config
   (setq consult-narrow-key "<"
         consult-async-min-input 2
