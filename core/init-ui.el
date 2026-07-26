@@ -122,6 +122,19 @@
                  (setq face-font-rescale-alist '(("Apple Color Emoji" . 0.79))))
         (set-fontset-font t 'unicode (font-spec :family "Noto Color Emoji") nil 'append)))))
 
+;; The initial frame is created with the system font, and
+;; `frame-inhibit-implied-resize' keeps its pixel size when `+setup-fonts'
+;; switches to the larger MonoLisaCode, shrinking the 100x45 grid from
+;; early-init.el.  Re-apply the intended size with the final font, then
+;; re-center (float left/top = proportional position, 0.5 = centered).
+;; Later frames inherit the correct font, so only the initial one needs this.
+(add-hook! window-setup-hook
+  (defun +apply-default-frame-geometry-h ()
+    (when (display-graphic-p)
+      (set-frame-size (selected-frame) 100 45)
+      (modify-frame-parameters (selected-frame)
+                               '((left . 0.5) (top . 0.5))))))
+
 
 ;; Smooth Scroll (less "jumpy" than defaults)
 (when (display-graphic-p)
