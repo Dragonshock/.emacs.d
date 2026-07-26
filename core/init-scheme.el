@@ -148,5 +148,53 @@
   (define-key scheme-mode-map (kbd "C-c C-t") #'+scheme/sicp-insert-lang-header)
   (define-key scheme-mode-map (kbd "C-c C-n") #'+scheme/sicp-new-exercise))
 
+;;;; ---------------------------------------------------------------------------
+;;;; Embark 集成：Scheme 符号动作
+;;;; 借鉴 https://emacsredux.com/blog/2026/07/25/cider-and-projectile-meet-embark/
+;;;; 的 CIDER 方案：wrapper 命令 + 专属 keymap + target finder 三件套。
+;;;; ---------------------------------------------------------------------------
+
+;; wrapper：交互调用时提示输入；被 embark 调用时目标符号作为参数传入
+(defun +geiser-embark-doc (sym)
+  "Show Geiser documentation for SYM."
+  (interactive "sScheme symbol: ")
+  (require 'geiser-doc)
+  (geiser-doc-symbol (intern sym)))
+
+(defun +geiser-embark-find-def (sym)
+  "Jump to the definition of SYM via Geiser."
+  (interactive "sScheme symbol: ")
+  (require 'geiser-edit)
+  (geiser-edit-symbol (intern sym)))
+
+(defun +geiser-embark-manual (sym)
+  "Look up SYM in the Scheme implementation's manual."
+  (interactive "sScheme symbol: ")
+  (require 'geiser-doc)
+  (geiser-doc-manual-for-symbol (intern sym)))
+
+;; 键位与文章一致：d=doc  .=find-def  c=外部文档
+;; （文章的 r/refs、i/inspect、a/apropos 在 Geiser 没有对应命令，从缺）
+(defvar +geiser-embark-symbol-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "d" #'+geiser-embark-doc)
+    (define-key map "." #'+geiser-embark-find-def)
+    (define-key map "c" #'+geiser-embark-manual)
+    map)
+  "Embark actions for Scheme symbols in Geiser buffers.")
+
+;; target finder：让 embark 认识 scheme / Geiser REPL buffer 里光标下的符号
+(defun +geiser-embark-target ()
+  "Target the Scheme symbol at point in Geiser-enabled buffers."
+  (when (derived-mode-p 'scheme-mode 'geiser-repl-mode)
+    (when-let* ((bounds (bounds-of-thing-at-point 'symbol))
+                (sym (buffer-substring-no-properties (car bounds) (cdr bounds))))
+      (unless (string-empty-p sym)
+        `(geiser-scheme-symbol ,sym . ,bounds)))))
+
+(with-eval-after-load 'embark
+  (add-to-list 'embark-target-finders #'+geiser-embark-target)
+  (add-to-list 'embark-keymap-alist '(geiser-scheme-symbol +geiser-embark-symbol-map)))
+
 (provide 'init-scheme)
 ;;; init-scheme.el ends here

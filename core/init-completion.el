@@ -102,12 +102,15 @@
 
 (use-package embark
   :straight t
-  :bind (("C-;" . embark-act)
-         ("M-;" . embark-dwim)
-         ("C-h E" . embark-bindings)
+  :bind (("C-." . embark-act)           ; 对当前目标执行动作（同 emacsredux 作者键位）
+         ("M-;" . embark-dwim)          ; 对当前目标执行默认动作
+         ("C-h B" . embark-bindings)    ; 列出所有 embark 绑定
          :map embark-file-map
-         ("s" . sudo-edit)
-         ("g" . +embark-magit-status))
+         ("s" . sudo-edit)              ; 对文件: sudo 编辑
+         ("g" . +embark-magit-status)   ; 对文件: 打开 magit-status
+         :map minibuffer-local-map
+         ("C-c C-c" . embark-export)    ; 导出候选项列表
+         ("C-c C-o" . embark-collect))  ; 收集候选项到独立 buffer
   :init
   (setq prefix-help-command 'embark-prefix-help-command)
   :config
@@ -129,20 +132,20 @@
 
 (use-package consult
   :straight t
-  :bind (([remap bookmark-jump]                 . consult-bookmark)
+  :bind (([remap bookmark-jump]                 . consult-bookmark)           ; C-x r b
          ([remap list-registers]                . consult-register)
-         ([remap goto-line]                     . consult-goto-line)
+         ([remap goto-line]                     . consult-goto-line)          ; M-g g
          ([remap imenu]                         . consult-imenu)
          ("C-c d i"                             . consult-imenu)
          ("C-c d I"                             . consult-imenu-multi)
          ([remap locate]                        . consult-locate)
          ([remap load-theme]                    . consult-theme)
          ([remap man]                           . consult-man)
-         ([remap recentf-open-files]            . consult-recent-file)
-         ([remap switch-to-buffer]              . consult-buffer)
-         ([remap switch-to-buffer-other-window] . consult-buffer-other-window)
-         ([remap switch-to-buffer-other-frame]  . consult-buffer-other-frame)
-         ([remap yank-pop]                      . consult-yank-pop)
+         ([remap recentf-open-files]            . consult-recent-file)        ; C-x C-r
+         ([remap switch-to-buffer]              . consult-buffer)             ; C-x b
+         ([remap switch-to-buffer-other-window] . consult-buffer-other-window); C-x 4 b
+         ([remap switch-to-buffer-other-frame]  . consult-buffer-other-frame) ; C-x 5 b
+         ([remap yank-pop]                      . consult-yank-pop)           ; M-y
          ("C-c d l"                             . consult-line)
          ("C-c d r"                             . consult-ripgrep)
          ("C-c d f"                             . consult-fd)
