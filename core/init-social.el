@@ -73,7 +73,9 @@
         telega-filter-custom-show-folders nil
 
         ;; images
-        telega-use-images nil
+        ;; 上游关闭图片走纯文字风格；本地打开，照片/视频缩略图/网页
+        ;; 预览图直接显示（emoji 仍用字体渲染，头像保持关闭）。
+        telega-use-images t
         telega-emoji-use-images nil
         telega-symbols-emojify '()
 
