@@ -161,8 +161,9 @@
 ;; `forge-repository-list-columns'.  The old setting was dead configuration.
 
 ;; [magh.el] Magit-style GitHub frontend powered by the `gh' CLI.
-;; Source: https://github.com/roife/magh.el  (NOT sigma/gh.el)
-;; Clone:  git clone https://github.com/roife/magh.el.git ~/code/gh.el
+;; Upstream github.com/roife/magh.el was DELETED by the author (upstream
+;; dropped magh); the recipe now points at the local backup clone
+;; ~/code/gh.el, and straight/repos/magh.el fetches from it.
 ;; Note: magh.el Package-Requires Emacs 31.1+; skip on older builds.
 (defconst +magh-directory (expand-file-name "~/code/gh.el")
   "Checkout of roife/magh.el used via :load-path.")
@@ -173,7 +174,7 @@
   "Non-nil when magh.el is present and this Emacs is new enough.")
 
 (use-package magh
-  :straight (:host github :repo "roife/magh.el")
+  :straight (:type git :repo "/Users/dragon/code/gh.el" :local-repo "magh.el")
   :bind (("C-, g g" . magh)
          ("C-, g G" . magh-dispatch)
          ("C-, g d" . magh-repo-status)
@@ -208,7 +209,7 @@
 
 ;; [magh-magit] Lightweight asynchronous magh.el summaries in Magit status
 (use-package magh-magit
-  :straight (:host github :repo "roife/magh.el")
+  :straight (:type git :repo "/Users/dragon/code/gh.el" :local-repo "magh.el")
   :after magit
   :demand t
   :config
@@ -224,7 +225,7 @@
 
 ;; Structured actions for magh.el candidates in Embark.
 (use-package magh-embark
-  :straight (:host github :repo "roife/magh.el")
+  :straight (:type git :repo "/Users/dragon/code/gh.el" :local-repo "magh.el")
   :after embark
   :demand t
   :config
@@ -233,7 +234,7 @@
 
 ;; Keep magh.el's native Issue/PR viewer, with an explicit Forge -> magh.el bridge.
 (use-package magh-forge
-  :straight (:host github :repo "roife/magh.el")
+  :straight (:type git :repo "/Users/dragon/code/gh.el" :local-repo "magh.el")
   :after forge
   :commands (magh-forge-open-current-topic-in-magh)
   :bind (:map forge-topic-mode-map
