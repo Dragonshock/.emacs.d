@@ -2,11 +2,10 @@
 
 ;; chirp moved to init-social.el (upstream layout).
 
-(with-eval-after-load "eglot"
-  (push '(verilog-mode . ("/Users/roifewu/code/vide/target/debug/vide")) eglot-server-programs)
-  )
-
-(setq eglot-x-enable-snippet-text-edit nil)
+;; NOTE: upstream registers its own `vide' verilog LSP here via an absolute
+;; path under ~roifewu; dropped since that binary does not exist in this fork.
+;; The `eglot-x-enable-snippet-text-edit' setting was dropped too: eglot-x is
+;; not installed.
 
 (defun cargo-xtask-install-server ()
   (interactive)

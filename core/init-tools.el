@@ -169,7 +169,7 @@
 
 ;; [re-builder]
 (use-package re-builder
-  :ensure nil
+  :straight nil
   :commands re-builder
   :bind (:map reb-mode-map
               ("C-c C-k" . reb-quit)

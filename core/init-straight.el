@@ -6,6 +6,18 @@
       warning-suppress-log-types '((comp))                   ; Don't display comp warnings
       straight-disable-native-compile (not (native-comp-available-p)))
 
+;; Make the running Emacs reachable as `emacs' for subprocesses.  Package
+;; :pre-build steps shell out to it (emacs-reader's Makefile runs checkdoc via
+;; `emacs'), and a macOS Emacs.app is not on PATH.  Must happen before any
+;; package is built.
+(let ((dir (and invocation-directory
+                (directory-file-name (expand-file-name invocation-directory)))))
+  (when (and dir (file-directory-p dir))
+    (add-to-list 'exec-path dir)
+    (let ((path (or (getenv "PATH") "")))
+      (unless (string-match-p (regexp-quote dir) path)
+        (setenv "PATH" (concat dir path-separator path))))))
+
 ;; Installation
 (defvar bootstrap-version)
 (let ((bootstrap-file

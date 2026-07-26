@@ -24,7 +24,7 @@
         aw-background nil
         aw-ignore-current t)
 
-  ;; Select window via `H-1'...`H-9'
+  ;; Select window via `C-1'...`C-9'
   (defun +aw--select-window (number)
     "Select the specified window."
     (let* ((window-list (aw-window-list))

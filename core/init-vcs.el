@@ -3,8 +3,12 @@
 ;; [vc-mode] Version control interface
 (use-package vc
   :config
+  ;; NOTE: `vc-auto-revert-mode' (new in Emacs 31.1) is a globalized minor
+  ;; mode, so `setq'-ing it never enabled anything.  Deliberately left off:
+  ;; enabling it would run real `auto-revert-mode' (timer + file notifications)
+  ;; in every VC-tracked buffer, which is exactly what `+auto-revert-mode' in
+  ;; init-edit.el exists to avoid.
   (setq vc-allow-async-revert t
-        vc-auto-revert-mode t
         vc-allow-rewriting-published-history t
         vc-dir-auto-hide-up-to-date 'revert))
 
@@ -133,14 +137,9 @@
   :straight t
   :after magit
   :custom-face
-  (forge-topic-label ((t (:inherit variable-pitch :height 0.9 :width condensed :weight regular :underline unspecified))))
-  :config
-  (setq forge-topic-list-columns
-        '(("#" 5 forge-topic-list-sort-by-number (:right-align t) number nil)
-          ("Title" 60 t nil title  nil)
-          ("State" 6 t nil state nil)
-          ("Updated" 10 t nil updated nil)))
-  )
+  (forge-topic-label ((t (:inherit variable-pitch :height 0.9 :width condensed :weight regular :underline unspecified)))))
+;; NOTE: `forge-topic-list-columns' was removed upstream; forge now only has
+;; `forge-repository-list-columns'.  The old setting was dead configuration.
 
 ;; [magh.el] Magit-style GitHub frontend powered by the `gh' CLI.
 ;; Source: https://github.com/roife/magh.el  (NOT sigma/gh.el)

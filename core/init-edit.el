@@ -60,6 +60,13 @@
       (with-current-buffer buffer
         (+auto-revert-buffer-h))))
 
+  (defun +auto-revert-on-focus-gained-h (&rest _)
+    "Auto revert visible buffers, but only when Emacs gains focus.
+`after-focus-change-function' fires for focus-out too, so filter on
+`frame-focus-state'."
+    (when (frame-focus-state)
+      (+auto-revert-visible-buffers-h)))
+
   (define-minor-mode +auto-revert-mode
     "A lazy alternative to `global-auto-revert-mode'."
     :global t
@@ -68,9 +75,14 @@
     (let ((fn (if +auto-revert-mode #'add-hook #'remove-hook)))
       (funcall fn 'window-buffer-change-functions #'+auto-revert-window-buffer-h)
       (funcall fn 'window-selection-change-functions #'+auto-revert-selected-window-h)
-      (funcall fn 'focus-in-hook #'+auto-revert-visible-buffers-h)
       (funcall fn 'after-save-hook #'+auto-revert-visible-buffers-h)
-      (funcall fn 'server-switch-hook #'+auto-revert-buffer-h))))
+      (funcall fn 'server-switch-hook #'+auto-revert-buffer-h))
+    ;; `focus-in-hook' is obsolete since Emacs 27.1.
+    (if +auto-revert-mode
+        (add-function :after after-focus-change-function
+                      #'+auto-revert-on-focus-gained-h)
+      (remove-function after-focus-change-function
+                       #'+auto-revert-on-focus-gained-h))))
 
 
 ;; [ws-butler] Remove trailing whitespace with lines touched

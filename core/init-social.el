@@ -86,8 +86,15 @@
                                             telega-capf-markdown-precode
                                             telega-capf-botcmd))
 
+  ;; `telega-proxies' is obsolete since telega 0.8.621; proxies are now added
+  ;; from `telega-before-auth-hook' via `telega--addProxy'.
   (when (eq system-type 'gnu/linux)
-    (setq telega-proxies '((:server "127.0.0.1" :port 7891 :enable t :type (:@type "proxyTypeSocks5")))))
+    (add-hook 'telega-before-auth-hook
+              (lambda ()
+                (telega--addProxy
+                    '(:server "127.0.0.1" :port 7891
+                              :type (:@type "proxyTypeSocks5"))
+                  :enable-p 'enable :comment "local socks5"))))
 
   ;; HACK: Show full name only in chatbuf
   (defadvice! +telega-message-header-username-only-a

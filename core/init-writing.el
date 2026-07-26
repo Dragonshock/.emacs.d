@@ -66,13 +66,15 @@
 ;; [auctex]
 (use-package tex
   :straight auctex
+  ;; `TeX-source-correlate-mode' is a minor mode: setting the variable via
+  ;; `setq' never turns it on.
+  :hook (TeX-mode . TeX-source-correlate-mode)
   :config
   (setq TeX-parse-self t             ; parse on load
         TeX-auto-save t              ; parse on save
         ;; Use hidden directories for AUCTeX files.
         TeX-auto-local ".auctex-auto"
         TeX-style-local ".auctex-style"
-        TeX-source-correlate-mode t
         TeX-source-correlate-method 'synctex
         ;; Don't start the Emacs server when correlating sources.
         TeX-source-correlate-start-server nil

@@ -402,8 +402,17 @@
 (use-package treesit
   :when (treesit-available-p)
   :init
-  (setq treesit-enabled-modes t
-        treesit-auto-install-grammar 'always
+  ;; `treesit-enabled-modes' MUST be set with `setopt': its :set function is
+  ;; what installs the 26 entries of `treesit-major-mode-remap-alist' into
+  ;; `major-mode-remap-alist'.  Plain `setq' silently does nothing.
+  ;;
+  ;; The `require' is load-bearing too: early-init.el advises `setopt--set'
+  ;; to bind `custom-load-recursion', which makes `custom-load-symbol' a
+  ;; no-op.  Without treesit already loaded, the :set property doesn't exist
+  ;; yet and `setopt' quietly degrades to `set-default'.
+  (require 'treesit)
+  (setopt treesit-enabled-modes t)
+  (setq treesit-auto-install-grammar 'always
         treesit-font-lock-level 4))
 
 

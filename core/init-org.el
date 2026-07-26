@@ -127,12 +127,10 @@
 
    org-appear-delay 0.1
 
-   org-appear-trigger 'always)          ; manual
-
-  (add-hook! org-mode-hook :call-immediately
-    (defun +org-add-appear-hook ()
-      (add-hook 'meow-insert-enter-hook #'org-appear-manual-start nil t)
-      (add-hook 'meow-insert-exit-hook #'org-appear-manual-stop nil t))))
+   org-appear-trigger 'always))
+;; NOTE: upstream drives org-appear manually from `meow-insert-enter-hook' /
+;; `meow-insert-exit-hook'.  meow is not installed here (init-modal.el stays
+;; commented out) and `org-appear-trigger' is `always', so that hook was dead.
 
 
 (use-package org-modern

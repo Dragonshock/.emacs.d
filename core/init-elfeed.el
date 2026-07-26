@@ -5,7 +5,7 @@
   :straight t
   :bind (:map elfeed-search-mode-map
               ("g" . elfeed-update)
-              ("G" . elfeed-search-update--force)
+              ("G" . revert-buffer)  ; elfeed-search-update--force obsolete since 4.0.0
               :map elfeed-show-mode-map
               ("M-v" . scroll-down-command)
               ("j" . scroll-up-line)
