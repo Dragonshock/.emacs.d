@@ -31,7 +31,6 @@
    ;; prettify
    org-startup-indented t
    org-pretty-entities t
-   org-hide-emphasis-markers t    ; 隐藏 *bold* /italic/ 等标记符号
    org-ellipsis "…"
    ;; Highlight quote and verse blocks
    org-fontify-quote-and-verse-blocks t
@@ -105,7 +104,7 @@
   :hook ((org-mode . org-appear-mode))
   :config
   (setq
-   ;; org-hide-emphasis-markers t
+   org-hide-emphasis-markers t
 
    org-appear-autosubmarkers t
    org-appear-autoentities t
@@ -114,37 +113,19 @@
 
    org-appear-delay 0.1
 
-   org-appear-trigger 'always))
-;; NOTE: upstream drives org-appear manually from `meow-insert-enter-hook' /
-;; `meow-insert-exit-hook'.  meow is not installed here (init-modal.el stays
-;; commented out) and `org-appear-trigger' is `always', so that hook was dead.
+   org-appear-trigger 'manual)
+
+  (add-hook! org-mode-hook :call-immediately
+    (defun +org-add-appear-hook ()
+      (add-hook 'meow-insert-enter-hook #'org-appear-manual-start nil t)
+      (add-hook 'meow-insert-exit-hook #'org-appear-manual-stop nil t))))
 
 
 (use-package org-modern
   :straight t
   :after org
   :hook ((org-mode . org-modern-mode)
-         (org-agenda-finalize . org-modern-agenda-mode))
-  :config
-  (setq org-modern-table nil)
-  (setq org-modern-checkbox
-        '((?X . "☑")
-          (?- . "☒")
-          (?\s . "□")))
-  ;; 修复字体大小：默认 height 0.8 导致偏小；换用 fixed-pitch-serif
-  (set-face-attribute 'org-modern-label nil :inherit 'fixed-pitch :height 0.8 :width 'normal)
-  (set-face-attribute 'org-modern-block-name nil :inherit 'fixed-pitch :height 0.8 :weight 'regular))
-
-
-;; [valign] 像素级对齐 Org 表格，完美解决中英文混排错位
-(use-package valign
-  :straight t
-  :hook ((org-mode . valign-mode)
-         (org-agenda-finalize . valign-mode))
-  :config
-  ;; 允许在 valign 模式下使用 org-table 的 TAB 等快捷键
-  (setq valign-fancy-bar t))
-
+         (org-agenda-finalize . org-modern-agenda-mode)))
 
 (use-package org-modern-indent
   :straight (org-modern-indent :type git :host github :repo "jdtsmith/org-modern-indent")
