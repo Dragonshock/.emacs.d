@@ -119,7 +119,15 @@
       ;; font for emoji, set as unicode to cover more chars
       (if (eq system-type 'darwin)
           (progn (set-fontset-font t 'unicode (font-spec :family "Apple Color Emoji") nil 'append)
-                 (setq face-font-rescale-alist '(("Apple Color Emoji" . 0.79))))
+                 ;; Scale CJK so one hanzi is exactly two half-width columns:
+                 ;; MonoLisaCode advance = 0.625em, LXGW = 1em, and
+                 ;; 1.25 x 1em = 2 x 0.625em at any point size (measured at
+                 ;; size 16: half-width 10px, hanzi 16px -> 20px).  Makes
+                 ;; column-aligned text (org/markdown tables, telega) align
+                 ;; in pixels, replacing valign.
+                 (setq face-font-rescale-alist
+                       '(("Apple Color Emoji" . 0.79)
+                         ("LXGW WenKai Mono Screen" . 1.25))))
         (set-fontset-font t 'unicode (font-spec :family "Noto Color Emoji") nil 'append)))))
 
 ;; The initial frame is created with the system font, and

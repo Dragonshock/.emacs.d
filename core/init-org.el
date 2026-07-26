@@ -137,13 +137,13 @@
 
 
 ;; [valign] 像素级对齐 Org 表格，完美解决中英文混排错位
-(use-package valign
-  :straight t
-  :hook ((org-mode . valign-mode)
-         (org-agenda-finalize . valign-mode))
-  :config
-  ;; 允许在 valign 模式下使用 org-table 的 TAB 等快捷键
-  (setq valign-fancy-bar t))
+;; (use-package valign
+;;   :straight t
+;;   :hook ((org-mode . valign-mode)
+;;          (org-agenda-finalize . valign-mode))
+;;   :config
+;;   ;; 允许在 valign 模式下使用 org-table 的 TAB 等快捷键
+;;  (setq valign-fancy-bar t))
 
 
 (use-package org-modern-indent
