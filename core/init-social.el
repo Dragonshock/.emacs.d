@@ -28,6 +28,55 @@
       (telega-filters-push filter)
       (message "telega filter: %s" (if archive-p telega-filter-default 'archive))))
 
+  (defun +telega-summarize-unread ()
+    "汇集当前聊天的全部未读消息，交给 `+gptel-rewrite-summarize' 总结。
+直接从 TDLib 分页拉取（不依赖 chatbuf 已渲染的历史），未读几百条
+也能一次取全。文本汇入新 buffer 后自动触发总结。"
+    (interactive)
+    (unless (derived-mode-p 'telega-chat-mode)
+      (user-error "仅在 telega chat buffer 中可用"))
+    (let* ((chat telega-chatbuf--chat)
+           (unread (plist-get chat :unread_count))
+           (last-read (plist-get chat :last_read_inbox_message_id))
+           (title (telega-chat-title chat))
+           (msgs nil)
+           (from-id 0)
+           (keep t))
+      (when (zerop unread)
+        (user-error "该聊天没有未读消息"))
+      (message "telega: 正在拉取 %d 条未读消息..." unread)
+      ;; getChatHistory 返回从新到旧，push 累积后 msgs 恰为时间顺序；
+      ;; 翻页直到越过 last_read_inbox_message_id。
+      (while keep
+        (let ((batch (append (plist-get
+                              (telega--getChatHistory chat from-id 0 100)
+                              :messages)
+                             nil)))
+          (if (null batch)
+              (setq keep nil)
+            (dolist (msg batch)
+              (if (> (plist-get msg :id) last-read)
+                  (push msg msgs)
+                (setq keep nil)))
+            (when keep
+              (setq from-id (plist-get (car (last batch)) :id))))))
+      (unless msgs
+        (user-error "没有取到未读消息"))
+      (let ((buf (generate-new-buffer (format "*telega unread: %s*" title))))
+        (with-current-buffer buf
+          (text-mode)
+          (dolist (msg msgs)
+            (let ((sender (ignore-errors
+                            (telega-msg-sender-title (telega-msg-sender msg))))
+                  (text (telega-msg-content-text msg)))
+              (when (and text (not (string-empty-p (string-trim text))))
+                (insert (format "%s: %s\n\n" (or sender "?") text)))))
+          (when (= (point-min) (point-max))
+            (user-error "未读消息里没有可总结的文本内容"))
+          (goto-char (point-min)))
+        (pop-to-buffer buf)
+        (+gptel-rewrite-summarize))))
+
   :custom-face
   (telega-msg-heading ((t (:inherit hl-line :background unspecified))))
   (telega-msg-inline-reply ((t (:inherit (hl-line font-lock-function-name-face)))))
@@ -36,7 +85,11 @@
   :bind (:map telega-chat-button-map
               ("h" . nil)
               :map telega-root-mode-map
-              ("A" . +telega-toggle-archive))
+              ("A" . +telega-toggle-archive)
+              ;; 复用全局总结键的肌肉记忆：在 chatbuf 里 C-c r s 直接
+              ;; 总结当前聊天的全部未读消息
+              :map telega-chat-mode-map
+              ("C-c r s" . +telega-summarize-unread))
   :hook ((telega-chat-mode . corfu-mode)
          (telega-chat-mode . telega-completions-setup-capf))
   :config
