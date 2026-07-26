@@ -49,6 +49,71 @@
 规则：忠于原文，不虚构、不加评论；输出只包含以上结构。"
     "用于 `+telega-summarize-unread' 的总结提示词。")
 
+  (defvar +telega-summary-engine 'grok
+    "未读消息总结引擎。
+`grok'  —— Grok Build CLI 单轮 headless 调用（订阅登录，无需 API key）；
+`gptel' —— gptel 的 DeepSeek 后端（rewrite 覆盖式）。")
+
+  (defvar +telega-grok-bin (expand-file-name "~/.grok/bin/grok")
+    "Grok Build CLI 路径（agent-shell 模块装好的那个）。")
+
+  (defun +telega--grok-summarize (buf)
+    "用 Grok Build CLI 异步总结 BUF 里的消息文本。
+总结插入 buffer 顶部；原始消息保留在文末标题下并折叠。"
+    (let* ((grok (if (file-executable-p +telega-grok-bin)
+                     +telega-grok-bin
+                   (or (executable-find "grok")
+                       (user-error
+                        "未找到 Grok Build CLI；(setq +telega-summary-engine 'gptel) 可回退"))))
+           (text (with-current-buffer buf (buffer-string)))
+           (prompt-file (make-temp-file "telega-unread-" nil ".txt" text)))
+      (with-current-buffer buf
+        (goto-char (point-min))
+        (insert "* 原始消息\n")
+        (goto-char (point-min))
+        (setq header-line-format " ⏳ Grok 总结中…"))
+      (make-process
+       :name "telega-grok-summary"
+       :buffer (generate-new-buffer " *telega-grok-out*")
+       ;; --cwd 指向临时目录，避免 CLI 扫描项目上下文（AGENTS.md 等）
+       :command (list grok
+                      "--prompt-file" prompt-file
+                      "--system-prompt-override" +telega-unread-summary-prompt
+                      "--disable-web-search" "--no-subagents" "--no-plan"
+                      "--no-memory" "--permission-mode" "dontAsk"
+                      "--output-format" "plain" "--verbatim"
+                      "--cwd" (temporary-file-directory))
+       :sentinel
+       (lambda (proc event)
+         (let ((out-buf (process-buffer proc)))
+           (unwind-protect
+               (if (and (eq (process-status proc) 'exit)
+                        (zerop (process-exit-status proc)))
+                   (let ((summary (with-current-buffer out-buf
+                                    (string-trim (buffer-string)))))
+                     (if (not (buffer-live-p buf))
+                         (message "telega: Grok 总结完成，但目标 buffer 已关闭")
+                       (with-current-buffer buf
+                         (setq header-line-format nil)
+                         (goto-char (point-min))
+                         (insert summary "\n\n")
+                         (goto-char (point-min))
+                         (when (re-search-forward "^\\* 原始消息$" nil t)
+                           (beginning-of-line)
+                           (ignore-errors (org-fold-hide-subtree)))
+                         (goto-char (point-min)))
+                       (message "telega: Grok 总结完成")))
+                 (when (buffer-live-p buf)
+                   (with-current-buffer buf
+                     (setq header-line-format " ❌ Grok 总结失败")))
+                 (message "telega: Grok 总结失败（%s）：%s"
+                          (string-trim event)
+                          (with-current-buffer out-buf
+                            (truncate-string-to-width
+                             (string-trim (buffer-string)) 200))))
+             (ignore-errors (delete-file prompt-file))
+             (kill-buffer out-buf)))))))
+
   (defun +telega-summarize-unread ()
     "汇集当前聊天的全部未读消息，用专用提示词做归类式总结。
 直接从 TDLib 分页拉取（不依赖 chatbuf 已渲染的历史），未读几百条
@@ -96,7 +161,9 @@
             (user-error "未读消息里没有可总结的文本内容"))
           (goto-char (point-min)))
         (pop-to-buffer buf)
-        (+gptel-rewrite-region-or-buffer +telega-unread-summary-prompt))))
+        (if (eq +telega-summary-engine 'grok)
+            (+telega--grok-summarize buf)
+          (+gptel-rewrite-region-or-buffer +telega-unread-summary-prompt)))))
 
   :custom-face
   (telega-msg-heading ((t (:inherit hl-line :background unspecified))))
