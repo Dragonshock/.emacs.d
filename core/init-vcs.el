@@ -77,6 +77,25 @@
   )
 
 
+;; [with-editor] Lets git-invoked editors reuse this Emacs.  The GUI
+;; Emacs.app here is a plain copy (no Contents/MacOS/bin/) and emacs-plus
+;; is keg-only, so with-editor's own search cannot find emacsclient and
+;; warns "Cannot determine a suitable Emacsclient" on first magit use.
+;; Pre-seed it from the Homebrew opt path (stable across minor upgrades);
+;; when nothing is found, leave the default so with-editor still falls
+;; back to its sleeping editor.
+(use-package with-editor
+  :straight t
+  :init
+  (when-let* ((client
+               (or (executable-find "emacsclient")
+                   (seq-find #'file-executable-p
+                             '("/opt/homebrew/opt/emacs-plus@31/bin/emacsclient"
+                               "/opt/homebrew/opt/emacs-plus/bin/emacsclient"
+                               "/usr/local/opt/emacs-plus@31/bin/emacsclient")))))
+    (setq with-editor-emacsclient-executable client)))
+
+
 ;; [magit] Version control interface
 (use-package magit
   :straight t
