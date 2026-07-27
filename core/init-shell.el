@@ -8,7 +8,9 @@
   :bind (("C-`" . +eshell-toggle)
          ("C-·" . +eshell-toggle)
          :map eshell-mode-map
-         ("M-s" . consult-history))
+         ;; Not M-s: consult search lives on the M-s prefix (init-completion).
+         ;; Match minibuffer history on M-r.
+         ("M-r" . consult-history))
   :config
   (setq
    ;; banner

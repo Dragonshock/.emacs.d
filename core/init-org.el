@@ -99,6 +99,8 @@
 
 
 ;; [org-appear] Make invisible parts of Org elements appear visible.
+;; Trigger `always' (not `manual'+meow hooks): init-modal/meow is disabled,
+;; so manual start/stop would never run and markers would stay hidden.
 (use-package org-appear
   :straight t
   :hook ((org-mode . org-appear-mode))
@@ -112,13 +114,7 @@
    org-appear-inside-latex t
 
    org-appear-delay 0.1
-
-   org-appear-trigger 'manual)
-
-  (add-hook! org-mode-hook :call-immediately
-    (defun +org-add-appear-hook ()
-      (add-hook 'meow-insert-enter-hook #'org-appear-manual-start nil t)
-      (add-hook 'meow-insert-exit-hook #'org-appear-manual-stop nil t))))
+   org-appear-trigger 'always))
 
 
 (use-package org-modern

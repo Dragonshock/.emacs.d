@@ -354,6 +354,9 @@
 
 
 ;; [environment variables]
+;; Initialize once via after-init only.  A second call in :config used to
+;; re-run after deferred load (use-package-always-defer), spawning an extra
+;; login shell on every graphical startup.
 (use-package exec-path-from-shell
   :straight t
   :unless (or noninteractive (daemonp) (not (display-graphic-p)))
@@ -364,10 +367,7 @@
         (let ((vars '("HOMEBREW" "JAVA_HOME" "JDTLS_JAVA_HOME" "MANPATH")))
           (if (bound-and-true-p ns-emacs-plus-injected-path)
               vars
-            (cons "PATH" vars))))
-  :config
-  (when exec-path-from-shell-variables
-    (exec-path-from-shell-initialize)))
+            (cons "PATH" vars)))))
 
 
 ;; [backup walker] A utility to view Emacs backup files.

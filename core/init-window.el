@@ -240,7 +240,9 @@
     (defun +auto-dim-other-buffers-auto-set-face (&rest _)
       (let ((dim (or (face-background 'mode-line)
                      'unspecified)))
-        (set-face-background 'auto-dim-other-buffers-face dim)
+        ;; Face renamed in auto-dim-other-buffers 2.2.1
+        ;; (`auto-dim-other-buffers-face' is obsolete).
+        (set-face-background 'auto-dim-other-buffers dim)
         (set-face-attribute 'auto-dim-other-buffers-hide nil
                             :foreground dim
                             :background dim))))

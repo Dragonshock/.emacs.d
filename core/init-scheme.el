@@ -196,12 +196,16 @@
   (add-to-list 'embark-target-finders #'+geiser-embark-target)
   (add-to-list 'embark-keymap-alist '(geiser-scheme-symbol +geiser-embark-symbol-map)))
 
-;; Geiser 把 `geiser-capf-complete-module' 同时绑在 C-. 和 M-`（编辑与
-;; REPL 两张 map）。解绑 C-. 给 embark-act 让位；模块补全仍走 M-`。
+;; Geiser 默认把 `geiser-capf-complete-module' 绑在 C-. 与 M-`。
+;; - 解绑 C-. → 全局 embark-act（init-completion）
+;; - 不用 M-` → 被 popper-mode-map 的 popper-toggle-type 盖住
+;; 模块补全改绑 C-c C-.（编辑 / REPL 一致）。
 (with-eval-after-load 'geiser-mode
-  (define-key geiser-mode-map (kbd "C-.") nil))
+  (define-key geiser-mode-map (kbd "C-.") nil)
+  (define-key geiser-mode-map (kbd "C-c C-.") #'geiser-capf-complete-module))
 (with-eval-after-load 'geiser-repl
-  (define-key geiser-repl-mode-map (kbd "C-.") nil))
+  (define-key geiser-repl-mode-map (kbd "C-.") nil)
+  (define-key geiser-repl-mode-map (kbd "C-c C-.") #'geiser-capf-complete-module))
 
 (provide 'init-scheme)
 ;;; init-scheme.el ends here
