@@ -28,7 +28,6 @@
  ;; Will improve long line display performance
  bidi-inhibit-bpa t
  bidi-paragraph-direction 'left-to-right
- bidi-display-reordering 'left-to-right
 
  ;; smaller threshold to improve long line performance
  long-line-threshold 1000
@@ -193,7 +192,7 @@
   :bind (("C-x C-r" . recentf-open-files))
   :hook (after-init . recentf-mode)
   :config
-  (setq recentf-autosave-interval 1000)
+  (setopt recentf-autosave-interval 1000)
 
   (setq recentf-auto-cleanup 'never
         recentf-max-saved-items 200
@@ -275,8 +274,10 @@
 
 
 ;; [glyphless-display] Don't render glyphs, in case of undisplayable characters.
+;; Buffer-local mode: enable on major-mode change so it applies to all buffers
+;; (after-init alone only affects the then-current buffer).
 (use-package glyphless-mode
-  :hook (after-init . glyphless-display-mode))
+  :hook (after-change-major-mode . glyphless-display-mode))
 
 ;; [Scrolling]
 (setq

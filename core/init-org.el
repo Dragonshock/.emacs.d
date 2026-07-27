@@ -121,7 +121,7 @@
   :straight t
   :after org
   :hook ((org-mode . org-modern-mode)
-         (org-agenda-finalize . org-modern-agenda-mode)))
+         (org-agenda-finalize . org-modern-agenda)))
 
 (use-package org-modern-indent
   :straight (org-modern-indent :type git :host github :repo "jdtsmith/org-modern-indent")

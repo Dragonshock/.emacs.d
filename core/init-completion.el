@@ -219,6 +219,9 @@
         corfu-preview-current nil
         corfu-auto-delay 0.1)
 
+  ;; Emacs 30+: text-mode defaults to Ispell Capf; prefer Corfu/cape sources.
+  (setq text-mode-ispell-word-completion nil)
+
   (defun +corfu-move-to-minibuffer ()
     "Use Consult's minibuffer UI for the current completion-in-region table."
     (interactive)
@@ -238,9 +241,7 @@
   :straight nil
   :after corfu
   :config
-  (corfu-history-mode 1)
-  (with-eval-after-load 'savehist
-    (cl-pushnew 'corfu-history savehist-additional-variables)))
+  (corfu-history-mode 1))
 
 (use-package corfu-popupinfo
   :straight nil

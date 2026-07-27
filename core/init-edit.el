@@ -93,7 +93,10 @@
 
 ;; [editorconfig] Respect project-local formatting rules
 (use-package editorconfig
-  :hook (find-file . editorconfig-mode))
+  :hook (find-file . editorconfig-mode)
+  :config
+  ;; Prefer ws-butler (touched lines only) over whole-buffer trailing trim.
+  (setq editorconfig-trim-whitespaces-mode 'ws-butler-mode))
 
 
 ;; [apheleia] Format buffers asynchronously without moving point
