@@ -152,39 +152,30 @@
         (when (window-live-p window)
           (delete-window window)))))
 
-  ;; HACK: do not select window in `+popper-reference-buffer-no-select'
-  (defvar +popper-unpacked-vars '(popper--reference-names
-                                  popper--reference-modes
-                                  popper--reference-predicates
-                                  popper--suppressed-names
-                                  popper--suppressed-modes
-                                  popper--suppressed-predicates))
-  (defvar +popper-unpacked-vars-no-select '())
-
-  (dolist (var +popper-unpacked-vars)
-    (let ((var-name (intern (concat "+" (symbol-name var) "-no-select"))))
-      (eval
-       `(progn
-          (defvar ,var-name nil)
-          (push ',var-name +popper-unpacked-vars-no-select)))))
-  (setq +popper-unpacked-vars-no-select (reverse +popper-unpacked-vars-no-select))
-
-  (cl-progv `(popper-reference-buffers ,@+popper-unpacked-vars)
-      (list +popper-reference-buffer-no-select)
-    (popper--set-reference-vars)
-    (cl-loop for var in +popper-unpacked-vars
-             for var-no-select in +popper-unpacked-vars-no-select
-             do (eval `(setq ,var-no-select ',(symbol-value var))))
-    )
+  ;; No-select list is matched via public patterns only (avoid popper--*
+  ;; internal unpack vars, which break across popper versions).
+  (defun +popper-match-reference-p (buffer entries)
+    "Return non-nil if BUFFER matches any ENTRY in ENTRIES.
+ENTRY may be a regexp string, major-mode symbol, or predicate."
+    (let ((name (buffer-name buffer))
+          (mode (buffer-local-value 'major-mode buffer)))
+      (cl-some
+       (lambda (entry)
+         (cond
+          ((stringp entry) (string-match-p entry name))
+          ((symbolp entry) (provided-mode-derived-p mode entry))
+          ((functionp entry) (funcall entry buffer))))
+       entries)))
 
   (defun +popper-smart-popup (buffer &optional alist)
-    (let ((window (display-buffer-in-direction buffer
-                                               (append alist '((direction . below)
-                                                               (window-height . 0.5))))))
-      (unless (cl-progv +popper-unpacked-vars
-                  (mapcar #'symbol-value +popper-unpacked-vars-no-select)
-                (popper-popup-p buffer))
-        (select-window window))))
+    "Display BUFFER as a half-height popup; select unless no-select listed."
+    (let ((window (display-buffer-in-direction
+                   buffer
+                   (append alist '((direction . below)
+                                   (window-height . 0.5))))))
+      (unless (+popper-match-reference-p buffer +popper-reference-buffer-no-select)
+        (select-window window))
+      window))
   (setq popper-display-function #'+popper-smart-popup)
   )
 

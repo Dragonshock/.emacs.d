@@ -25,12 +25,8 @@
           (with-silent-modifications
             (comint-truncate-buffer))))))
 
-  (add-hook! compilation-filter-hook
-    (defun +compilation--colorize-h ()
-      "Apply ANSI color codes to the compilation buffer."
-      (require 'ansi-color)
-      (let ((inhibit-read-only t))
-        (ansi-color-apply-on-region compilation-filter-start (point)))))
+  ;; Emacs 28+: stock filter (respects `ansi-color-for-compilation-mode').
+  (add-hook 'compilation-filter-hook #'ansi-color-compilation-filter)
   )
 
 
@@ -80,10 +76,12 @@
         eglot-documentation-renderer 'markdown-ts-view-mode
         eglot-code-action-indications nil)
 
-  ;; eglot has it's own strategy by default
-  (setq-local eldoc-documentation-strategy 'eldoc-documentation-compose-eagerly)
+  ;; Do not setq-local eldoc strategy here: :config only affects the then-current
+  ;; buffer, eglot-managed-mode sets its own strategy, and this config disables
+  ;; eldoc-mode under eglot (manual C-h h).
   (setq-default eglot-workspace-configuration
-                '((:pyls . (:plugins (:jedi_completion (:fuzzy t))))
+                ;; Prefer pylsp section name (pyls is the deprecated Palantir server).
+                '((:pylsp . (:plugins (:jedi_completion (:fuzzy t))))
                   (:rust-analyzer . (:cargo (:allFeatures t :allTargets t :features "full")
                                             :checkOnSave :json-false
                                             :completion (:termSearch (:enable t)
@@ -155,8 +153,10 @@
   (setq eldoc-echo-area-display-truncation-message t
         eldoc-echo-area-prefer-doc-buffer t
         eldoc-echo-area-use-multiline-p nil
-        eglot-extend-to-xref t
-        eldoc-help-at-pt t))
+        eglot-extend-to-xref t)
+  ;; Has a :set function that wires `eldoc-show-help-at-pt' into
+  ;; `eldoc-documentation-functions'; plain setq is a silent no-op.
+  (setopt eldoc-help-at-pt t))
 
 
 ;; [help]
@@ -407,9 +407,10 @@
   ;; no-op.  Without treesit already loaded, the :set property doesn't exist
   ;; yet and `setopt' quietly degrades to `set-default'.
   (require 'treesit)
-  (setopt treesit-enabled-modes t)
-  (setq treesit-auto-install-grammar 'always
-        treesit-font-lock-level 4))
+  (setopt treesit-enabled-modes t
+          ;; Also has a :set (`treesit--font-lock-level-setter'); setq is not enough.
+          treesit-font-lock-level 4)
+  (setq treesit-auto-install-grammar 'always))
 
 
 ;; [indent-bars] Show indent guides

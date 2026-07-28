@@ -233,16 +233,13 @@
               ("C-c C-g" . magh-forge-open-current-topic-in-magh)))
 
 
-;; Show TODOs in magit
+;; Show TODOs in magit (`magit-todos-mode' is global; enable once).
 (use-package magit-todos
   :straight t
   :after magit
-  :hook (magit-mode . magit-todos-mode)
   :config
-  (with-eval-after-load 'magit-status
-    (transient-append-suffix 'magit-status-jump '(0 0 -1)
-      '("t " "Todos" magit-todos-jump-to-todos)))
-  )
+  (magit-todos-mode 1))
+
 
 
 ;; [smerge] Highlight all the conflicted regions for git

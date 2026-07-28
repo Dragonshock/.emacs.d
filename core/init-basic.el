@@ -180,10 +180,10 @@
   ;; cache, which is expensive and useless. replace it with `prin1'
   (+advice-pp-to-prin1! 'save-place-alist-to-file)
 
-  ;; recenters the view after the jump
-  (advice-add 'save-place-find-file-hook :after
-              (lambda (&rest _)
-                (when buffer-file-name (ignore-errors (recenter)))))
+  ;; Recenter after restore (Emacs 29+: public hook, not advice on finder).
+  (add-hook 'save-place-after-find-file-hook
+            (lambda ()
+              (when buffer-file-name (ignore-errors (recenter)))))
   )
 
 
@@ -266,8 +266,9 @@
                   auto-composition-mode))
     (add-to-list 'so-long-minor-modes mode))
 
-  (dolist (override '((bidi-display-reordering . nil)
-                      (font-lock-maximum-decoration . 1)
+  ;; Do not set bidi-display-reordering to nil (debug-only / unsupported).
+  ;; Rely on bidi-paragraph-direction, bidi-inhibit-bpa, and long-line-threshold.
+  (dolist (override '((font-lock-maximum-decoration . 1)
                       (save-place-alist . nil)))
     (add-to-list 'so-long-variable-overrides override))
   )

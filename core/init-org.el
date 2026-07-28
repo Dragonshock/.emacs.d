@@ -45,7 +45,6 @@
    ;; better keybindings
    org-special-ctrl-a/e t
    org-special-ctrl-k t
-   org-special-ctrl-o t
    org-support-shift-select t
    org-ctrl-k-protect-subtree 'error
    org-fold-catch-invisible-edits 'show-and-error
@@ -54,19 +53,21 @@
 
   ;; Better Org Latex Preview
   (setq org-preview-latex-default-process 'dvisvgm
-        org-startup-with-latex-preview nil
         org-highlight-latex-and-related '(latex))
-  (plist-put org-format-latex-options :scale 1.7)
+  ;; Copy the defcustom plist so we do not mutate the shared standard value;
+  ;; dvisvgm's :image-size-adjust still multiplies with :scale.
+  (setq org-format-latex-options
+        (plist-put (copy-tree org-format-latex-options) :scale 1.7))
 
-  ;; HACK: inline highlight for CJK
+  ;; CJK-friendly emphasis boundaries for font-lock only.
+  ;; `org-emphasis-regexp-components' does not change the Org parser/export
+  ;; markup rules, so skip org-element-update-syntax / org-element--set-regexps.
   (setq org-emphasis-regexp-components '("-[:space:]('\"{[:nonascii:][:alpha:]"
                                          "-[:space:].,:!?;'\")}\\[[:nonascii:][:alpha:]"
                                          "[:space:]"
                                          "."
                                          1))
   (org-set-emph-re 'org-emphasis-regexp-components org-emphasis-regexp-components)
-  (org-element-update-syntax)
-  (org-element--set-regexps)
   )
 
 
@@ -134,5 +135,4 @@
   :config
   (setq org-export-with-smart-quotes t
         org-html-validation-link nil
-        org-latex-prefer-user-labels t
-        org-export-with-latex t))
+        org-latex-prefer-user-labels t))

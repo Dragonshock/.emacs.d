@@ -31,8 +31,11 @@
   :straight nil
   :hook (tty-setup . xterm-mouse-mode)
   :init
-  (setq xterm-extra-capabilities '(modifyOtherKeys reportBackground
-                                   getSelection setSelection)
+  ;; Trust boundary: hardcoding OSC-52 clipboard ops bypasses xterm's
+  ;; 'check probe. Keep modifyOtherKeys + reportBackground (theme/keys).
+  ;; Drop getSelection (clipboard read — not auto-enabled in Emacs 31 check
+  ;; path for security/timeout reasons). Keep setSelection for yank-to-terminal.
+  (setq xterm-extra-capabilities '(modifyOtherKeys reportBackground setSelection)
         xterm-set-window-title t)
 
   (defun +xterm-report-background ()

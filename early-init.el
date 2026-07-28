@@ -28,19 +28,17 @@
       warning-suppress-types '((defvaralias) (lexical-binding))
       warning-inhibit-types '((files missing-lexbind-cookie)))
 
-;; Increase process read size before any package can start subprocesses.
-(setq read-process-output-max (* 64 1024))
-
 ;; In noninteractive sessions, prioritize .el file. It saves IO time
 (setq load-prefer-newer noninteractive)
 
 ;; Inhibit resizing frame
 (setq frame-inhibit-implied-resize t)
 
-;; Inhibit startup screen & message
+;; Inhibit startup screen & message.
+;; Note: (setq inhibit-startup-echo-area-message t) is a no-op; Emacs only
+;; honors a login-name string via Customize or user-init-file. The advice
+;; below is what actually suppresses the echo-area message.
 (setq inhibit-startup-screen t
-      inhibit-startup-echo-area-message t
-      inhibit-startup-message t
       inhibit-startup-buffer-menu t
       inhibit-x-resources t
       inhibit-default-init t
@@ -123,17 +121,15 @@
                           old-value))))
               101)))
 
-;; optimize `load-suffixes'
-(setq load-suffixes '(".elc" ".el")
-      load-file-rep-suffixes '(""))
+;; Optimize load-suffixes for startup (prefer bytecode). Do not clear
+;; load-file-rep-suffixes: stock/jka-compr needs ("" ".gz") so load and
+;; locate-library can open compressed Lisp (foo.el.gz) after init.
+(setq load-suffixes '(".elc" ".el"))
 
 (defun +restore-load-suffixes-h ()
   "Restore dynamic module suffixes before loading the init file."
   (setq load-suffixes `(".elc" ".el"
-                        ,(cond ((eq system-type 'darwin) ".dylib")
-                               ((eq system-type 'gnu/linux) ".so")
-                               ((eq system-type 'windows-nt) ".dll")
-                               (t nil)))))
+                        ,@(when module-file-suffix (list module-file-suffix)))))
 
 (add-hook 'before-init-hook #'+restore-load-suffixes-h 100)
 

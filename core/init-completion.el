@@ -62,8 +62,14 @@
   ;;   %foo enables char-folding, @foo matches annotations.
   (defun +orderless-dispatch (pattern _index _total)
     (cond
-     ;; Ensure $ works with Consult commands, which add disambiguation suffixes
-     ((string-suffix-p "$" pattern) `(orderless-regexp . ,(concat (substring pattern 0 -1) "[\x200000-\x300000]*$")))
+     ;; Ensure $ works with Consult: candidates may end with tofu chars for
+     ;; disambiguation. Consult uses [#x100000, #x10FFFD] (consult--tofu-*),
+     ;; not the old #x200000–#x300000 PUA range.
+     ((string-suffix-p "$" pattern)
+      (let ((tofu (if (boundp 'consult--tofu-regexp)
+                      (concat consult--tofu-regexp "*")
+                    "[\x100000-\x10FFFD]*")))
+        `(orderless-regexp . ,(concat (substring pattern 0 -1) tofu "$"))))
      ((string= "!" pattern) `(orderless-literal . ""))
      ((string-prefix-p "!" pattern) `(orderless-without-literal . ,(substring pattern 1)))
      ((string-prefix-p "%" pattern) `(char-fold-to-regexp . ,(substring pattern 1)))
@@ -84,11 +90,10 @@
         completion-ignore-case t
         read-buffer-completion-ignore-case t
         read-file-name-completion-ignore-case t
+        ;; eglot registers category `eglot-capf' only (no bare `eglot').
         completion-category-overrides '((file (styles basic partial-completion))
-                                        (eglot (styles orderless))
                                         (eglot-capf (styles orderless)))
         orderless-style-dispatchers '(+orderless-dispatch)
-        orderless-component-separator #'orderless-escapable-split
         completions-sort 'historical
         completion-pcm-leading-wildcard t))
 
@@ -114,8 +119,10 @@
   :init
   (setq prefix-help-command 'embark-prefix-help-command)
   :config
+  ;; Embark buffer names are "*Embark Collect: …*" / "*Embark Live: …*"
+  ;; (old "*Embark Collect Live/Completions*" names are obsolete).
   (add-to-list 'display-buffer-alist
-               '("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
+               '("\\`\\*Embark \\(Collect\\|Live\\)\\b"
                  nil
                  (window-parameters (mode-line-format . none))))
 
@@ -217,7 +224,8 @@
         corfu-auto-prefix 2
         corfu-preselect 'first
         corfu-preview-current nil
-        corfu-auto-delay 0.1)
+        ;; 0.1 was too aggressive with cape-dabbrev; 0.2 is the usual floor.
+        corfu-auto-delay 0.2)
 
   ;; Emacs 30+: text-mode defaults to Ispell Capf; prefer Corfu/cape sources.
   (setq text-mode-ispell-word-completion nil)
@@ -261,7 +269,8 @@
   :straight t
   :hook (((TeX-mode LaTeX-mode org-mode markdown-ts-mode) . +completion-add-tex-capfs))
   :init
-  (setq cape-dabbrev-buffer-function #'buffer-list)
+  ;; With corfu-auto, scanning every buffer is expensive; same-mode is cape's default.
+  (setq cape-dabbrev-buffer-function #'cape-same-mode-buffers)
 
   (defun +completion-add-capfs (&rest capfs)
     "Append CAPFS to the buffer-local `completion-at-point-functions'."

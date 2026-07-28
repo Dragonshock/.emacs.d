@@ -91,8 +91,8 @@
 (use-package mb-depth
   :hook (after-init . minibuffer-depth-indicate-mode))
 ;; Keep the cursor out of the read-only portions of the minibuffer
+;; `intangible' is obsolete since Emacs 25; cursor-intangible-mode handles this.
 (setq minibuffer-prompt-properties '(read-only t
-                                               intangible t
                                                cursor-intangible t
                                                face minibuffer-prompt))
 (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
@@ -162,7 +162,11 @@
 (add-hook! (tty-setup-hook server-after-make-frame-hook) :unless-daemonp-call-immediately
   (defun +load-theme (&optional theme)
     (setq theme (if (if (display-graphic-p)
-                        (cond ((eq system-type 'darwin) (eq ns-system-appearance 'dark))
+                        ;; `ns-system-appearance' is from the emacs-plus
+                        ;; system-appearance patch, not stock Emacs NS.
+                        (cond ((and (eq system-type 'darwin)
+                                    (boundp 'ns-system-appearance))
+                               (eq ns-system-appearance 'dark))
                               (t t))
                       (eq (or (terminal-parameter nil 'background-mode)
                               (frame-parameter nil 'background-mode))

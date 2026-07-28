@@ -34,13 +34,8 @@
    ;; Fold bodies on open, keep all heading levels visible
    markdown-ts-default-folding 'fold-headings
    ;; Show images inline below their links
-   markdown-ts-inline-images t
-   ;; Highlight fenced code blocks with the embedded language's mode
-   markdown-ts-fontify-code-blocks-natively t
-   ;; TAB/newline run in the code block's language when point is inside it
-   markdown-ts-enable-code-block-context-mode t
-   ;; org-table-like editing/auto-align when point is in a pipe table
-   markdown-ts-enable-table-mode t)
+   markdown-ts-inline-images t)
+  ;; fontify/context/table modes already default to t in Emacs 31 markdown-ts-mode.
 
   ;; markdown-ts-mode gives all 6 heading levels the same face; inherit the
   ;; Org level faces instead so they differ and follow the current theme.
