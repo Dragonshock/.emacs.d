@@ -35,7 +35,8 @@
                      'init-ai
                      'init-agent-shell
                      'init-social
-                     'init-elfeed
+                     'init-gnus
+                     ;; 'init-elfeed
                      'init-test
                      ))
 
