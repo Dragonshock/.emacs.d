@@ -20,8 +20,7 @@
   :hook ((window-configuration-change . aw-update)) ;; For modeline
   ;; (add-hook 'after-make-frame-functions #'aw--after-make-frame t)
   :config
-  (setq aw-scope 'global
-        aw-background nil
+  (setq aw-background nil
         aw-ignore-current t)
 
   ;; Select window via `M-1'...`M-9'

@@ -9,7 +9,8 @@
   ;; in every VC-tracked buffer, which is exactly what `+auto-revert-mode' in
   ;; init-edit.el exists to avoid.
   (setq vc-allow-async-revert t
-        vc-allow-rewriting-published-history t
+        ;; Emacs 31: `t' rewrites published history with no prompt — prefer ask.
+        vc-allow-rewriting-published-history 'ask
         vc-dir-auto-hide-up-to-date 'revert))
 
 
@@ -33,15 +34,14 @@
               ("C-c v [" . diff-hl-previous-hunk)
               ("C-c v ]" . diff-hl-next-hunk)
               ("C-c v s" . diff-hl-stage-current-hunk)
-              ("C-c v u" . diff-hl-undo-revert-hunk))
+              ;; `diff-hl-undo-revert-hunk' does not exist; use plain undo after revert.
+              ("C-c v u" . undo))
   :config
   (setq
    ;; Reduce load on remote
    diff-hl-disable-on-remote t
    ;; A slightly faster algorithm for diffing
-   vc-git-diff-switches '("--histogram")
-   ;; Use margins in terminal frames where fringes don't exist.
-   diff-hl-fallback-to-margin t)
+   vc-git-diff-switches '("--histogram"))
 
   (defun +diff-hl--vc-face (type)
     (pcase type
@@ -103,18 +103,15 @@
   :hook ((magit-process-mode . goto-address-mode))
   :config
   (setq
-   ;; word-granularity diff
-   ;; magit-diff-refine-hunk nil
-   ;; Highlight the changed region in the hunk
-   ;; magit-diff-fontify-hunk t
+   ;; word-granularity refine (also required for abridge-diff impact)
+   magit-diff-refine-hunk 'all
    ;; dont paint whitespace
    magit-diff-paint-whitespace nil
    ;; Don't autosave repo buffers. This is too magical
    magit-save-repository-buffers nil
    ;; Don't display parent/related refs in commit buffers; they are rarely helpful and only add to runtime costs.
    magit-revision-insert-related-refs nil
-   magit-diff-use-indicator-faces t
-   magit-diff-highlight-trailing nil)
+   magit-diff-use-indicator-faces t)
 
   ;; Exterminate Magit buffers
   (defun +magit-kill-buffers (&rest _)
@@ -242,18 +239,9 @@
 
 
 
-;; [smerge] Highlight all the conflicted regions for git
+;; [smerge] VC/Git already calls `smerge-start-session' on conflicts.
 (use-package smerge-mode
-  :hook ((find-file . +smerge-try-smerge))
-  :config
-  (defun +smerge-try-smerge ()
-    (when (and buffer-file-name (vc-backend buffer-file-name))
-      (save-excursion
-        (goto-char (point-min))
-        (when (re-search-forward "^<<<<<<< " nil t)
-          (require 'smerge-mode)
-          (smerge-mode 1)))))
-  )
+  :defer t)
 
 
 ;; [browse-at-remote] Open github/gitlab/bitbucket page
@@ -269,8 +257,9 @@
   :straight t)
 
 
-;; [abridge-diff]
+;; [abridge-diff] Global minor mode (not a magit-diff-visit-file buffer hook).
 (use-package abridge-diff
   :straight t
-  :after magit ;; optional, if you'd like to use with magit
-  :hook (magit-diff-visit-file . abridge-diff-mode))
+  :after magit
+  :config
+  (abridge-diff-mode 1))

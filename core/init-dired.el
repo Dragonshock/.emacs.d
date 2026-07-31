@@ -14,7 +14,8 @@
    ;; Ask whether destination dirs should get created when copying/removing files.
    dired-create-destination-dirs 'ask
    ;; don't prompt to revert, just do it
-   dired-auto-revert-buffer #'dired-buffer-stale-p
+   ;; Predicate must accept DIRNAME; `dired-buffer-stale-p' is for Auto Revert.
+   dired-auto-revert-buffer #'dired-directory-changed-p
    ;; symlink
    dired-hide-details-hide-symlink-targets nil
    ;; free disk

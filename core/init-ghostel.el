@@ -108,7 +108,8 @@
           ("scp"    login-shell "/bin/bash")
           ("docker" "/bin/sh")
           ("podman" "/bin/sh"))
-        ghostel-tramp-shell-integration '("ssh" "scp")
+        ;; Shell types (or t), not TRAMP method names — methods live above.
+        ghostel-tramp-shell-integration t
         ghostel-ssh-install-terminfo 'auto)
   )
 

@@ -1,7 +1,20 @@
 #!/bin/sh
+# Refresh local Atom files for Elfeed, then let Emacs fetch feeds.
+# HN failure → non-zero. Reddit soft-skip (no token) → zero and does not fail the run.
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 status=0
-"$script_dir/hn-elfeed.py" update || status=1
-"$script_dir/reddit-elfeed.py" || status=1
+
+echo "== hn-elfeed =="
+if ! "$script_dir/hn-elfeed.py" update; then
+  status=1
+  echo "hn-elfeed failed" >&2
+fi
+
+echo "== reddit-elfeed =="
+if ! "$script_dir/reddit-elfeed.py"; then
+  status=1
+  echo "reddit-elfeed failed" >&2
+fi
+
 exit "$status"

@@ -179,7 +179,9 @@
         '(tab-bar-tab-name-format-hints
           tab-bar-tab-name-format-truncated
           (lambda (name &rest _) (concat " " name " "))
-          tab-bar-tab-name-format-face))
+          tab-bar-tab-name-format-face
+          ;; Emacs 30.1+/31: hover face (default list includes this after face).
+          tab-bar-tab-name-format-mouse-face))
 
   (defvar +tab-bar-gnus-indicator-cache nil)
   (defvar +tab-bar-telega-indicator-cache nil)
@@ -240,8 +242,10 @@
 
   (with-eval-after-load 'elfeed
     (add-hook! (elfeed-db-update-hook elfeed-tag-hook elfeed-untag-hook)
-      (defun +tab-bar-elfeed-indicator ()
-        "Show the number of unread Elfeed entries."
+      ;; elfeed-tag-hook / elfeed-untag-hook pass 2 args (entries, tags);
+      ;; elfeed-db-update-hook passes none. Accept any args like gnus/telega.
+      (defun +tab-bar-elfeed-indicator-update (&rest _)
+        "Update the cached Elfeed unread count in the tab bar."
         (when (and (featurep 'elfeed)
                    (hash-table-p elfeed-db-entries))
           (setq +tab-bar-elfeed-indicator-cache

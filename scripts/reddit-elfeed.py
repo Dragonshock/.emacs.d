@@ -1,8 +1,18 @@
 #!/usr/bin/env python3
 
-"""Refresh the private r/emacs Atom feed used by Elfeed."""
+"""Refresh the private r/emacs Atom feed used by Elfeed.
+
+Requires REDDIT_PRIVATE_RSS_TOKEN (set by Emacs from auth-source).
+Optional REDDIT_PRIVATE_RSS_USER (defaults to Complex_Outcome697).
+
+If the token is missing, exit 0 after a skip message so Hacker News
+updates are not reported as a total local-feed failure.
+"""
+
+from __future__ import annotations
 
 import os
+import sys
 import tempfile
 import time
 import urllib.error
@@ -13,15 +23,12 @@ from pathlib import Path
 
 
 USER_AGENT = "elfeed-emacs-rss/1.0 (personal Elfeed reader)"
-USERNAME = "Complex_Outcome697"
+DEFAULT_USERNAME = "Complex_Outcome697"
 OUTPUT = Path(__file__).resolve().parent.parent / "rss/reddit-emacs.atom"
 
 
-def private_feed_url() -> str:
-    token = os.environ.get("REDDIT_PRIVATE_RSS_TOKEN")
-    if not token:
-        raise RuntimeError("REDDIT_PRIVATE_RSS_TOKEN is missing")
-    query = urllib.parse.urlencode({"feed": token, "user": USERNAME})
+def private_feed_url(token: str, username: str) -> str:
+    query = urllib.parse.urlencode({"feed": token, "user": username})
     return f"https://www.reddit.com/r/emacs/new/.rss?{query}"
 
 
@@ -59,12 +66,26 @@ def write_feed(body: bytes) -> None:
     os.replace(temporary, OUTPUT)
 
 
-def main() -> None:
-    body = fetch_feed(private_feed_url())
+def main() -> int:
+    token = os.environ.get("REDDIT_PRIVATE_RSS_TOKEN")
+    if not token:
+        print(
+            "skipping private Reddit feed: REDDIT_PRIVATE_RSS_TOKEN is missing",
+            file=sys.stderr,
+        )
+        return 0
+
+    username = os.environ.get("REDDIT_PRIVATE_RSS_USER") or DEFAULT_USERNAME
+    body = fetch_feed(private_feed_url(token, username))
     validate_feed(body)
     write_feed(body)
     print(f"updated {OUTPUT}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        raise SystemExit(main())
+    except Exception as error:  # noqa: BLE001 — surface as non-zero for the shell wrapper
+        print(f"reddit-elfeed: {error}", file=sys.stderr)
+        raise SystemExit(1) from error

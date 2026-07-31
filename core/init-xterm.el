@@ -29,7 +29,8 @@
 ;; []
 (use-package term/xterm
   :straight nil
-  :hook (tty-setup . xterm-mouse-mode)
+  ;; Emacs 31 enables `xterm-mouse-mode' on compatible terminals by default.
+  ;; A bare mode symbol on `tty-setup' would toggle it off after enable.
   :init
   ;; Trust boundary: hardcoding OSC-52 clipboard ops bypasses xterm's
   ;; 'check probe. Keep modifyOtherKeys + reportBackground (theme/keys).

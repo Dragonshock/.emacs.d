@@ -20,8 +20,7 @@
   :straight nil
   :hook (find-file . +auto-revert-mode)
   :config
-  (setq auto-revert-verbose t
-        auto-revert-use-notify nil
+  (setq auto-revert-use-notify nil
         auto-revert-stop-on-user-input nil
         ;; Only prompts for confirmation when buffer is unsaved.
         revert-without-query (list "."))
@@ -92,8 +91,9 @@
 
 
 ;; [editorconfig] Respect project-local formatting rules
+;; Global minor mode: enable early so the first find-file still sees dir-locals.
 (use-package editorconfig
-  :hook (find-file . editorconfig-mode)
+  :init (editorconfig-mode 1)
   :config
   ;; Prefer ws-butler (touched lines only) over whole-buffer trailing trim.
   (setq editorconfig-trim-whitespaces-mode 'ws-butler-mode))
@@ -176,15 +176,15 @@
   (setq ediff-window-setup-function 'ediff-setup-windows-plain
         ediff-split-window-function 'split-window-horizontally
         ediff-merge-split-window-function 'split-window-horizontally
-        ediff-highlight-all-diffs t
         ;; turn off whitespace checking
         ediff-diff-options "-w")
   )
 
 
-;; [elec-pair] Automatic parenthesis pairing
+;; [elec-pair] Automatic parenthesis pairing (buffer-local; not global mode)
 (use-package elec-pair
-  :hook ((prog-mode conf-mode yaml-mode org-mode markdown-ts-mode minibuffer-mode) . electric-pair-mode))
+  :hook ((prog-mode conf-mode yaml-mode yaml-ts-mode toml-ts-mode org-mode markdown-ts-mode minibuffer-mode)
+         . electric-pair-local-mode))
 
 
 ;; [mwim] Better C-a C-e for programming

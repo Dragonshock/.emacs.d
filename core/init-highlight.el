@@ -4,7 +4,8 @@
 (use-package hl-line
   :hook (after-init . global-hl-line-mode)
   :config
-  (setq hl-line-sticky-flag nil)
+  ;; `hl-line-sticky-flag' is ignored under `global-hl-line-mode'; default
+  ;; `global-hl-line-sticky-flag' is already nil.
   ;; Highlight starts from EOL, to avoid conflicts with other overlays
   (setq hl-line-range-function (lambda () (cons (line-end-position)
                                            (line-beginning-position 2))))
@@ -18,14 +19,15 @@
   (setq show-paren-when-point-inside-paren t
         show-paren-when-point-in-periphery t
         show-paren-context-when-offscreen t
-        blink-matching-paren-highlight-offscreen t
-        show-paren-delay 0.2)
+        blink-matching-paren-highlight-offscreen t)
+  ;; Must use setopt while show-paren-mode is on so the idle timer is recreated.
+  (setopt show-paren-delay 0.2)
   )
 
 
 ;; [whitespace] Show visualize TAB, (HARD) SPC, newline
 (use-package whitespace
-  :hook ((prog-mode conf-mode yaml-mode) . whitespace-mode)
+  :hook ((prog-mode conf-mode yaml-mode yaml-ts-mode toml-ts-mode) . whitespace-mode)
   :init
   :config
   ;; only show bad whitespace
@@ -41,7 +43,7 @@
 ;; [rainbow-delimiters] Highlight brackets according to their depth
 (use-package rainbow-delimiters
   :straight t
-  :hook ((prog-mode conf-mode yaml-mode) . rainbow-delimiters-mode)
+  :hook ((prog-mode conf-mode yaml-mode yaml-ts-mode toml-ts-mode) . rainbow-delimiters-mode)
   :config
   (setq rainbow-delimiters-max-face-count 5))
 
@@ -64,7 +66,7 @@
   :functions (rainbow-turn-off rainbow-colorize-match rainbow-x-color-luminance)
   :bind (:map help-mode-map
               ("r" . rainbow-mode))
-  :hook ((html-mode css-mode) . rainbow-mode)
+  :hook ((html-mode css-mode css-ts-mode) . rainbow-mode)
   :config
   ;; removed HACK: Use overlay instead of text properties to override `hl-line' faces.
   ;; @see https://emacs.stackexchange.com/questions/36420
@@ -76,7 +78,7 @@
   :straight t
   :custom-face
   (hl-todo ((t (:inherit default :height 0.9 :width condensed :weight bold :inverse-video t))))
-  :hook ((prog-mode conf-mode yaml-mode) . hl-todo-mode)
+  :hook ((prog-mode conf-mode yaml-mode yaml-ts-mode toml-ts-mode) . hl-todo-mode)
   :config
   (setq hl-todo-require-punctuation t
         hl-todo-highlight-punctuation ":")
@@ -109,7 +111,9 @@
   :custom-face
   (pulse-highlight-start-face ((t (:inherit region :background unspecified))))
   (pulse-highlight-face ((t (:inherit region :background unspecified :extend t))))
-  :hook (((dumb-jump-after-jump imenu-after-jump) . +recenter-and-pulse)
+  ;; dumb-jump is only on `xref-backend-functions' here; pulse via xref, not
+  ;; the unused `dumb-jump-after-jump' hook.
+  :hook (((imenu-after-jump xref-after-jump) . +recenter-and-pulse)
          ((bookmark-after-jump magit-diff-visit-file next-error) . +recenter-and-pulse-line))
   :init
   (setq pulse-delay 0.1
@@ -168,7 +172,7 @@
          ("?" . symbol-overlay-map-help)
          ("c" . symbol-overlay-put)
          ("C" . symbol-overlay-remove-all))
-  :hook (((prog-mode yaml-mode) . symbol-overlay-mode))
+  :hook (((prog-mode yaml-mode yaml-ts-mode) . symbol-overlay-mode))
   :config
   (setq symbol-overlay-temp-highlight-on-region t)
   )

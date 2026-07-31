@@ -115,11 +115,13 @@
       (dolist (charset '(han cjk-misc))
         (set-fontset-font t charset (font-spec :family "Sarasa Mono SC")))
 
-      ;; font for emoji, set as unicode to cover more chars
+      ;; Emoji script (Emacs 28+ NEWS); 'prepend so color emoji wins composition.
+      ;; Do not bind color-emoji fonts to broad 'unicode — that can miss script
+      ;; 'emoji entries or pull non-emoji glyphs into the emoji font.
       (if (eq system-type 'darwin)
-          (progn (set-fontset-font t 'unicode (font-spec :family "Apple Color Emoji") nil 'append)
+          (progn (set-fontset-font t 'emoji (font-spec :family "Apple Color Emoji") nil 'prepend)
                  (setq face-font-rescale-alist '(("Apple Color Emoji" . 0.79))))
-        (set-fontset-font t 'unicode (font-spec :family "Noto Color Emoji") nil 'append)))))
+        (set-fontset-font t 'emoji (font-spec :family "Noto Color Emoji") nil 'prepend)))))
 
 ;; The initial frame is created with the system font, and
 ;; `frame-inhibit-implied-resize' keeps its pixel size when `+setup-fonts'

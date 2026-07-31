@@ -6,12 +6,11 @@
   :functions eshell/alias
   :hook ((eshell-mode . compilation-shell-minor-mode))
   :bind (("C-`" . +eshell-toggle)
-         ("C-·" . +eshell-toggle)
-         :map eshell-mode-map
-         ;; Not M-s: consult search lives on the M-s prefix (init-completion).
-         ;; Match minibuffer history on M-r.
-         ("M-r" . consult-history))
+         ("C-·" . +eshell-toggle))
   :config
+  ;; Emacs 31 binds M-r on `eshell-hist-mode-map' (minor); major-map binding is shadowed.
+  (with-eval-after-load 'em-hist
+    (keymap-set eshell-hist-mode-map "M-r" #'consult-history))
   (setq
    ;; banner
    eshell-banner-message ""
@@ -91,18 +90,19 @@ If no project is found, create a temporary Eshell instance in the current direct
                           nil t))))))))
 
   (defun +eshell/define-alias ()
-    "Define alias for eshell"
-    ;; Aliases
-    (defalias 'eshell-f 'find-file)
-    (defalias 'eshell-fo 'find-file-other-window)
-    (defalias 'eshell-d 'dired)
+    "Define alias for eshell.
+Eshell looks up `eshell/NAME' (slash), not `eshell-NAME' (hyphen)."
+    ;; Lisp-backed commands (eshell-find-alias-function → eshell/NAME)
+    (defalias 'eshell/f #'find-file)
+    (defalias 'eshell/fo #'find-file-other-window)
+    (defalias 'eshell/d #'dired)
+    (defalias 'eshell/q #'eshell/exit)
+    (defalias 'eshell/vim #'find-file)
+    (defalias 'eshell/vi #'find-file)
+    ;; String aliases
     (eshell/alias "l" "ls -lah $*")
     (eshell/alias "ll" "ls -laG $*")
-    (defalias 'eshell-q 'eshell/exit)
     (eshell/alias "rg" "rg --color=always $*")
-    ;; Vim
-    (defalias 'eshell-vim 'find-file)
-    (defalias 'eshell-vi 'find-file)
     ;; Git
     (eshell/alias "git" "git $*")
     (eshell/alias "gst" "git status $*")
@@ -217,9 +217,11 @@ If no project is found, create a temporary Eshell instance in the current direct
 
 
 ;; [eshell-z] `cd' to frequent directory in `eshell'
+;; Load on eshell-mode so frecent visits are recorded before the first `z'.
 (use-package eshell-z
   :straight t
   :after eshell
+  :hook (eshell-mode . (lambda () (require 'eshell-z)))
   :commands (eshell/z))
 
 
@@ -231,10 +233,16 @@ If no project is found, create a temporary Eshell instance in the current direct
 (use-package esh-help
   :straight t
   :preface
+  (defun +esh-help-eldoc-backend (callback &rest _)
+    "Eldoc backend wrapping `esh-help-eldoc-command' (modern multi-backend API)."
+    (when-let* ((doc (esh-help-eldoc-command)))
+      (funcall callback doc)))
   (defun +eshell-setup-esh-help-eldoc ()
-    "Use `esh-help' as the Eldoc backend in Eshell."
+    "Register `esh-help' on `eldoc-documentation-functions' in Eshell."
     (require 'esh-help)
-    (setq-local eldoc-documentation-function #'esh-help-eldoc-command))
+    ;; Do not set obsolete `eldoc-documentation-function' to a string-returning
+    ;; command; that skips the composable `eldoc-documentation-functions' hook.
+    (add-hook 'eldoc-documentation-functions #'+esh-help-eldoc-backend nil t))
   :hook ((eshell-mode . +eshell-setup-esh-help-eldoc)
          (eshell-mode . eldoc-mode))
   :config
@@ -263,19 +271,22 @@ If no project is found, create a temporary Eshell instance in the current direct
 
 
 
+;; eshell-did-you-mean 0.2 is unmaintained and assumes (pcomplete-completions)
+;; is a plain string list, then mapcar's it for edit-distance.  Emacs 31 Eshell
+;; bare-command completion returns a programmed completion table (function /
+;; completion-table-dynamic via eshell--complete-commands-list).  Materialize
+;; with all-completions first.  Do not remove this override without replacing
+;; or forking the package — stock 0.2 breaks the eshell preoutput filter.
 (use-package eshell-did-you-mean
   :straight t
   :after esh-mode
-  :init (eshell-did-you-mean-setup)
-  ;; HACK: `pcomplete-completions' returns a function, but
-  ;;   `eshell-did-you-mean--get-all-commands' unconditionally expects it to
-  ;;   return a list of strings, causing wrong-type-arg errors in many cases.
-  ;;   `all-completions' handles all these cases.
+  :init
   (defadvice! +eshell--fix-eshell-did-you-mean-a (&rest _)
     :override #'eshell-did-you-mean--get-all-commands
     (unless eshell-did-you-mean--all-commands
       (setq eshell-did-you-mean--all-commands
-            (all-completions "" (pcomplete-completions))))))
+            (all-completions "" (pcomplete-completions)))))
+  (eshell-did-you-mean-setup))
 
 
 ;; Ghostel lives in `init-ghostel.el` (loaded earlier). Eshell still uses

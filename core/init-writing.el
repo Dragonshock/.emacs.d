@@ -27,14 +27,11 @@
   :mode (("\\.md\\'" . markdown-ts-mode)
          ("\\.markdown\\'" . markdown-ts-mode))
   :config
-  ;; Hide markup delimiters (**, #, []() ...) for a rendered look.
-  ;; buffer-local (:local t), so set the default value.
-  (setq-default markdown-ts-hide-markup t)
-  (setq
-   ;; Fold bodies on open, keep all heading levels visible
-   markdown-ts-default-folding 'fold-headings
-   ;; Show images inline below their links
-   markdown-ts-inline-images t)
+  ;; Hide markup / inline images are buffer-local (:local t) — set defaults.
+  (setq-default markdown-ts-hide-markup t
+                markdown-ts-inline-images t)
+  ;; Fold bodies on open, keep all heading levels visible
+  (setq markdown-ts-default-folding 'fold-headings)
   ;; fontify/context/table modes already default to t in Emacs 31 markdown-ts-mode.
 
   ;; markdown-ts-mode gives all 6 heading levels the same face; inherit the
@@ -47,17 +44,18 @@
 
 ;; [typst-ts-mode]
 (use-package typst-ts-mode
-  :straight (:host sourcehut :repo "meow_king/typst-ts-mode")
+  ;; Upstream migrated from SourceHut to Codeberg.
+  :straight (:host codeberg :repo "meow_king/typst-ts-mode")
   :custom
   (typst-ts-watch-options "--open"))
 
 ;; [auctex]
 (use-package tex
   :straight auctex
-  ;; `TeX-source-correlate-mode' is a minor mode: setting the variable via
-  ;; `setq' never turns it on.
-  :hook (TeX-mode . TeX-source-correlate-mode)
   :config
+  ;; Global minor mode: bare mode symbol on a hook toggles per buffer and
+  ;; can flip SyncTeX off when opening multiple TeX buffers. Enable once.
+  (TeX-source-correlate-mode 1)
   (setq TeX-parse-self t             ; parse on load
         TeX-auto-save t              ; parse on save
         ;; Use hidden directories for AUCTeX files.

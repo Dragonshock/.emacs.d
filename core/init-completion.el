@@ -71,7 +71,8 @@
                     "[\x100000-\x10FFFD]*")))
         `(orderless-regexp . ,(concat (substring pattern 0 -1) tofu "$"))))
      ((string= "!" pattern) `(orderless-literal . ""))
-     ((string-prefix-p "!" pattern) `(orderless-without-literal . ,(substring pattern 1)))
+     ;; Prefer `orderless-not' over legacy `orderless-without-literal' (README).
+     ((string-prefix-p "!" pattern) `(orderless-not . ,(substring pattern 1)))
      ((string-prefix-p "%" pattern) `(char-fold-to-regexp . ,(substring pattern 1)))
      ((string-suffix-p "%" pattern) `(char-fold-to-regexp . ,(substring pattern 0 -1)))
      ((string-prefix-p "^" pattern) `(orderless-literal-prefix . ,(substring pattern 1)))
@@ -89,12 +90,13 @@
         completion-category-defaults nil
         completion-ignore-case t
         read-buffer-completion-ignore-case t
-        read-file-name-completion-ignore-case t
+        ;; `read-file-name-completion-ignore-case' is set once in init-basic
+        ;; (darwin default is already t; keep the global explicit setq there).
         ;; eglot registers category `eglot-capf' only (no bare `eglot').
-        completion-category-overrides '((file (styles basic partial-completion))
+        completion-category-overrides '((file (styles partial-completion))
                                         (eglot-capf (styles orderless)))
         orderless-style-dispatchers '(+orderless-dispatch)
-        completions-sort 'historical
+        ;; `completions-sort' only affects built-in *Completions*; Vertico ignores it.
         completion-pcm-leading-wildcard t))
 
 
@@ -201,16 +203,21 @@
          ("C-x C-d" . consult-dir)
          ("C-x C-j" . consult-dir-jump-file))
   :config
-  (add-to-list 'consult-dir-sources 'consult-dir--source-tramp-ssh t)
-  (add-to-list 'consult-dir-sources 'consult-dir--source-tramp-local t))
+  ;; `consult-dir--source-tramp-local' is already in the default sources list.
+  (add-to-list 'consult-dir-sources 'consult-dir--source-tramp-ssh t))
 
 
 ;;; In-buffer completion
 
 (use-package corfu
   :straight (:files (:defaults "extensions/*.el"))
-  :hook (((prog-mode conf-mode yaml-mode shell-mode eshell-mode text-mode codex-ide-session-mode) . corfu-mode)
-         ((eshell-mode shell-mode) . (lambda () (setq-local corfu-auto nil)))
+  :hook (((prog-mode conf-mode yaml-mode yaml-ts-mode toml-ts-mode text-mode codex-ide-session-mode)
+          . +corfu-enable)
+         ;; Shells are not prog-mode; set auto nil *before* enabling Corfu.
+         ((shell-mode eshell-mode) . +corfu-enable-no-auto)
+         ;; Elisp: prog-mode-hook runs while major-mode is still prog-mode, so
+         ;; disable auto only on the child mode hook, then restart Corfu.
+         ((emacs-lisp-mode lisp-interaction-mode) . +corfu-disable-auto)
          (minibuffer-setup . +corfu-enable-in-minibuffer))
   :bind (:map corfu-map
               ("TAB" . corfu-complete)
@@ -218,6 +225,20 @@
               ("S-TAB" . +corfu-move-to-minibuffer)
               ("S-<tab>" . +corfu-move-to-minibuffer)
               ("RET" . nil))
+  :init
+  (defun +corfu-enable ()
+    "Enable Corfu (auto Capf on by default)."
+    (corfu-mode 1))
+  (defun +corfu-enable-no-auto ()
+    "Enable Corfu with auto Capf off (shells)."
+    (setq-local corfu-auto nil)
+    (corfu-mode 1))
+  (defun +corfu-disable-auto ()
+    "Turn off auto Capf after Corfu is already on (Elisp security)."
+    (setq-local corfu-auto nil)
+    (when corfu-mode
+      (corfu-mode -1)
+      (corfu-mode 1)))
   :config
   (setq corfu-cycle t
         corfu-auto t
@@ -269,8 +290,7 @@
   :straight t
   :hook (((TeX-mode LaTeX-mode org-mode markdown-ts-mode) . +completion-add-tex-capfs))
   :init
-  ;; With corfu-auto, scanning every buffer is expensive; same-mode is cape's default.
-  (setq cape-dabbrev-buffer-function #'cape-same-mode-buffers)
+  ;; cape 2.7+ defaults `cape-dabbrev-buffer-function' to `cape-same-mode-buffers'.
 
   (defun +completion-add-capfs (&rest capfs)
     "Append CAPFS to the buffer-local `completion-at-point-functions'."

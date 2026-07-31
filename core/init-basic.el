@@ -29,10 +29,9 @@
  bidi-inhibit-bpa t
  bidi-paragraph-direction 'left-to-right
 
- ;; smaller threshold to improve long line performance
- long-line-threshold 1000
- large-hscroll-threshold 1000
- syntax-wholeline-max 1000
+ ;; Leave long-line-threshold / large-hscroll-threshold / syntax-wholeline-max
+ ;; at stock defaults (DOC: do not lower except for debugging; stock ~50000 /
+ ;; 10000). Rely on global-so-long-mode + bidi settings for long lines.
 
  ;; Larger process output buffer for LSP module
  read-process-output-max (* 4 1024 1024)
@@ -174,11 +173,9 @@
 (use-package saveplace
   :hook (after-init . save-place-mode)
   :config
-  (setq save-place-autosave-interval 1000)
+  (setopt save-place-autosave-interval 1000)
 
-  ;; HACK: `save-place-alist-to-file' uses `pp' to prettify the contents of its
-  ;; cache, which is expensive and useless. replace it with `prin1'
-  (+advice-pp-to-prin1! 'save-place-alist-to-file)
+  ;; Emacs 31 `save-place-alist-to-file' already uses `prin1' (no `pp'); no advice needed.
 
   ;; Recenter after restore (Emacs 29+: public hook, not advice on finder).
   (add-hook 'save-place-after-find-file-hook
@@ -197,14 +194,17 @@
   (setq recentf-auto-cleanup 'never
         recentf-max-saved-items 200
         recentf-exclude (list "\\.?cache" ".cask" "url" "COMMIT_EDITMSG\\'" "bookmarks"
-                              "\\.?ido\\.last$" "\\.revive$" "/G?TAGS$" "/.elfeed/"
+                              "\\.?ido\\.last$" "\\.revive$" "/G?TAGS$"
+                              ;; Elfeed db is `elfeed/' (no leading dot); also excluded
+                              ;; via predicate in init-elfeed.el.
+                              "/elfeed/"
                               "^/tmp/" "^/var/folders/.+$" "^/ssh:"
                               (lambda (file) (file-in-directory-p file package-user-dir))
                               (expand-file-name recentf-save-file))
         recentf-keep nil)
 
-  (add-to-list 'recentf-filename-handlers #'abbreviate-file-name)
-
+  ;; Emacs 29.1+ already defaults `recentf-filename-handlers' to
+  ;; '(abbreviate-file-name); only strip text properties for cache size.
   ;; HACK: Text properties inflate the size of recentf's files, and there is
   ;; no purpose in persisting them (Must be first in the list!)
   (add-to-list 'recentf-filename-handlers #'substring-no-properties)
@@ -356,20 +356,33 @@
 
 
 ;; [environment variables]
-;; Initialize once via after-init only.  A second call in :config used to
-;; re-run after deferred load (use-package-always-defer), spawning an extra
-;; login shell on every graphical startup.
+;; Run `exec-path-from-shell-initialize' at most once (after-init).  Do not
+;; permanently `:unless' on (daemonp): emacs-plus site-start only injects PATH
+;; via EMACS_PLUS_PATH / ns-emacs-plus-injected-path, not JAVA_HOME /
+;; JDTLS_JAVA_HOME / MANPATH / HOMEBREW.  Daemon + emacsclient needs those.
+;; Non-daemon pure TTY sessions skip the login-shell probe.  Avoid a second
+;; call from :config — use-package-always-defer used to re-run initialize and
+;; spawn an extra shell on every graphical startup.
 (use-package exec-path-from-shell
   :straight t
-  :unless (or noninteractive (daemonp) (not (display-graphic-p)))
-  :hook (after-init . exec-path-from-shell-initialize)
+  :unless noninteractive
   :init
   (setq exec-path-from-shell-arguments '("-l")
         exec-path-from-shell-variables
         (let ((vars '("HOMEBREW" "JAVA_HOME" "JDTLS_JAVA_HOME" "MANPATH")))
           (if (bound-and-true-p ns-emacs-plus-injected-path)
               vars
-            (cons "PATH" vars)))))
+            (cons "PATH" vars))))
+  (defvar +exec-path-from-shell--initialized nil
+    "Non-nil after `exec-path-from-shell-initialize' has run once this session.")
+  (defun +exec-path-from-shell-maybe-initialize ()
+    "Copy shell env once for GUI frames or Emacs daemon sessions."
+    (unless +exec-path-from-shell--initialized
+      (when (or (daemonp) (display-graphic-p))
+        (require 'exec-path-from-shell)
+        (exec-path-from-shell-initialize)
+        (setq +exec-path-from-shell--initialized t))))
+  :hook (after-init . +exec-path-from-shell-maybe-initialize))
 
 
 ;; [backup walker] A utility to view Emacs backup files.

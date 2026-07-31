@@ -59,7 +59,7 @@
   :preface
   (defconst +eglot-auto-start-modes
     '(c-mode c++-mode rust-mode python-mode java-mode
-             c-ts-mode c++-ts-mode rust-ts-mode python-ts-mode)
+             c-ts-mode c++-ts-mode rust-ts-mode python-ts-mode java-ts-mode)
     "Major modes where Eglot should start automatically.")
   :init
   (dolist (mode +eglot-auto-start-modes)
@@ -73,47 +73,54 @@
   (setq eglot-events-buffer-config '(:size 0 :format full)
         eglot-autoshutdown t
         ;; eglot-report-progress 'messages
-        eglot-documentation-renderer 'markdown-ts-view-mode
         eglot-code-action-indications nil)
+  ;; Renderer needs a bound major mode; markdown-ts-view-mode is not autoloaded.
+  (require 'markdown-ts-mode nil t)
+  (setq eglot-documentation-renderer
+        (if (fboundp 'markdown-ts-view-mode)
+            'markdown-ts-view-mode
+          'gfm-view-mode))
 
   ;; Do not setq-local eldoc strategy here: :config only affects the then-current
   ;; buffer, eglot-managed-mode sets its own strategy, and this config disables
   ;; eldoc-mode under eglot (manual C-h h).
+  ;; Flat plist (not alist of sections); RA uses :features "all", not "full"/:allFeatures.
+  ;; Client ECC belongs in CONTACT :initializationOptions, not workspace/configuration.
   (setq-default eglot-workspace-configuration
                 ;; Prefer pylsp section name (pyls is the deprecated Palantir server).
-                '((:pylsp . (:plugins (:jedi_completion (:fuzzy t))))
-                  (:rust-analyzer . (:cargo (:allFeatures t :allTargets t :features "full")
-                                            :checkOnSave :json-false
-                                            :completion (:termSearch (:enable t)
-                                                                     :fullFunctionSignatures (:enable t))
-                                            :hover (:memoryLayout (:size "both")
-                                                                  :show (:traitAssocItems 5)
-                                                                  :documentation (:keywords (:enable :json-false)))
-                                            :inlayHints (:lifetimeElisionHints (:enable "skip_trivial" :useParameterNames t)
-                                                                               :closureReturnTypeHints (:enable "always")
-                                                                               :discriminantHints (:enable t)
-                                                                               :genericParameterHints (:lifetime (:enable t)))
-                                            :semanticHighlighting (:operator (:specialization (:enable t))
-                                                                             :punctuation (:enable t :specialization (:enable t)))
-                                            :workspace (:symbol (:search (:kind "all_symbols"
-                                                                                :scope "workspace_and_dependencies")))
-                                            :references (:excludeImports t
-                                                         :excludeTests t)
-                                            :lru (:capacity 1024)
-                                            :diagnostics (:enable :json-false)))
-                  (:typescript . (:preferences (:importModuleSpecifierPreference "non-relative")))
-                  (:java . (:configuration
-                            (:runtimes [(:name "JavaSE-17"
-                                               :path "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home/")
-                                        (:name "JavaSE-21"
-                                               :path "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/"
-                                               :default t)])
-                            :import (:gradle (:enabled t
-                                              :wrapper (:enabled t)))
-                            :autobuild (:enabled :json-false)
-                            :extendedClientCapabilities (:classFileContentsSupport t)))))
+                '(:pylsp (:plugins (:jedi_completion (:fuzzy t)))
+                  :rust-analyzer (:cargo (:allTargets t :features "all")
+                                  :checkOnSave :json-false
+                                  :completion (:termSearch (:enable t)
+                                                           :fullFunctionSignatures (:enable t))
+                                  :hover (:memoryLayout (:size "both")
+                                                        :show (:traitAssocItems 5)
+                                                        :documentation (:keywords (:enable :json-false)))
+                                  :inlayHints (:lifetimeElisionHints (:enable "skip_trivial" :useParameterNames t)
+                                                                     :closureReturnTypeHints (:enable "always")
+                                                                     :discriminantHints (:enable t)
+                                                                     :genericParameterHints (:lifetime (:enable t)))
+                                  :semanticHighlighting (:operator (:specialization (:enable t))
+                                                                   :punctuation (:enable t :specialization (:enable t)))
+                                  :workspace (:symbol (:search (:kind "all_symbols"
+                                                                      :scope "workspace_and_dependencies")))
+                                  :references (:excludeImports t
+                                               :excludeTests t)
+                                  :lru (:capacity 1024)
+                                  :diagnostics (:enable :json-false))
+                  :typescript (:preferences (:importModuleSpecifierPreference "non-relative"))
+                  :java (:configuration
+                         (:runtimes [(:name "JavaSE-17"
+                                            :path "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home/")
+                                     (:name "JavaSE-21"
+                                            :path "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/"
+                                            :default t)])
+                         :import (:gradle (:enabled t
+                                           :wrapper (:enabled t)))
+                         :autobuild (:enabled :json-false))))
 
   (defun jdtls-command-contact (&optional interactive)
+    "Eglot CONTACT for jdtls; ECC goes in :initializationOptions (not workspace config)."
     (let* ((jdtls-java-home (getenv "JDTLS_JAVA_HOME"))
            (project-root (project-root (project-current t)))
            (data-dir (expand-file-name
@@ -121,8 +128,11 @@
                                         "cache" "lsp-cache"
                                         (md5 (expand-file-name project-root))))))
       `("env" ,(concat "JAVA_HOME=" jdtls-java-home)
-        "jdtls" "--jvm-arg=-Xmx16G" "-data" ,data-dir)))
-  (push '(java-mode . jdtls-command-contact) eglot-server-programs)
+        "jdtls" "--jvm-arg=-Xmx16G" "-data" ,data-dir
+        :initializationOptions
+        (:extendedClientCapabilities (:classFileContentsSupport t)))))
+  (add-to-list 'eglot-server-programs
+               `((java-mode java-ts-mode) . ,#'jdtls-command-contact))
 
   ;; we call eldoc manually
   (add-hook! eglot-managed-mode-hook
@@ -139,19 +149,14 @@
   (eglot-tempel-mode 1))
 
 
-(use-package eglot-booster
-  :straight (:host github :repo "jdtsmith/eglot-booster")
-  :after eglot
-  :config (eglot-booster-mode)
-  (setq eglot-booster-io-only t))
+;; eglot-booster: upstream archived; Emacs 30/31 JSON is fast enough without it.
 
 
 ;; [Eldoc]
 (use-package eldoc
   :bind (("C-h h" . eldoc))
   :config
-  (setq eldoc-echo-area-display-truncation-message t
-        eldoc-echo-area-prefer-doc-buffer t
+  (setq eldoc-echo-area-prefer-doc-buffer t
         eldoc-echo-area-use-multiline-p nil
         eglot-extend-to-xref t)
   ;; Has a :set function that wires `eldoc-show-help-at-pt' into
@@ -188,8 +193,8 @@
   :init
   (add-hook 'xref-backend-functions #'dumb-jump-xref-activate)
   :config
+  ;; `dumb-jump-selector' only affects legacy dumb-jump-go*; we use xref only.
   (setq dumb-jump-prefer-searcher 'rg
-        dumb-jump-selector 'completing-read
         dumb-jump-aggressive t
         dumb-jump-default-project user-emacs-directory)
   )
@@ -208,9 +213,7 @@
   (require 'citre-config)
   :config
   (setq citre-auto-enable-citre-mode-modes '(prog-mode)
-        citre-default-create-tags-file-location 'global-cache
-        citre-edit-ctags-options-manually t
-        citre-enable-capf-integration t)
+        citre-default-create-tags-file-location 'global-cache)
 
   (defun +citre-jump ()
     "Jump to the definition of the symbol at point. Fallback to `xref-find-definitions'."
@@ -289,6 +292,13 @@
   (setq c-basic-offset 4)
   (c-set-offset 'case-label '+))
 
+;; treesit C/C++ ignore `c-basic-offset'; use `c-ts-indent-offset' (default 2).
+(use-package c-ts-mode
+  :straight (:type built-in)
+  :when (treesit-available-p)
+  :config
+  (setopt c-ts-indent-offset 4))
+
 
 (use-package csv-mode
   :straight t)
@@ -316,12 +326,9 @@
   (setq css-indent-offset 2))
 
 
+;; Classic rust-mode kept as dependency/fallback; .rs remaps to rust-ts-mode.
 (use-package rust-mode
-  :straight t
-  :init
-  (setq rust-mode-treesitter-derive t
-        rust-format-goto-problem nil)
-  )
+  :straight t)
 
 
 (use-package rust-playground
@@ -350,14 +357,13 @@
         verilog-tab-to-comment t))
 
 
-;; [yaml]
+;; [yaml] third-party fallback; treesit remaps to yaml-ts-mode when available.
 (use-package yaml-mode
   :straight t)
 
 
-;; [toml]
-(use-package toml-mode
-  :straight t)
+;; [toml] Use built-in conf-toml-mode / toml-ts-mode (treesit remaps).
+;; Do not install third-party toml-mode — it steals auto-mode from treesit.
 
 
 ;; [graphviz-dot]
@@ -390,8 +396,7 @@
    web-mode-markup-indent-offset 2
    web-mode-css-indent-offset 2
    web-mode-code-indent-offset 2
-   web-mode-enable-html-entities-fontification t
-   web-mode-auto-close-style 1))
+   web-mode-enable-html-entities-fontification t))
 
 
 ;; [treesit]
@@ -402,10 +407,9 @@
   ;; what installs the 26 entries of `treesit-major-mode-remap-alist' into
   ;; `major-mode-remap-alist'.  Plain `setq' silently does nothing.
   ;;
-  ;; The `require' is load-bearing too: early-init.el advises `setopt--set'
-  ;; to bind `custom-load-recursion', which makes `custom-load-symbol' a
-  ;; no-op.  Without treesit already loaded, the :set property doesn't exist
-  ;; yet and `setopt' quietly degrades to `set-default'.
+  ;; `require' remains load-bearing during early init while early-init's
+  ;; temporary setopt advice inhibits custom-load-symbol (removed at
+  ;; emacs-startup-hook).
   (require 'treesit)
   (setopt treesit-enabled-modes t
           ;; Also has a :set (`treesit--font-lock-level-setter'); setq is not enough.

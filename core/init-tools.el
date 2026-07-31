@@ -107,14 +107,15 @@
                                (search-backward "\\begin{document}"
                                                 (line-beginning-position) t))
                        (LaTeX-find-matching-end)))))))
-  :hook (((prog-mode conf-mode yaml-mode) . hs-minor-mode)
+  :hook (((prog-mode conf-mode yaml-mode yaml-ts-mode) . hs-minor-mode)
          ((ruby-mode nxml-mode latex-mode LaTeX-mode) . +hideshow-setup)
-         ((yaml-mode) . hs-indentation-mode))
+         ((yaml-mode yaml-ts-mode) . hs-indentation-mode))
   :bind (("C-c h TAB" . hs-cycle)
          ("C-c h `" . hs-toggle-all))
   :config
-  (setq hs-indicator-type nil
-        hs-display-lines-hidden t))
+  ;; Leave `hs-show-indicators' at default nil; do not set `hs-indicator-type'
+  ;; alone (it only applies when indicators are enabled).
+  (setq hs-display-lines-hidden t))
 
 
 ;; [project] Project manager
@@ -122,13 +123,14 @@
   :bind (:map project-prefix-map
               ("m" . magit-status))
   :config
-  (setq project-switch-commands '((project-find-file "File")
-                                  (project-find-regexp "Regexp")
-                                  (project-switch-to-buffer "Buffer")
-                                  (project-dired "Dired")
-                                  (project-eshell "Eshell")
-                                  (project-search "Search")
-                                  (magit-status "Magit")))
+  ;; Third element is the dispatch KEY (required for a working switch menu).
+  (setq project-switch-commands '((project-find-file "File" ?f)
+                                  (project-find-regexp "Regexp" ?g)
+                                  (project-switch-to-buffer "Buffer" ?b)
+                                  (project-dired "Dired" ?d)
+                                  (project-eshell "Eshell" ?e)
+                                  (project-search "Search" ?s)
+                                  (magit-status "Magit" ?m)))
 
   )
 
@@ -146,17 +148,35 @@
   :straight t
   :hook (after-init . undo-fu-session-global-mode)
   :config
-  (setq undo-fu-session-incompatible-files '("\\.gpg$" "/COMMIT_EDITMSG\\'" "/git-rebase-todo\\'"))
+  ;; Never snapshot secrets or ephemeral credentials (regexps match full path).
+  (setq undo-fu-session-incompatible-files
+        '("\\.gpg$"
+          "/COMMIT_EDITMSG\\'"
+          "/git-rebase-todo\\'"
+          "/\\.authinfo\\(\\.gpg\\)?\\'"
+          "/authinfo\\.gpg\\'"
+          "\\.netrc\\'"
+          "/cookies\\'"
+          "\\.pat\\'"
+          "/gh\\.pat\\'"
+          "/\\.cli-proxy-api/"
+          "/\\.ssh/"
+          "id_rsa"
+          "id_ed25519"
+          "/private/tmp/"
+          "^/tmp/"
+          "passwd"
+          "credentials"))
 
   (when (executable-find "zstd")
     ;; There are other algorithms available, but zstd is the fastest
     (setq undo-fu-session-compression 'zst)))
 
 
-;; [undo-hl] Highlight undo changes
+;; [undo-hl] Highlight undo changes (buffer-local; not global after-init)
 (use-package undo-hl
   :straight (:host github :repo "casouri/undo-hl")
-  :hook (after-init . undo-hl-mode)
+  :hook ((prog-mode text-mode conf-mode) . undo-hl-mode)
   :config (setq undo-hl-flash-duration 0.1))
 
 
@@ -184,7 +204,8 @@
   :bind (:map prog-mode-map
               ("C-c '" . separedit))
   :config
-  (setq separedit-default-mode 'markdown-ts-mode))
+  ;; separedit only wires nested fenced-block edit for markdown-mode / gfm-mode.
+  (setq separedit-default-mode 'markdown-mode))
 
 
 ;; [emacs-reader] read docs in emacs (moved here from init-pdf.el, upstream layout)

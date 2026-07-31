@@ -3,7 +3,8 @@
 ;; [straight] Package manager config (should put setq before installation for `straight`)
 (setq straight-check-for-modifications nil                   ; skip modification
       straight-vc-git-default-clone-depth '(1 single-branch) ; shadow clone
-      warning-suppress-log-types '((comp))                   ; Don't display comp warnings
+      ;; Do not permanently suppress-log 'native-compiler: that would ignore
+      ;; display-warning entirely and cancel early-init's kind filter / debug-init.
       straight-disable-native-compile (not (native-comp-available-p)))
 
 ;; Make the running Emacs reachable as `emacs' for subprocesses.  Package

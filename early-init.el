@@ -17,12 +17,12 @@
 
 (add-hook 'emacs-startup-hook #'+restore-gc-threshold-h 100)
 
-(setq native-comp-jit-compilation t)
-
 ;; Keep early startup quiet unless we're debugging init.
+;; Leave stock defaults for jit-compilation and async-report (both t on 31).
+;; Emacs 30+: only override the kind filter and battery/missing-source behavior.
 (setq ad-redefinition-action 'accept
       jka-compr-verbose init-file-debug
-      native-comp-async-report-warnings-errors init-file-debug
+      native-comp-async-warnings-errors-kind (if init-file-debug 'all 'important)
       native-comp-warning-on-missing-source init-file-debug
       native-comp-async-on-battery-power nil
       warning-suppress-types '((defvaralias) (lexical-binding))
@@ -96,12 +96,17 @@
 (unless (memq initial-window-system '(x pgtk))
   (setq command-line-x-option-alist nil))
 
-;; `setopt' can load custom dependencies early for type checks. Keep it from
-;; doing so during init; type checks will still happen when variables are defined.
+;; `setopt' can load custom dependencies early for type checks. Inhibit that
+;; only during init; remove the advice at startup so later setopt still runs
+;; custom-load-symbol / :set (treesit remaps, timers, etc.).
 (when (fboundp 'setopt--set)
   (define-advice setopt--set (:around (fn &rest args) inhibit-load-symbol -90)
     (let ((custom-load-recursion t))
-      (apply fn args))))
+      (apply fn args)))
+  (add-hook 'emacs-startup-hook
+            (lambda ()
+              (advice-remove 'setopt--set #'setopt--set@inhibit-load-symbol))
+            100))
 
 ;; `file-name-handler-alist' is consulted on each call to `require', `load', or various file/io functions
 (unless (or (daemonp) noninteractive init-file-debug)

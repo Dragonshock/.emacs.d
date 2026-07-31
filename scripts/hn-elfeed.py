@@ -15,7 +15,6 @@ import argparse
 import datetime as dt
 import html
 import json
-import netrc
 import os
 import time
 import urllib.error
@@ -124,6 +123,34 @@ def log(message: str) -> None:
     print(
         f"[{dt.datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S %z')}] {message}"
     )
+
+
+def authinfo_password(machine: str, path: Path = AUTHINFO_PATH) -> str:
+    """Read password for MACHINE from Emacs authinfo.
+
+    Unlike stdlib ``netrc``, this accepts the ``port`` keyword used by
+    auth-source (e.g. Reddit private RSS lines) in the same file.
+    """
+    if not path.is_file():
+        raise FileNotFoundError(f"authinfo not found: {path}")
+    keywords = {"machine", "login", "password", "port", "account"}
+    for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        tokens = line.split()
+        fields: dict[str, str] = {}
+        i = 0
+        while i < len(tokens):
+            key = tokens[i]
+            if key in keywords and i + 1 < len(tokens):
+                fields[key] = tokens[i + 1]
+                i += 2
+            else:
+                i += 1
+        if fields.get("machine") == machine and fields.get("password"):
+            return fields["password"]
+    raise KeyError(f"no password for machine {machine!r} in {path}")
 
 
 def request(
@@ -402,7 +429,7 @@ def command_update(limit: int | None, jobs: int) -> int:
 
     worker_count = min(jobs, len(candidates))
     log(f"开始并行处理 {len(candidates)} 篇，并发数 {worker_count}")
-    api_key = netrc.netrc(str(AUTHINFO_PATH)).authenticators(DEEPSEEK_HOST)[2]
+    api_key = authinfo_password(DEEPSEEK_HOST)
     stories = []
     failures = 0
     with ThreadPoolExecutor(
