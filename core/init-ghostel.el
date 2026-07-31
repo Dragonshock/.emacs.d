@@ -24,7 +24,7 @@
 ;; PTY I/O / 终端状态 / 渲染；Elisp 管理 keymap、buffer、命令与远程集成。
 ;;
 ;; 安装: 首次使用时自动下载预编译原生模块（无需 zig）。
-;; 模块目录: `ghostel-module-directory'（本配置显式设为 ~/.emacs.d/ghostel/）。
+;; 模块目录: set in init-basic via no-littering (`var/ghostel/`).
 ;; 若 Elisp 要求的最低版本高于 sidecar（ghostel-module.version），
 ;; 会按 `ghostel-module-auto-install' 策略重装（当前 Elisp 要求 ≥0.45.0）。
 
@@ -48,8 +48,8 @@
   ;; ── 原生模块 ──
   ;; download = 自动下载预编译二进制（推荐）
   ;; ask / compile / nil 见 ghostel-module-auto-install docstring
-  (setq ghostel-module-directory (expand-file-name "ghostel/" user-emacs-directory)
-        ghostel-module-auto-install 'download
+  ;; `ghostel-module-directory' is themed by no-littering in init-basic.
+  (setq ghostel-module-auto-install 'download
         ;; OSC 52: programs can set the kill-ring/clipboard.  Useful over
         ;; SSH; disabled by upstream default for security.
         ghostel-enable-osc52 t)

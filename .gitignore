@@ -1,56 +1,68 @@
+# Editor and system files
 *~
-projects
-eln-cache
-auto-save-list
-straight/*
-!straight/versions
-transient
-rime
-recentf
-tramp
-.cache
-private.el
-org-roam.db
-bookmarks
-custom.el
-emacs.pdmp
-url
-eshell
-.org-id-locations
-.emacs.desktop
-history
-places
-.mc-lists.el
-persp-confs/*
-*.sqlite3
-*.sqlite
+.DS_Store
+
+# Emacs runtime files
+/.cache/
+/auto-save-list/
+/cache/
+/data/
+/state/
+/etc/
+/var/
+/rss/
+
+# Package and native build artifacts
+/straight/
+/elpa/
 *.elc
-elpa/
-.persistent-scratch
-tree-sitter/
-ispell/
-elfeed/
-cnfonts/
-autosaves
-rss/
-request/
-emms/
-librime/
-session*
-modules/
+*.sqlite*
+
+# Local configuration and credentials
 .env
-cache/
+private.el
+emacs.pdmp
+
+# ---- Legacy root runtime (pre-no-littering; still may appear at ~/.emacs.d) ----
+eln-cache/
+modules/
+ghostel/
+elfeed/
+eshell/
+url/
+rime/
+tramp
+transient/
+tree-sitter/
+recentf
+places
+history
 org-persist/
 .tree-sitter/
 undohist/
 undo-fu-session/
 chirp/
 persist/
-ghostel/
-
+request/
+emms/
+librime/
+cnfonts/
+autosaves
+ispell/
+.persistent-scratch
+persp-confs/
+session*
+org-roam.db
+bookmarks
+custom.el
+.org-id-locations
+.emacs.desktop
+.mc-lists.el
+projects
+agent/
 
 # ---- 本地补充 (Dragonshock) ----
-# Emacs 状态文件 (后缀形式, 原配置只忽略了无后缀名)
+# Emacs 状态文件 (后缀形式)
 recentf.eld
 places.eld
 network-security.eld
@@ -58,9 +70,6 @@ network-security.eld
 # ediff 合并时的临时冲突文件
 \#*#
 .*-merge.*
-
-# macOS Finder 元数据
-.DS_Store
 
 # 备份目录 (本地用,不进版本库)
 backups/

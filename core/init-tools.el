@@ -210,47 +210,10 @@
 
 ;; [emacs-reader] read docs in emacs (moved here from init-pdf.el, upstream layout)
 (use-package reader
-  :straight (reader :type git :host codeberg :repo "MonadicSheep/emacs-reader"
-                    :files ("*.el" "render-core.dylib")
-                    ;; NOTE: the Makefile shells out to `emacs' for checkdoc, so
-                    ;; `emacs' must be on PATH (init-straight.el ensures this).
-                    :pre-build ("make" "all")))
+  :straight '(reader :type git :host codeberg :repo "MonadicSheep/emacs-reader"
+                     :files ("*.el" "render-core.dylib")
+                     ;; NOTE: Makefile shells out to `emacs' for checkdoc;
+                     ;; init-straight.el ensures emacs is on PATH.
+                     :pre-build ("make" "all")))
 
-
-;; [minuet-ai] AI-powered inline code completion
-;; (use-package minuet
-;;   :straight (:host github :repo "milanglacier/minuet-ai.el")
-;;   :bind
-;;   (("M-y" . #'minuet-complete-with-minibuffer)
-;;    ("M-i" . #'minuet-show-suggestion)
-;;    :map minuet-active-mode-map
-;;    ("M-p" . #'minuet-previous-suggestion)
-;;    ("M-n" . #'minuet-next-suggestion)
-;;    ("C-e" . #'minuet-accept-suggestion))
-;;   :config
-;;   (defun my/minuet-deepseek-api-key ()
-;;     "Return the DeepSeek API key from `auth-source'.
-;; Looks up host `api.deepseek.com', user `apikey'.  Returns nil (and
-;; logs via `minuet--log') when the entry is missing."
-;;     (require 'auth-source)
-;;     (if-let* ((entry (car (auth-source-search :host "api.deepseek.com"
-;;                                               :user "apikey"
-;;                                               :require '(:secret)
-;;                                               :max 1)))
-;;               (secret (plist-get entry :secret)))
-;;         (string-trim-right
-;;          (if (functionp secret) (funcall secret) secret)
-;;          "[\n\r]+")
-;;       (when (fboundp 'minuet--log)
-;;         (minuet--log
-;;          "DeepSeek key not found in auth-source: machine api.deepseek.com login apikey"))
-;;       nil))
-;;   (setq minuet-provider 'openai-fim-compatible)
-;;
-;;   (plist-put minuet-openai-fim-compatible-options :end-point "https://api.deepseek.com/beta/completions")
-;;   (plist-put minuet-openai-fim-compatible-options :model "deepseek-v4-pro")
-;;   (plist-put minuet-openai-fim-compatible-options :name "Deepseek")
-;;   (plist-put minuet-openai-fim-compatible-options :api-key #'my/minuet-deepseek-api-key)
-;;
-;;   (minuet-set-optional-options minuet-openai-fim-compatible-options :max_tokens 56)
-;;   (minuet-set-optional-options minuet-openai-fim-compatible-options :top_p 0.9))
+;; minuet lives in init-prog.el (enabled by upstream merge).

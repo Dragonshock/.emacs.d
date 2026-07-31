@@ -36,7 +36,7 @@
                      'init-agent-shell
                      'init-social
                      'init-gnus
-                     'init-elfeed
+                     ;; 'init-elfeed  ; obsolete; feeds via Gnus (upstream)
                      'init-test
                      ))
 

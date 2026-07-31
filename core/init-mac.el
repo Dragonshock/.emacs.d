@@ -23,11 +23,18 @@
   :commands (emt-mode emt-download-module emt-ensure
                       emt-forward-word emt-backward-word)
   :init
+  ;; Keep dylib under no-littering `var/' (upstream path policy).
+  (setq emt-lib-path
+        (concat (no-littering-expand-var-file-name "modules/libEMT")
+                module-file-suffix))
   (defun +emt-enable-or-install ()
     "Enable `emt-mode' without interactive prompts during startup.
 
 If the native module is missing, download it non-interactively.  On
-failure, leave emt disabled and print a recovery message."
+failure, leave emt disabled and print a recovery message.
+
+Do not hook `after-init': `emt-mode' -> `emt-ensure' may call
+`yes-or-no-p' while early-init still has inhibit-redisplay/message."
     (require 'emt)
     (condition-case err
         (progn

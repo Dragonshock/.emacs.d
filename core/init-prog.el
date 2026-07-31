@@ -88,6 +88,7 @@
   ;; Client ECC belongs in CONTACT :initializationOptions, not workspace/configuration.
   (setq-default eglot-workspace-configuration
                 ;; Prefer pylsp section name (pyls is the deprecated Palantir server).
+                ;; Flat plist per eglot docstring (alist is less reliable).
                 '(:pylsp (:plugins (:jedi_completion (:fuzzy t)))
                   :rust-analyzer (:cargo (:allTargets t :features "all")
                                   :checkOnSave :json-false
@@ -123,10 +124,10 @@
     "Eglot CONTACT for jdtls; ECC goes in :initializationOptions (not workspace config)."
     (let* ((jdtls-java-home (getenv "JDTLS_JAVA_HOME"))
            (project-root (project-root (project-current t)))
-           (data-dir (expand-file-name
-                      (file-name-concat user-emacs-directory
-                                        "cache" "lsp-cache"
-                                        (md5 (expand-file-name project-root))))))
+           (data-dir
+            (file-name-concat
+             (no-littering-expand-var-file-name "lsp-cache/")
+             (md5 (expand-file-name project-root)))))
       `("env" ,(concat "JAVA_HOME=" jdtls-java-home)
         "jdtls" "--jvm-arg=-Xmx16G" "-data" ,data-dir
         :initializationOptions
@@ -427,13 +428,37 @@
         indent-bars-color '(highlight :face-bg t :blend 0.2)
         indent-bars-zigzag nil
         indent-bars-highlight-current-depth nil
-        indent-bars-pattern "."
-        ;; indent-bars-prefer-character t
-        )
-  )
+        indent-bars-pattern "."))
 
 
 ;; [direnv] Buffer-local project environments
 (use-package envrc
   :straight t
   :hook (emacs-startup . envrc-global-mode))
+
+
+;; [minuet-ai] AI-powered inline code completion
+(use-package minuet
+  :straight (:host github :repo "milanglacier/minuet-ai.el")
+  :hook (prog-mode . minuet-auto-suggestion-mode)
+  :bind (("M-i" . #'minuet-complete-with-minibuffer)
+         :map minuet-active-mode-map
+         ("M-p" . #'minuet-previous-suggestion)
+         ("M-n" . #'minuet-next-suggestion)
+         ("C-e" . #'minuet-accept-suggestion)
+         ("C-g" . #'minuet-dismiss-suggestion))
+  :custom-face
+  (minuet-suggestion-face ((t (:inherit font-lock-comment-face :slant italic :weight normal :underline nil))))
+  :config
+  (setq minuet-provider 'openai-fim-compatible)
+
+  (plist-put minuet-openai-fim-compatible-options :end-point "https://api.deepseek.com/beta/completions")
+  (plist-put minuet-openai-fim-compatible-options :model "deepseek-v4-flash")
+  (plist-put minuet-openai-fim-compatible-options :name "Deepseek")
+  (plist-put minuet-openai-fim-compatible-options :api-key
+             (lambda ()
+               (require 'gptel)
+               (gptel-api-key-from-auth-source "api.deepseek.com" "apikey")))
+
+  (minuet-set-optional-options minuet-openai-fim-compatible-options :max_tokens 56)
+  (minuet-set-optional-options minuet-openai-fim-compatible-options :top_p 0.9))

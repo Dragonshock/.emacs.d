@@ -17,6 +17,15 @@
 
 (add-hook 'emacs-startup-hook #'+restore-gc-threshold-h 100)
 
+;; Keep native compilation artifacts under no-littering's `var/' directory.
+;; (native-comp-jit-compilation defaults to t on Emacs 31; no need to setq.)
+(when (and (fboundp 'startup-redirect-eln-cache)
+           (fboundp 'native-comp-available-p)
+           (native-comp-available-p))
+  (startup-redirect-eln-cache
+   (convert-standard-filename
+    (expand-file-name "var/eln-cache/" user-emacs-directory))))
+
 ;; Keep early startup quiet unless we're debugging init.
 ;; Leave stock defaults for jit-compilation and async-report (both t on 31).
 ;; Emacs 30+: only override the kind filter and battery/missing-source behavior.
@@ -76,7 +85,7 @@
 ;; (push '(undecorated-round . t) default-frame-alist)
 (when (featurep 'ns)
   (push '(ns-transparent-titlebar . t) default-frame-alist))
-; Set these to nil so users don't have to toggle the modes twice to reactivate.
+                                        ; Set these to nil so users don't have to toggle the modes twice to reactivate.
 (setq menu-bar-mode nil
       tool-bar-mode nil
       scroll-bar-mode nil
