@@ -30,27 +30,36 @@
   (defun +emt-enable-or-install ()
     "Enable `emt-mode' without interactive prompts during startup.
 
-If the native module is missing, download it non-interactively.  On
-failure, leave emt disabled and print a recovery message.
+If the native module is missing, do NOT auto-download (no integrity pin
+on the remote artifact).  Leave a recovery message for interactive install.
 
 Do not hook `after-init': `emt-mode' -> `emt-ensure' may call
 `yes-or-no-p' while early-init still has inhibit-redisplay/message."
     (require 'emt)
     (condition-case err
-        (progn
-          (unless (file-exists-p emt-lib-path)
-            (message "emt: native module missing; downloading to %s ..." emt-lib-path)
-            (emt-download-module))
-          (unless emt-mode
-            (emt-mode 1)))
+        (if (file-exists-p emt-lib-path)
+            (unless emt-mode
+              (emt-mode 1))
+          (message "emt: native module missing at %s — run M-x emt-download-module when ready (no auto-download)"
+                   emt-lib-path))
       (error
        (message "emt: skipped (%s). Fix later with M-x emt-download-module"
                 (error-message-string err)))))
   :hook (window-setup . +emt-enable-or-install))
 
+;; emacs-plus passes APPEARANCE as `dark' or `light' (not via display-graphic-p).
+;; Prefer the hook arg so headless/selected non-GUI frames don't force light/dark wrong.
 (add-hook! ns-system-appearance-change-functions
-  (defun +mac-auto-change-theme-with-system (&rest _)
-    (+load-theme)))
+  (defun +mac-auto-change-theme-with-system (appearance)
+    (let ((theme (pcase appearance
+                   ('dark +dark-theme)
+                   ('light +light-theme)
+                   (_ nil))))
+      (if theme
+          (unless (member theme custom-enabled-themes)
+            (mapc #'disable-theme custom-enabled-themes)
+            (load-theme theme t))
+        (+load-theme)))))
 
 ;; Prevent accidental touch
 (unbind-key "C-<wheel-down>")

@@ -46,7 +46,11 @@ USER_AGENT = "hn-elfeed/1.0 (personal Elfeed generator)"
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "rss"
 FEED_PATH = DATA_DIR / "hackernews.atom"
-AUTHINFO_PATH = Path.home() / ".authinfo"
+# Plaintext authinfo is last resort; prefer DEEPSEEK_API_KEY or AUTHINFO_PATH.
+AUTHINFO_PATH = Path(
+    os.environ.get("AUTHINFO_PATH", str(Path.home() / ".authinfo"))
+)
+AUTHINFO_GPG_PATH = Path.home() / ".authinfo.gpg"
 
 HTTP_TIMEOUT = 25
 MAX_ARTICLE_CHARS = 120_000
@@ -125,16 +129,10 @@ def log(message: str) -> None:
     )
 
 
-def authinfo_password(machine: str, path: Path = AUTHINFO_PATH) -> str:
-    """Read password for MACHINE from Emacs authinfo.
-
-    Unlike stdlib ``netrc``, this accepts the ``port`` keyword used by
-    auth-source (e.g. Reddit private RSS lines) in the same file.
-    """
-    if not path.is_file():
-        raise FileNotFoundError(f"authinfo not found: {path}")
+def _parse_authinfo_text(text: str, machine: str) -> str | None:
+    """Return password for MACHINE from authinfo text, or None."""
     keywords = {"machine", "login", "password", "port", "account"}
-    for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
+    for raw in text.splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
@@ -150,7 +148,78 @@ def authinfo_password(machine: str, path: Path = AUTHINFO_PATH) -> str:
                 i += 1
         if fields.get("machine") == machine and fields.get("password"):
             return fields["password"]
-    raise KeyError(f"no password for machine {machine!r} in {path}")
+    return None
+
+
+def authinfo_password(machine: str, path: Path | None = None) -> str:
+    """Read password for MACHINE from Emacs authinfo.
+
+    Prefer, in order:
+    1. ``DEEPSEEK_API_KEY`` (or generic ``API_KEY`` is not used — host-specific)
+    2. Explicit ``path`` / ``AUTHINFO_PATH`` plaintext
+    3. ``~/.authinfo.gpg`` via ``gpg --decrypt`` when available
+    4. ``~/.authinfo`` plaintext (last resort)
+
+    Unlike stdlib ``netrc``, this accepts the ``port`` keyword used by
+    auth-source (e.g. Reddit private RSS lines) in the same file.
+    """
+    if path is not None:
+        if not path.is_file():
+            raise FileNotFoundError(f"authinfo not found: {path}")
+        found = _parse_authinfo_text(
+            path.read_text(encoding="utf-8", errors="replace"), machine
+        )
+        if found:
+            return found
+        raise KeyError(f"no password for machine {machine!r} in {path}")
+
+    candidates: list[tuple[str, Path, str]] = []
+    if AUTHINFO_PATH.is_file():
+        candidates.append(
+            (
+                "plain",
+                AUTHINFO_PATH,
+                AUTHINFO_PATH.read_text(encoding="utf-8", errors="replace"),
+            )
+        )
+    if AUTHINFO_GPG_PATH.is_file():
+        import shutil
+        import subprocess
+
+        gpg = shutil.which("gpg") or shutil.which("gpg2")
+        if gpg:
+            try:
+                proc = subprocess.run(
+                    [gpg, "--quiet", "--batch", "--decrypt", str(AUTHINFO_GPG_PATH)],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                candidates.append(("gpg", AUTHINFO_GPG_PATH, proc.stdout))
+            except (subprocess.CalledProcessError, OSError) as err:
+                log(f"authinfo.gpg decrypt failed: {err}")
+
+    # Prefer gpg over plaintext when both exist.
+    for kind in ("gpg", "plain"):
+        for k, p, text in candidates:
+            if k != kind:
+                continue
+            found = _parse_authinfo_text(text, machine)
+            if found:
+                return found
+
+    raise FileNotFoundError(
+        f"no password for machine {machine!r}: set DEEPSEEK_API_KEY, "
+        f"or provide {AUTHINFO_GPG_PATH} / {AUTHINFO_PATH}"
+    )
+
+
+def deepseek_api_key() -> str:
+    """Resolve DeepSeek API key: env first, then authinfo."""
+    env_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
+    if env_key:
+        return env_key
+    return authinfo_password(DEEPSEEK_HOST)
 
 
 def request(
@@ -429,7 +498,7 @@ def command_update(limit: int | None, jobs: int) -> int:
 
     worker_count = min(jobs, len(candidates))
     log(f"开始并行处理 {len(candidates)} 篇，并发数 {worker_count}")
-    api_key = authinfo_password(DEEPSEEK_HOST)
+    api_key = deepseek_api_key()
     stories = []
     failures = 0
     with ThreadPoolExecutor(

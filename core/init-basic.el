@@ -30,6 +30,36 @@
                  (file-name-directory typst-ts-lsp-download-path)))
     (make-directory directory t)))
 
+;; Never write numbered backups / auto-saves for credential-like paths
+;; (align patterns with recentf / undo-fu-session excludes).
+(defun +secret-file-p (file)
+  "Return non-nil if FILE looks like a credential or secret path."
+  (when file
+    (let* ((name (expand-file-name file))
+           (base (file-name-nondirectory name)))
+      (or (string-match-p "\\.gpg\\'" name)
+          (string-match-p "\\.authinfo\\(\\.gpg\\)?\\'" base)
+          (string-equal base "authinfo.gpg")
+          (string-match-p "\\.netrc\\'" base)
+          (string-match-p "\\bcookies\\'" base)
+          (string-match-p "\\.pat\\'" base)
+          (string-match-p "gh\\.pat\\'" base)
+          (string-match-p "/\\.cli-proxy-api/" name)
+          (string-match-p "/\\.ssh/" name)
+          (member base '("id_rsa" "id_ed25519" "passwd" "credentials"))))))
+
+(setq backup-enable-predicate
+      (lambda (name)
+        (and (normal-backup-enable-predicate name)
+             (not (+secret-file-p name)))))
+
+(defun +maybe-disable-auto-save-for-secrets ()
+  "Turn off auto-save when visiting a secret file."
+  (when (and buffer-file-name (+secret-file-p buffer-file-name))
+    (auto-save-mode -1)
+    (setq buffer-auto-save-file-name nil)))
+(add-hook 'find-file-hook #'+maybe-disable-auto-save-for-secrets)
+
 (setq-default
  ;; no client startup messages
  server-client-instructions nil
@@ -43,8 +73,7 @@
  backup-by-copying t
  delete-old-versions t
  kept-new-versions 6
- ;; [auto-save]
- auto-save-default t
+ ;; [auto-save] stock auto-save-default is already t; keep big-deletion override only.
  auto-save-include-big-deletions t ; Don't auto-disable auto-save after deleting big chunks.
 
  ;; Disable [bidirectional text] scanning for a modest performance
@@ -91,9 +120,9 @@
  tabify-regexp "^\t* [ \t]+"
  ;; Indent with 4 space by default
  indent-tabs-mode nil
- ;; Indent first, otherwise run completion-at-point. This lets Tempel
- ;; templates expand via TAB when indentation does not apply.
- tab-always-indent t
+ ;; Indent first; when already indented, run completion-at-point (Tempel/cape via TAB).
+ ;; Symbol `complete' is required — plain `t' is the stock default and never reaches capf.
+ tab-always-indent 'complete
  tab-width 4
 
  ;; Sentence end
@@ -195,6 +224,28 @@
   :config
   (setopt save-place-autosave-interval 1000)
 
+  ;; Align with +secret-file-p / recentf / undo-fu: never record point in
+  ;; credential paths (path+offset still leak via places file / sync).
+  ;; Include cookies/passwd/credentials basenames (same as +secret-file-p).
+  (setopt save-place-ignore-files-regexp
+          (concat "\\(?:"
+                  (or (default-value 'save-place-ignore-files-regexp)
+                      "\\`/tmp/")
+                  "\\)\\|"
+                  "\\.gpg\\'\\|"
+                  "/\\.authinfo\\(\\.gpg\\)?\\'\\|"
+                  "authinfo\\.gpg\\'\\|"
+                  "\\.netrc\\'\\|"
+                  "/\\.ssh/\\|"
+                  "\\bid_rsa\\b\\|"
+                  "\\bid_ed25519\\b\\|"
+                  "\\.pat\\'\\|"
+                  "gh\\.pat\\'\\|"
+                  "/\\.cli-proxy-api/\\|"
+                  "\\bcookies\\'\\|"
+                  "\\bpasswd\\'\\|"
+                  "\\bcredentials\\'"))
+
   ;; Emacs 31 `save-place-alist-to-file' already uses `prin1' (no `pp'); no advice needed.
 
   ;; Recenter after restore (Emacs 29+: public hook, not advice on finder).
@@ -211,14 +262,30 @@
   :config
   (setopt recentf-autosave-interval 1000)
 
-  (setq recentf-auto-cleanup 'never
+  ;; Cleanup periodically (not `never`): secrets/ephemeral paths should not linger.
+  ;; Align secret patterns with `undo-fu-session-incompatible-files' (init-tools).
+  (setq recentf-auto-cleanup 3600
         recentf-max-saved-items 200
         recentf-exclude (list "\\.?cache" ".cask" "url" "COMMIT_EDITMSG\\'" "bookmarks"
                               "\\.?ido\\.last$" "\\.revive$" "/G?TAGS$"
                               ;; Elfeed db is `elfeed/' (no leading dot); also excluded
                               ;; via predicate in init-elfeed.el.
                               "/elfeed/"
-                              "^/tmp/" "^/var/folders/.+$" "^/ssh:"
+                              "^/tmp/" "/private/tmp/"
+                              "^/var/folders/.+$" "^/ssh:"
+                              "\\.gpg$"
+                              "/\\.authinfo\\(\\.gpg\\)?\\'"
+                              "/authinfo\\.gpg\\'"
+                              "\\.netrc\\'"
+                              "/cookies\\'"
+                              "\\.pat\\'"
+                              "/gh\\.pat\\'"
+                              "/\\.cli-proxy-api/"
+                              "/\\.ssh/"
+                              "id_rsa"
+                              "id_ed25519"
+                              "passwd"
+                              "credentials"
                               (lambda (file) (file-in-directory-p file package-user-dir))
                               (recentf-expand-file-name no-littering-var-directory)
                               (recentf-expand-file-name no-littering-etc-directory)
@@ -242,35 +309,31 @@
 (use-package savehist
   :hook (after-init . savehist-mode)
   :config
-  (setq savehist-additional-variables '(kill-ring
-                                        global-mark-ring
+  ;; Do not persist `kill-ring': yanks can contain passwords/tokens and would
+  ;; land in var/savehist.el (mode 600 is not enough if the file is synced).
+  ;; MERGE LOCK: never re-add kill-ring from roife/.emacs.d (audit keep-local).
+  ;;
+  ;; Do not persist `dogears-list': each place stores full source line (`line')
+  ;; and can leak secrets even after path filters.  Align with dogears README
+  ;; (intentionally non-persistent).  Session dogears still work in-memory.
+  ;;
+  ;; Do not half-register `vertico-repeat-history' without vertico-repeat-save
+  ;; on minibuffer-setup-hook (silent-nop dead config).
+  (setq savehist-additional-variables '(global-mark-ring
                                         search-ring
-                                        regexp-search-ring
-                                        dogears-list)
+                                        regexp-search-ring)
         savehist-autosave-interval 1000)
-
-  (with-eval-after-load 'vertico
-    (add-to-list 'savehist-additional-variables 'vertico-repeat-history))
-
-  (defvar dogears-list nil)
-  (defun +dogears--record-for-savehist (record)
-    (cons (substring-no-properties (car record))
-          (mapcar
-           (lambda (item)
-             (pcase item
-               (`(buffer . ,buffer)
-                (if (bufferp buffer)
-                    (cons 'buffer (buffer-name buffer))
-                  item))
-               (_ item)))
-           (cdr record))))
 
   (defadvice! +savehist-clean-values-a (save &rest args)
     :around #'savehist-save
-    (let ((kill-ring (mapcar #'substring-no-properties kill-ring))
-          (search-ring (mapcar #'substring-no-properties search-ring))
+    ;; Scrub secrets from path-like history (minibuffer add-to-history bypasses
+    ;; find-file-hook).  Align with +secret-file-p / recentf / save-place.
+    (let ((search-ring (mapcar #'substring-no-properties search-ring))
           (regexp-search-ring (mapcar #'substring-no-properties regexp-search-ring))
-          (dogears-list (mapcar #'+dogears--record-for-savehist dogears-list)))
+          (file-name-history
+           (seq-remove (lambda (f)
+                         (and (stringp f) (+secret-file-p f)))
+                       file-name-history)))
       (apply save args))))
 
 
@@ -290,17 +353,31 @@
 
   ;; Do not set bidi-display-reordering to nil (debug-only / unsupported).
   ;; Rely on bidi-paragraph-direction, bidi-inhibit-bpa, and long-line-threshold.
-  (dolist (override '((font-lock-maximum-decoration . 1)
-                      (save-place-alist . nil)))
-    (add-to-list 'so-long-variable-overrides override))
+  ;; Do not override `save-place-alist': so-long makes overrides buffer-local, and
+  ;; that shadows the session-global alist so so-long buffers never persist point.
+  (add-to-list 'so-long-variable-overrides '(font-lock-maximum-decoration . 1))
   )
 
 
-;; [glyphless-display] Don't render glyphs, in case of undisplayable characters.
-;; Buffer-local mode: enable on major-mode change so it applies to all buffers
-;; (after-init alone only affects the then-current buffer).
-(use-package glyphless-mode
-  :hook (after-change-major-mode . glyphless-display-mode))
+;; [glyphless-display] — DO NOT enable globally.
+;;
+;; Upstream roife/.emacs.d hooks only (after-init . glyphless-display-mode),
+;; which almost only affects *scratch* at startup.  A previous local "fix"
+;; used after-change-major-mode so EVERY buffer got glyphless-display-mode
+;; with glyphless-mode-types default (all) → C1 controls show as [PAD] etc.
+;; and characters without a font (icon PUA, some symbols) show as hex/acronym
+;; boxes instead of glyphs.  That is the (PAD..\377) / "icons don't render"
+;; class of bugs.
+;;
+;; Perfect policy: leave stock display; use M-x glyphless-display-mode only
+;; when debugging invisible control characters.  Optional toggle:
+(defun +glyphless-display-toggle ()
+  "Toggle `glyphless-display-mode' in the current buffer (debug)."
+  (interactive)
+  (if (bound-and-true-p glyphless-display-mode)
+      (glyphless-display-mode -1)
+    (setq-local glyphless-mode-types '(c0-control c1-control bidi-control))
+    (glyphless-display-mode 1)))
 
 ;; [Scrolling]
 (setq
@@ -326,7 +403,9 @@
 (defun +scroll-other-window-down () (interactive) (scroll-other-window-down +scrolling-lines))
 (defun +scroll-window () (interactive) (scroll-up +scrolling-lines))
 (defun +scroll-window-down () (interactive) (scroll-down +scrolling-lines))
-(bind-keys*
+;; Prefer global-map over bind-keys*/override-global-map so major-mode maps
+;; (e.g. elfeed-show M-v → scroll-down-command) still win.
+(bind-keys
  ("C-M-v" . +scroll-other-window)
  ("M-<down>" . +scroll-other-window)
 
@@ -351,8 +430,10 @@
                    :repo "ArthurHeymans/emacs-tramp-rpc")
   :after tramp
   :config
+  ;; Default git policy is `auto' (cargo-build from source tree).  `release'
+  ;; is only for forced prebuilt binaries and skews with git-installed Lisp.
   (setq tramp-rpc-deploy-auto-deploy t
-        tramp-rpc-deploy-git-build-policy 'release))
+        tramp-rpc-deploy-git-build-policy 'auto))
 
 
 ;; [minibuffer]
@@ -416,12 +497,13 @@
   :hook (after-init . +exec-path-from-shell-maybe-initialize))
 
 
-;; [backup walker] A utility to view Emacs backup files.
-(use-package backup-walker
-  :straight t)
+;; backup-walker (2013) is unmaintained and uses obsolete cl / easy-mmode-defmap /
+;; point-at-bol.  Prefer built-in `diff-backup' / `file-newest-backup' / VC.
 
 
-;; [info]Add local Info manuals
+;; [info] Add local Info manuals after system dirs (do not replace Info-directory-list;
+;; a non-nil list skips info-initialize's INFOPATH/system path merge).
 (use-package info
   :config
-  (add-to-list 'Info-directory-list (expand-file-name "~/Documents/Info")))
+  (add-to-list 'Info-additional-directory-list
+               (expand-file-name "~/Documents/Info")))

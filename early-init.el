@@ -92,9 +92,13 @@
       tab-bar-mode t)
 
 ;; Avoid toolbar setup work during startup. It is unnecessary while the toolbar is
-;; disabled, and can be reconstructed if `tool-bar-mode' is enabled later.
+;; disabled; remove the override after init so `tool-bar-mode' can rebuild the map.
 (when (fboundp 'tool-bar-setup)
-  (advice-add #'tool-bar-setup :override #'ignore))
+  (advice-add #'tool-bar-setup :override #'ignore)
+  (add-hook 'emacs-startup-hook
+            (lambda ()
+              (advice-remove #'tool-bar-setup #'ignore))
+            100))
 
 ;; Case-insensitive pass over `auto-mode-alist' is time wasted.
 (setq auto-mode-case-fold nil)
@@ -117,10 +121,17 @@
               (advice-remove 'setopt--set #'setopt--set@inhibit-load-symbol))
             100))
 
-;; `file-name-handler-alist' is consulted on each call to `require', `load', or various file/io functions
+;; `file-name-handler-alist' is consulted on each call to `require', `load', or
+;; various file/io functions. Clear it for startup I/O (keep jka-compr so
+;; compressed Lisp can still load), then merge back anything registered during init.
 (unless (or (daemonp) noninteractive init-file-debug)
   (let ((old-value (default-toplevel-value 'file-name-handler-alist)))
     (put 'file-name-handler-alist 'initial-value (copy-sequence old-value))
+    ;; Actually disable handlers for the bulk of init (was a silent no-op before).
+    (set-default-toplevel-value
+     'file-name-handler-alist
+     (let ((jka (rassq 'jka-compr-handler old-value)))
+       (if jka (list jka) nil)))
     (define-advice command-line-1 (:around (fn args-left) restore-file-name-handlers)
       (let ((file-name-handler-alist
              (if args-left (copy-sequence old-value) file-name-handler-alist)))
@@ -147,9 +158,6 @@
 
 (add-hook 'before-init-hook #'+restore-load-suffixes-h 100)
 
-;; Site files will use `load-file', which emit messages and triggers redisplay
-;; Make it silent and undo advice later
-(define-advice load-file (:override (file) silence)
-  (load file nil 'nomessage))
-(define-advice startup--load-user-init-file (:after (&rest _) undo-silence)
-  (advice-remove #'load-file #'load-file@silence))
+;; Note: do not advice `load-file' for silence.  Emacs 31 loads site-start
+;; before early-init via (load site-run-file t t), and early-init/init also
+;; use `load' with nomessage — a late load-file override never covers them.

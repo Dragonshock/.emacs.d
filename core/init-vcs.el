@@ -25,7 +25,9 @@
 ;; [diff-hl] Highlight uncommitted changes using VC
 (use-package diff-hl
   :straight t
-  :hook ((find-file . global-diff-hl-mode)
+  ;; Enable global mode once at startup (not on every find-file — that
+  ;; re-runs globalized-mode body and rescans the buffer list each open).
+  :hook ((after-init . global-diff-hl-mode)
          (vc-dir-mode  . diff-hl-dir-mode)
          (dired-mode   . diff-hl-dired-mode))
   :bind (:map diff-hl-mode-map
@@ -158,10 +160,11 @@
 ;; `forge-repository-list-columns'.  The old setting was dead configuration.
 
 ;; [magh.el] Magit-style GitHub frontend powered by the `gh' CLI.
-;; Upstream github.com/roife/magh.el was DELETED by the author (upstream
-;; dropped magh); the recipe now points at the local backup clone
-;; ~/code/gh.el, and straight/repos/magh.el fetches from it.
-;; Note: magh.el Package-Requires Emacs 31.1+; skip on older builds.
+;; Upstream github.com/roife/magh.el was DELETED (404). Source of truth is the
+;; local backup clone ~/code/gh.el → straight/repos/magh.el (origin → that path).
+;; MERGE LOCK: do not point recipe at roife/magh.el. Prefer publishing a private
+;; remote later and switching :repo to HTTPS/SSH so rebuilds work off this machine.
+;; Package-Requires Emacs 31.1+ (header); runs on 31.0.91 builds with care.
 (use-package magh
   :straight (:type git :repo "/Users/dragon/code/gh.el" :local-repo "magh.el")
   :bind (("C-, g g" . magh)

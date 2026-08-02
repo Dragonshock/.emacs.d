@@ -94,9 +94,7 @@
           ("subsetneqq" "\\subsetneqq" t "⊊" "⊊" "⊊" "⊊")
           ("supsetneqq" "\\supsetneqq" t "⊋" "⊋" "⊋" "⊋")
           ("nsubset" "\\nsubset" t "⊄" "⊄" "⊄" "⊄")
-          ("nsupset" "\\nsupset" t "⊅" "⊅" "⊅" "⊅")
-          ("nsubseteq" "\\nsubseteq" t "⊈" "⊈" "⊈" "⊈")
-          ("nsupseteq" "\\nsupseteq" t "⊉" "⊉" "⊉" "⊉"))))
+          ("nsupset" "\\nsupset" t "⊅" "⊅" "⊅" "⊅"))))
 
 
 ;; [org-appear] Make invisible parts of Org elements appear visible.
@@ -126,8 +124,8 @@
 
 (use-package org-modern-indent
   :straight (org-modern-indent :type git :host github :repo "jdtsmith/org-modern-indent")
-  :config
-  (add-hook 'org-mode-hook #'org-modern-indent-mode 90))
+  ;; :hook loads the package under always-defer; bare :config never runs alone.
+  :hook (org-mode . org-modern-indent-mode))
 
 
 ;; [ox]

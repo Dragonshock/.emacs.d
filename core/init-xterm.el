@@ -1,10 +1,13 @@
 ;;; -*- lexical-binding: t -*-
 
 ;; warp/truncation indicator in tty
+;; NS dumps may not pre-load disp-table; ensure a live char-table first.
+(require 'disp-table)
+(unless (char-table-p standard-display-table)
+  (setq standard-display-table (make-display-table)))
 (set-display-table-slot standard-display-table
                         'wrap
                         (make-glyph-code ?↩ 'shadow))
-
 (set-display-table-slot standard-display-table
                         'truncation
                         (make-glyph-code ?… 'shadow))
@@ -23,6 +26,11 @@
 ;; which allows the terminal to send key events to Emacs.
 (use-package kkp
   :straight t
+  ;; KKP maps C-g to CSI-u; call-process (e.g. envrc--export) cannot be
+  ;; interrupted without restoring legacy keys around subprocesses.
+  ;; README + both local/roife default nil → footgun with envrc-global-mode.
+  :init
+  (setq kkp-restore-legacy-keys-around-subprocesses t)
   :hook (tty-setup . global-kkp-mode))
 
 
@@ -36,8 +44,13 @@
   ;; 'check probe. Keep modifyOtherKeys + reportBackground (theme/keys).
   ;; Drop getSelection (clipboard read — not auto-enabled in Emacs 31 check
   ;; path for security/timeout reasons). Keep setSelection for yank-to-terminal.
-  (setq xterm-extra-capabilities '(modifyOtherKeys reportBackground setSelection)
-        xterm-set-window-title t)
+  ;; term/tmux.el and term/screen.el let-bind xterm-extra-capabilities from
+  ;; their own vars (defaults only modifyOtherKeys); keep them in sync.
+  (let ((caps '(modifyOtherKeys reportBackground setSelection)))
+    (setq xterm-extra-capabilities caps
+          xterm-tmux-extra-capabilities caps
+          xterm-screen-extra-capabilities caps
+          xterm-set-window-title t))
 
   (defun +xterm-report-background ()
     "Query the terminal background color and reload the matching theme."

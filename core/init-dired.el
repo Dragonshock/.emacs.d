@@ -6,13 +6,11 @@
               ("C-c C-p" . wdired-change-to-wdired-mode))
   :config
   (setq
-   ;; Always delete and copy recursively
-   dired-recursive-deletes 'top
+   ;; dired-recursive-deletes stock default is already 'top.
    dired-recursive-copies 'always
    ;; Move between two dired buffer quickly
    dired-dwim-target t
-   ;; Ask whether destination dirs should get created when copying/removing files.
-   dired-create-destination-dirs 'ask
+   ;; dired-create-destination-dirs set once in dired-aux (with vc-rename).
    ;; don't prompt to revert, just do it
    ;; Predicate must accept DIRNAME; `dired-buffer-stale-p' is for Auto Revert.
    dired-auto-revert-buffer #'dired-directory-changed-p
@@ -22,16 +20,14 @@
    dired-free-space nil
    )
 
-  (when (eq system-type 'darwin)
-    (if (executable-find "gls")
-        (setq insert-directory-program "gls") ; Use GNU ls as `gls' from `coreutils' if available.
-      ;; Suppress the warning: `ls does not support --dired'.
-      (setq dired-use-ls-dired nil)))
+  ;; Emacs 30.1+: insert-directory-program defaults to "gls" when present on
+  ;; darwin — do not setq it.  Only suppress --dired when BSD ls is all we have.
+  (when (and (eq system-type 'darwin) (not (executable-find "gls")))
+    (setq dired-use-ls-dired nil))
 
   (when (or (not (eq system-type 'darwin)) (executable-find "gls"))
-    (setq ls-lisp-use-insert-directory-program t ; Using `insert-directory-program'
-          ;; Show directory first
-          dired-listing-switches "-alh --group-directories-first"))
+    ;; ls-lisp-use-insert-directory-program stock default is already t off Win/Android.
+    (setq dired-listing-switches "-alh --group-directories-first"))
   )
 
 ;; [dired-git-info] Show git info in dired

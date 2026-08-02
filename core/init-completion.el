@@ -8,7 +8,8 @@
               ("TAB" . minibuffer-complete)
               ("<tab>" . minibuffer-complete)
               ("C-<return>" . vertico-exit-input)
-              ("C-, ." . vertico-quick-jump))
+              ;; Single key (vertico-quick also binds C-, — keep one path only).
+              ("C-," . vertico-quick-jump))
   :hook ((after-init . vertico-mode))
   :config
   (setq vertico-cycle t
@@ -33,8 +34,8 @@
 (use-package vertico-quick
   :straight nil
   :after vertico
-  :bind (:map vertico-map
-              ("C-," . vertico-quick-jump)))
+  ;; Binding lives on vertico-map above (avoid C-, / C-, . double-bind).
+  )
 
 
 (use-package vertico-buffer
@@ -56,8 +57,8 @@
 (use-package orderless
   :straight t
   :init
-  ;; Component modifiers:
-  ;;   !foo excludes, =foo matches literally, ~foo uses flex,
+  ;; Component modifiers (affix both ends, matching orderless-affix-dispatch):
+  ;;   !foo / foo! excludes, =foo matches literally, ~foo uses flex,
   ;;   ^foo matches a literal prefix, ,foo uses initialism,
   ;;   %foo enables char-folding, @foo matches annotations.
   (defun +orderless-dispatch (pattern _index _total)
@@ -70,9 +71,11 @@
                       (concat consult--tofu-regexp "*")
                     "[\x100000-\x10FFFD]*")))
         `(orderless-regexp . ,(concat (substring pattern 0 -1) tofu "$"))))
+     ;; Bare "!" alone would become empty orderless-not; keep no-op literal.
      ((string= "!" pattern) `(orderless-literal . ""))
      ;; Prefer `orderless-not' over legacy `orderless-without-literal' (README).
      ((string-prefix-p "!" pattern) `(orderless-not . ,(substring pattern 1)))
+     ((string-suffix-p "!" pattern) `(orderless-not . ,(substring pattern 0 -1)))
      ((string-prefix-p "%" pattern) `(char-fold-to-regexp . ,(substring pattern 1)))
      ((string-suffix-p "%" pattern) `(char-fold-to-regexp . ,(substring pattern 0 -1)))
      ((string-prefix-p "^" pattern) `(orderless-literal-prefix . ,(substring pattern 1)))
@@ -160,20 +163,18 @@
          ("M-s d"                               . consult-fd)
          :map minibuffer-mode-map
          ("M-r"                                 . consult-history))
+  ;; Register/xref UI must be wired before first use; :config is too late under
+  ;; always-defer (stock register-preview / xref UI until consult loads).
+  :init
+  (setq register-preview-delay 0.5
+        register-preview-function #'consult-register-format
+        xref-show-xrefs-function #'consult-xref
+        xref-show-definitions-function #'consult-xref)
+  (advice-add #'register-preview :override #'consult-register-window)
   :config
   (setq consult-narrow-key "<"
         consult-async-min-input 2
         consult-async-refresh-delay 0.05)
-
-  ;; [consult-register] Configure the register formatting.
-  (setq register-preview-delay 0.5
-        register-preview-function #'consult-register-format)
-  ;; This adds thin lines, sorting and hides the mode line of the window.
-  (advice-add #'register-preview :override #'consult-register-window)
-
-  ;; [consult-xref] Use Consult to select xref locations with preview
-  (setq xref-show-xrefs-function #'consult-xref
-        xref-show-definitions-function #'consult-xref)
 
   ;; better preview
   (consult-customize
@@ -199,7 +200,9 @@
 (use-package consult-dir
   :straight t
   :bind (([remap list-directory] . consult-dir)
-         :map minibuffer-local-completion-map
+         ;; Vertico uses vertico-map (parent minibuffer-local-map), not
+         ;; minibuffer-local-completion-map — binds there are dead under Vertico.
+         :map vertico-map
          ("C-x C-d" . consult-dir)
          ("C-x C-j" . consult-dir-jump-file))
   :config
@@ -226,6 +229,11 @@
               ("S-<tab>" . +corfu-move-to-minibuffer)
               ("RET" . nil))
   :init
+  ;; Emacs 30+: text-mode reads this when the major mode body runs and installs
+  ;; a buffer-local Ispell Capf. Must be set before any text/org/md buffer is
+  ;; created — corfu :config is too late when the package is deferred.
+  (setq text-mode-ispell-word-completion nil)
+
   (defun +corfu-enable ()
     "Enable Corfu (auto Capf on by default)."
     (corfu-mode 1))
@@ -247,9 +255,6 @@
         corfu-preview-current nil
         ;; 0.1 was too aggressive with cape-dabbrev; 0.2 is the usual floor.
         corfu-auto-delay 0.2)
-
-  ;; Emacs 30+: text-mode defaults to Ispell Capf; prefer Corfu/cape sources.
-  (setq text-mode-ispell-word-completion nil)
 
   (defun +corfu-move-to-minibuffer ()
     "Use Consult's minibuffer UI for the current completion-in-region table."

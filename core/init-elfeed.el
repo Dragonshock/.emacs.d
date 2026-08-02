@@ -27,6 +27,12 @@ Safe to call repeatedly; does not duplicate entries."
       (unless known
         (setq elfeed-feeds (append elfeed-feeds (list entry)))))))
 
+(defvar +elfeed-hn-llm nil
+  "When non-nil, `scripts/update-elfeed-feeds' runs DeepSeek HN summarization.
+
+Background `elfeed-update-background' never enables this.  Use
+`+elfeed-update-with-hn-llm' or set this to t before interactive `g'.")
+
 ;; [elfeed] Read rss within Emacs
 (use-package elfeed
   :straight t
@@ -35,6 +41,7 @@ Safe to call repeatedly; does not duplicate entries."
 
   ;; Local generators (scripts/update-elfeed-feeds) rewrite rss/*.atom, then
   ;; the original update fetches file:// and remote feeds.
+  ;; HN DeepSeek is gated by env ELFEED_HN_LLM (see +elfeed-hn-llm).
   (defadvice! +elfeed-update-after-local-feeds-a (fn &rest args)
     :around '(elfeed-update elfeed-update-background)
     "Refresh local feeds asynchronously, then call FN with ARGS.
@@ -42,7 +49,9 @@ Safe to call repeatedly; does not duplicate entries."
 If a local-feed process is already running, still invoke FN so remote
 feeds keep updating.  Auth-source / GPG failures for the Reddit token
 are ignored so a cancelled pinentry cannot abort the whole update.
-Missing Reddit token is a soft-skip in the Python script (exit 0)."
+Missing Reddit token is a soft-skip in the Python script (exit 0).
+DeepSeek HN runs only when `+elfeed-hn-llm' is non-nil or ELFEED_HN_LLM
+is already set in the environment."
     (if (process-live-p (get-process "elfeed-local-feeds"))
         (progn
           (message "Local feed update is already running; updating remote feeds only")
@@ -58,6 +67,8 @@ Missing Reddit token is a soft-skip in the Python script (exit 0)."
                       nil))))
         (when token
           (setenv "REDDIT_PRIVATE_RSS_TOKEN" token))
+        (when +elfeed-hn-llm
+          (setenv "ELFEED_HN_LLM" "1"))
         (make-process :name "elfeed-local-feeds"
                       :buffer (get-buffer-create "*elfeed-local-feeds*")
                       :command (list command)
@@ -71,7 +82,14 @@ Missing Reddit token is a soft-skip in the Python script (exit 0)."
                           (+elfeed-ensure-reddit-feed)
                           (apply fn args)))))))
 
+  (defun +elfeed-update-with-hn-llm ()
+    "Like `elfeed-update', but allow DeepSeek HN summarization once."
+    (interactive)
+    (let ((+elfeed-hn-llm t))
+      (elfeed-update)))
+
   ;; Background refresh: first run ~1 min after init, then every 2 hours.
+  ;; Never sets +elfeed-hn-llm — remote/file feeds only + optional Reddit.
   (run-at-time "1 min" (* 60 60 2) #'elfeed-update-background)
   :bind (:map elfeed-search-mode-map
               ("g" . elfeed-update)

@@ -1,14 +1,21 @@
 #!/bin/sh
 # Refresh local Atom files for Elfeed, then let Emacs fetch feeds.
-# HN failure → non-zero. Reddit soft-skip (no token) → zero and does not fail the run.
+# Reddit soft-skip (no token) → zero and does not fail the run.
+#
+# HN DeepSeek LLM is OPT-IN: set ELFEED_HN_LLM=1 (or any non-empty value).
+# Background elfeed-update must not call paid APIs unattended.
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 status=0
 
-echo "== hn-elfeed =="
-if ! "$script_dir/hn-elfeed.py" update; then
-  status=1
-  echo "hn-elfeed failed" >&2
+if [ -n "$ELFEED_HN_LLM" ]; then
+  echo "== hn-elfeed (LLM gated ON) =="
+  if ! "$script_dir/hn-elfeed.py" update; then
+    status=1
+    echo "hn-elfeed failed" >&2
+  fi
+else
+  echo "== hn-elfeed skipped (set ELFEED_HN_LLM=1 for DeepSeek summarization) =="
 fi
 
 echo "== reddit-elfeed =="

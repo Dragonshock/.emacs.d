@@ -112,8 +112,8 @@
 (advice-add #'rename-buffer :after #'+mode-line-update-project-crumb)
 (advice-add #'set-visited-file-name :after #'+mode-line-update-project-crumb)
 (advice-add #'pop-to-buffer :after #'+mode-line-update-project-crumb)
-(advice-add #'popup-create :after #'+mode-line-update-project-crumb)
-(advice-add #'popup-delete :after #'+mode-line-update-project-crumb)
+;; Do not advice popup-create/delete: popup.el (auto-complete era) is not
+;; installed; nadvice would only park pending advice on undefined symbols.
 
 (defsubst +mode-line-normal ()
   "Formatting active-long mode-line."

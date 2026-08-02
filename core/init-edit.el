@@ -18,7 +18,8 @@
 ;; [autorevert]
 (use-package autorevert
   :straight nil
-  :hook (find-file . +auto-revert-mode)
+  ;; Global lazy mode: enable once after init (not on every find-file).
+  :hook (after-init . +auto-revert-mode)
   :config
   (setq auto-revert-use-notify nil
         auto-revert-stop-on-user-input nil
@@ -43,15 +44,25 @@
         (auto-revert-handler))))
 
   (defun +auto-revert-window-buffer-h (window &rest _)
-    "Auto revert WINDOW's buffer when it is stale."
+    "Auto revert WINDOW's buffer when it is stale.
+For buffer-local `window-buffer-change-functions' the arg is a window."
     (when (window-live-p window)
       (with-current-buffer (window-buffer window)
         (+auto-revert-buffer-h))))
 
+  (defun +auto-revert-on-window-buffer-change-h (frame &rest _)
+    "Global `window-buffer-change-functions' receives FRAME (Emacs 31 DOC).
+Roife/.emacs.d had the same bug: treating the arg as a window made this path a no-op."
+    (when (frame-live-p frame)
+      (dolist (window (window-list frame 'no-minibuf))
+        (+auto-revert-window-buffer-h window))))
+
   (defun +auto-revert-selected-window-h (&optional frame)
-    "Auto revert the selected window's buffer in FRAME."
-    (+auto-revert-window-buffer-h
-     (frame-selected-window (or frame (selected-frame)))))
+    "Auto revert selected window on FRAME.
+Global `window-selection-change-functions' also receives a frame."
+    (let ((frame (or frame (selected-frame))))
+      (when (frame-live-p frame)
+        (+auto-revert-window-buffer-h (frame-selected-window frame)))))
 
   (defun +auto-revert-visible-buffers-h (&rest _)
     "Auto revert visible stale buffers."
@@ -72,8 +83,11 @@
     (when global-auto-revert-mode
       (setq +auto-revert-mode nil))
     (let ((fn (if +auto-revert-mode #'add-hook #'remove-hook)))
-      (funcall fn 'window-buffer-change-functions #'+auto-revert-window-buffer-h)
-      (funcall fn 'window-selection-change-functions #'+auto-revert-selected-window-h)
+      ;; Global hook → FRAME handler (not window-live-p on a frame).
+      (funcall fn 'window-buffer-change-functions
+               #'+auto-revert-on-window-buffer-change-h)
+      (funcall fn 'window-selection-change-functions
+               #'+auto-revert-selected-window-h)
       (funcall fn 'after-save-hook #'+auto-revert-visible-buffers-h)
       (funcall fn 'server-switch-hook #'+auto-revert-buffer-h))
     ;; `focus-in-hook' is obsolete since Emacs 27.1.
@@ -253,11 +267,11 @@
       (puni-backward-delete-char)))
   )
 
-;; [dtdr-indent] Detect indentation size
+;; [dtrt-indent] Detect indentation size
 (use-package dtrt-indent
   :straight t
-  :config
-  (dtrt-indent-global-mode 1))
+  ;; Always-defer: :config alone never runs until package loads.
+  :hook (after-init . dtrt-indent-global-mode))
 
 
 ;; [dogears] Jump to the last edit location
@@ -279,7 +293,6 @@
                             other-window switch-to-buffer
                             aw-select
                             windmove-do-window-select
-                            pager-page-up
                             tab-bar-select-tab
                             pop-to-mark-command
                             pop-global-mark

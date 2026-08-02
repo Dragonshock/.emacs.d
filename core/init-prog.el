@@ -109,7 +109,8 @@
                                                :excludeTests t)
                                   :lru (:capacity 1024)
                                   :diagnostics (:enable :json-false))
-                  :typescript (:preferences (:importModuleSpecifierPreference "non-relative"))
+                  ;; typescript preferences belong in CONTACT :initializationOptions
+                  ;; (workspace/configuration does not feed tsserver preferences).
                   :java (:configuration
                          (:runtimes [(:name "JavaSE-17"
                                             :path "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home/")
@@ -120,6 +121,17 @@
                                            :wrapper (:enabled t)))
                          :autobuild (:enabled :json-false))))
 
+  ;; typescript-language-server: import preference via initialize options only.
+  (add-to-list 'eglot-server-programs
+               `(((js-mode :language-id "javascript")
+                  (js-ts-mode :language-id "javascript")
+                  (tsx-ts-mode :language-id "typescriptreact")
+                  (typescript-ts-mode :language-id "typescript")
+                  (typescript-mode :language-id "typescript"))
+                 . ("typescript-language-server" "--stdio"
+                    :initializationOptions
+                    (:preferences (:importModuleSpecifierPreference "non-relative")))))
+
   (defun jdtls-command-contact (&optional interactive)
     "Eglot CONTACT for jdtls; ECC goes in :initializationOptions (not workspace config)."
     (let* ((jdtls-java-home (getenv "JDTLS_JAVA_HOME"))
@@ -127,11 +139,16 @@
            (data-dir
             (file-name-concat
              (no-littering-expand-var-file-name "lsp-cache/")
-             (md5 (expand-file-name project-root)))))
-      `("env" ,(concat "JAVA_HOME=" jdtls-java-home)
-        "jdtls" "--jvm-arg=-Xmx16G" "-data" ,data-dir
-        :initializationOptions
-        (:extendedClientCapabilities (:classFileContentsSupport t)))))
+             (md5 (expand-file-name project-root))))
+           (init-opts
+            '(:extendedClientCapabilities (:classFileContentsSupport t))))
+      ;; Only inject JAVA_HOME when set; bare "JAVA_HOME=" clears the child env.
+      (if (and jdtls-java-home (not (string-empty-p jdtls-java-home)))
+          `("env" ,(concat "JAVA_HOME=" jdtls-java-home)
+            "jdtls" "--jvm-arg=-Xmx16G" "-data" ,data-dir
+            :initializationOptions ,init-opts)
+        `("jdtls" "--jvm-arg=-Xmx16G" "-data" ,data-dir
+          :initializationOptions ,init-opts))))
   (add-to-list 'eglot-server-programs
                `((java-mode java-ts-mode) . ,#'jdtls-command-contact))
 
@@ -183,8 +200,8 @@
   :straight t
   :commands webpaste-paste-buffer-or-region
   :config
+  ;; webpaste-add-to-killring package default is already t.
   (setq webpaste-paste-confirmation t
-        webpaste-add-to-killring t
         webpaste-provider-priority '("paste.rs")))
 
 
@@ -397,7 +414,24 @@
    web-mode-markup-indent-offset 2
    web-mode-css-indent-offset 2
    web-mode-code-indent-offset 2
-   web-mode-enable-html-entities-fontification t))
+   web-mode-enable-html-entities-fontification t)
+  ;; web-mode defaults six enable-* options with STANDARD (display-graphic-p).
+  ;; Daemon + use-package-always-demand loads the package with no GUI frame, so
+  ;; those STANDARD forms become nil and stick. Force GUI-friendly defaults
+  ;; here (and refresh when a graphic client frame appears).
+  (defun +web-mode-force-graphic-defaults ()
+    "Set web-mode interactive defaults as if loaded under a graphic frame."
+    (setq web-mode-enable-css-colorization t
+          web-mode-enable-auto-indentation t
+          web-mode-enable-auto-closing t
+          web-mode-enable-auto-pairing t
+          web-mode-enable-auto-opening t
+          web-mode-enable-auto-quoting t))
+  (+web-mode-force-graphic-defaults)
+  (add-hook 'server-after-make-frame-hook
+            (lambda ()
+              (when (display-graphic-p)
+                (+web-mode-force-graphic-defaults)))))
 
 
 ;; [treesit]
@@ -423,10 +457,10 @@
   :straight (indent-bars :type git :host github :repo "jdtsmith/indent-bars")
   :hook (prog-mode . indent-bars-mode)
   :config
+  ;; indent-bars-zigzag package default is already nil.
   (setq indent-bars-display-on-blank-lines nil
         indent-bars-width-frac 0.1
         indent-bars-color '(highlight :face-bg t :blend 0.2)
-        indent-bars-zigzag nil
         indent-bars-highlight-current-depth nil
         indent-bars-pattern "."))
 
@@ -438,9 +472,11 @@
 
 
 ;; [minuet-ai] AI-powered inline code completion
+;; Audit: do NOT global-hook minuet-auto-suggestion-mode on prog-mode —
+;; default context posts buffer slices to DeepSeek (privacy P0; roife same-bad).
+;; Opt-in: M-i minibuffer complete, or M-x minuet-auto-suggestion-mode.
 (use-package minuet
   :straight (:host github :repo "milanglacier/minuet-ai.el")
-  :hook (prog-mode . minuet-auto-suggestion-mode)
   :bind (("M-i" . #'minuet-complete-with-minibuffer)
          :map minuet-active-mode-map
          ("M-p" . #'minuet-previous-suggestion)
@@ -461,4 +497,23 @@
                (gptel-api-key-from-auth-source "api.deepseek.com" "apikey")))
 
   (minuet-set-optional-options minuet-openai-fim-compatible-options :max_tokens 56)
-  (minuet-set-optional-options minuet-openai-fim-compatible-options :top_p 0.9))
+  (minuet-set-optional-options minuet-openai-fim-compatible-options :top_p 0.9)
+
+  ;; If auto mode is enabled manually, still never FIM on credential paths.
+  ;; block-predicates only gate minuet--maybe-show-suggestion (auto path).
+  (add-to-list 'minuet-auto-suggestion-block-predicates
+               (lambda ()
+                 (and buffer-file-name
+                      (fboundp '+secret-file-p)
+                      (+secret-file-p buffer-file-name))))
+
+  ;; Manual paths (M-i / minuet-show-suggestion) ignore block-predicates —
+  ;; refuse secret files so buffer context is never POSTed to the provider.
+  (defun +minuet-refuse-secret-context (&rest _)
+    "Abort minuet when the current buffer is a secret file."
+    (when (and buffer-file-name
+               (fboundp '+secret-file-p)
+               (+secret-file-p buffer-file-name))
+      (user-error "minuet: refused on secret file")))
+  (advice-add 'minuet-complete-with-minibuffer :before #'+minuet-refuse-secret-context)
+  (advice-add 'minuet-show-suggestion :before #'+minuet-refuse-secret-context))

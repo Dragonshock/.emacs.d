@@ -5,12 +5,12 @@
  ;; Inhibits fontification while receiving input, which should help a little with scrolling performance.
  redisplay-skip-fontification-on-input t
 
- ;; [Selected-window]
- highlight-nonselected-windows nil
- cursor-in-non-selected-windows nil
-
+ ;; [Selected-window] — must be default/global (plain setq is buffer-local here).
  ;; Font compacting can be terribly expensive, but may increase memory use
  inhibit-compacting-font-caches t)
+ ;; highlight-nonselected-windows stock default is already nil — do not setq.
+
+(setq-default cursor-in-non-selected-windows nil)
 
 
 ;; [Cursor] disable blinking
@@ -18,8 +18,8 @@
 
 
 ;; [Fringes] Reduce the clutter in the fringes
-(setq indicate-buffer-boundaries nil
-      indicate-empty-lines nil)
+;; indicate-buffer-boundaries stock default is already nil.
+(setq-default indicate-empty-lines t)
 
 ;; Better fringe symbol
 (define-fringe-bitmap 'right-curly-arrow
@@ -69,10 +69,6 @@
       use-dialog-box nil)
 
 
-;; Indicate eob lines
-(setq indicate-empty-lines t)
-
-
 ;; Disable menu/tool/scroll bars in daemon/client frames
 (add-hook! after-make-frame-functions
   (defun +disable-frame-chrome (&optional frame)
@@ -103,6 +99,19 @@
 ;; Font: Same width and height for emoji, chinese and english characters
 (defvar +font-size (if (eq system-type 'darwin) 16 26))
 
+(defun +apply-default-frame-geometry-h (&optional frame force)
+  "Re-apply 120x50 and center geometry for FRAME once after font setup.
+Needed under `frame-inhibit-implied-resize' (early-init).  Skips frames that
+already got this pass so `server-after-make-frame-hook' reusing a GUI frame
+does not clobber maximized/custom sizes.  FORCE non-nil re-applies."
+  (let ((frame (or frame (selected-frame))))
+    (when (and (display-graphic-p frame)
+               (or force (not (frame-parameter frame '+geometry-applied))))
+      (with-selected-frame frame
+        (set-frame-size frame 120 50)
+        (modify-frame-parameters frame '((left . 0.5) (top . 0.5)))
+        (set-frame-parameter frame '+geometry-applied t)))))
+
 (add-hook! server-after-make-frame-hook :unless-daemonp-call-immediately
   (defun +setup-fonts ()
     "Setup fonts."
@@ -121,27 +130,20 @@
       (if (eq system-type 'darwin)
           (progn (set-fontset-font t 'emoji (font-spec :family "Apple Color Emoji") nil 'prepend)
                  (setq face-font-rescale-alist '(("Apple Color Emoji" . 0.79))))
-        (set-fontset-font t 'emoji (font-spec :family "Noto Color Emoji") nil 'prepend)))))
+        (set-fontset-font t 'emoji (font-spec :family "Noto Color Emoji") nil 'prepend))
+      ;; First graphic setup for this frame only (reused emacsclient frames skip).
+      (+apply-default-frame-geometry-h))))
 
-;; The initial frame is created with the system font, and
-;; `frame-inhibit-implied-resize' keeps its pixel size when `+setup-fonts'
-;; switches to the configured font, changing the 120x50 grid from
-;; early-init.el.  Re-apply the intended size with the final font, then
-;; re-center (float left/top = proportional position, 0.5 = centered).
-;; Later frames inherit the correct font, so only the initial one needs this.
-(add-hook! window-setup-hook
-  (defun +apply-default-frame-geometry-h ()
-    (when (display-graphic-p)
-      (set-frame-size (selected-frame) 120 50)
-      (modify-frame-parameters (selected-frame)
-                               '((left . 0.5) (top . 0.5))))))
+;; Non-daemon: window-setup after immediate +setup-fonts; once-guarded.
+(add-hook 'window-setup-hook #'+apply-default-frame-geometry-h)
 
 
-;; Smooth Scroll (less "jumpy" than defaults)
-(when (display-graphic-p)
-  (setq mouse-wheel-scroll-amount '(2 ((shift) . hscroll) ((control) . nil))
+;; Smooth Scroll (less "jumpy" than defaults).
+;; `mouse-wheel-scroll-amount' has a custom :set that reinstalls bindings;
+;; plain setq leaves preloaded C-wheel text-scale. Harmless on TTY / daemon init.
+(setopt mouse-wheel-scroll-amount '(2 ((shift) . hscroll) ((control) . nil))
         mouse-wheel-scroll-amount-horizontal 1
-        mouse-wheel-progressive-speed nil))
+        mouse-wheel-progressive-speed nil)
 
 ;; Load theme
 ;; Don't prompt to confirm theme safety. This avoids problems with
@@ -161,23 +163,31 @@
 
 (defvar +light-theme 'doom-gruvbox-light)
 (defvar +dark-theme 'doom-gruvbox)
+;; Themes are session-global.  Auto-pick only when none is loaded so mixed
+;; emacsclient -c / -t does not flip doom-gruvbox ↔ light for all frames.
+;; Explicit THEME (incl. ns-system-appearance-change-functions) still switches.
 (add-hook! (tty-setup-hook server-after-make-frame-hook) :unless-daemonp-call-immediately
   (defun +load-theme (&optional theme)
-    (setq theme (if (if (display-graphic-p)
-                        ;; `ns-system-appearance' is from the emacs-plus
-                        ;; system-appearance patch, not stock Emacs NS.
-                        (cond ((and (eq system-type 'darwin)
-                                    (boundp 'ns-system-appearance))
-                               (eq ns-system-appearance 'dark))
-                              (t t))
-                      (eq (or (terminal-parameter nil 'background-mode)
-                              (frame-parameter nil 'background-mode))
-                          'dark))
-                    +dark-theme
-                  +light-theme))
-    (unless (member theme custom-enabled-themes)
-      (mapc #'disable-theme custom-enabled-themes)
-      (load-theme theme t))))
+    "Load THEME, or pick dark/light once when no theme is enabled yet."
+    (if theme
+        (unless (member theme custom-enabled-themes)
+          (mapc #'disable-theme custom-enabled-themes)
+          (load-theme theme t))
+      (when (null custom-enabled-themes)
+        (let ((picked
+               (if (if (display-graphic-p)
+                       ;; `ns-system-appearance' is from the emacs-plus
+                       ;; system-appearance patch, not stock Emacs NS.
+                       (cond ((and (eq system-type 'darwin)
+                                   (boundp 'ns-system-appearance))
+                              (eq ns-system-appearance 'dark))
+                             (t t))
+                     (eq (or (terminal-parameter nil 'background-mode)
+                             (frame-parameter nil 'background-mode))
+                         'dark))
+                   +dark-theme
+                 +light-theme)))
+          (load-theme picked t))))))
 
 ;; [window-divider] Display window divider
 (setq window-divider-default-places t

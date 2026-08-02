@@ -136,6 +136,19 @@ for subscription/login auth."
   ;; use setopt so it runs — agent-shell is loaded here, so the setter exists.
   (setopt agent-shell-session-strategy 'prompt)
 
+  ;; header-style STANDARD is (if (display-graphic-p) 'graphical 'text) with no
+  ;; :set.  Daemon + use-package-always-demand loads under no GUI → freezes as
+  ;; text.  Force graphical when a real GUI frame exists (web-mode pattern).
+  (defun +agent-shell-force-graphic-header ()
+    "Prefer graphical agent-shell header when a GUI frame is available."
+    (when (display-graphic-p)
+      (setq agent-shell-header-style 'graphical)))
+  (+agent-shell-force-graphic-header)
+  (add-hook 'server-after-make-frame-hook
+            (lambda ()
+              (when (display-graphic-p)
+                (+agent-shell-force-graphic-header))))
+
   (unless (or (file-executable-p +agent-shell-grok-bin)
               (executable-find "grok"))
     (warn "Cannot find Grok Build CLI at %s. Install it and run `grok login'."

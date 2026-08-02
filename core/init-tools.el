@@ -8,8 +8,7 @@
   (setq
    ;; Record isearch in minibuffer history, so C-x ESC ESC can repeat it.
    isearch-resume-in-command-history t
-   ;; One space can represent a sequence of whitespaces
-   isearch-lax-whitespace t
+   ;; isearch-lax-whitespace stock default is already t (Emacs 25.1+).
    ;; direction change
    isearch-repeat-on-direction-change t
    ;; M-< and M-> move to the first/last occurrence of the current search string.
@@ -38,8 +37,16 @@
 
 
 ;; [arxiv.el] Search, browse, and save arXiv papers
+;; Package has no autoloads; :bind/:commands load it (always-defer is on for
+;; non-daemon sessions). Align binds with upstream README.
 (use-package arxiv
   :straight (:type git :host github :repo "roife/arxiv.el")
+  :bind (("C-c a s" . arxiv-search-builder)
+         ("C-c a o" . arxiv-open)
+         ("C-c a a" . arxiv-search-author)
+         ("C-c a c" . arxiv-search-category)
+         ("C-c a l" . arxiv-latest)
+         ("C-c a w" . arxiv-past-week))
   :config
   (setq arxiv-browser-function #'arxiv-eww-browse-url)
   (arxiv-url-handler-mode 1))
@@ -83,13 +90,9 @@
 (use-package hideshow
   :preface
   (defun +hideshow-setup ()
-    "Set up hideshow block definitions for modes that need overrides."
+    "Set up hideshow block definitions for modes that need overrides.
+Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
     (pcase major-mode
-      ('ruby-mode
-       (setq-local hs-block-start-regexp "class\\|d\\(?:ef\\|o\\)\\|module\\|[[{]"
-                   hs-block-end-regexp "end\\|[]}]"
-                   hs-c-start-regexp "#\\|=begin"
-                   hs-forward-sexp-function #'ruby-forward-sexp))
       ('nxml-mode
        (setq-local hs-block-start-regexp "<!--\\|<[^/>]*[^/]>"
                    hs-block-end-regexp "-->\\|</[^/>]*[^/]>"
@@ -107,9 +110,18 @@
                                (search-backward "\\begin{document}"
                                                 (line-beginning-position) t))
                        (LaTeX-find-matching-end)))))))
-  :hook (((prog-mode conf-mode yaml-mode yaml-ts-mode) . hs-minor-mode)
-         ((ruby-mode nxml-mode latex-mode LaTeX-mode) . +hideshow-setup)
-         ((yaml-mode yaml-ts-mode) . hs-indentation-mode))
+  ;; toml-ts-mode derives from text-mode (not conf-mode); with
+  ;; treesit-enabled-modes remapping conf-toml → toml-ts, conf-mode-hook never
+  ;; runs for .toml — list toml-ts-mode explicitly (same pattern as yaml-ts).
+  ;; nxml/latex/LaTeX derive from text-mode (not prog/conf) — must list them on
+  ;; hs-minor-mode or setup-only hooks leave folding as a silent no-op.
+  :hook (((prog-mode conf-mode yaml-mode yaml-ts-mode toml-ts-mode
+                     nxml-mode latex-mode LaTeX-mode)
+          . hs-minor-mode)
+         ((nxml-mode latex-mode LaTeX-mode) . +hideshow-setup)
+         ;; Indentation-style hs is for classic yaml-mode; treesit yaml uses
+         ;; treesit-hs predicates from major-mode setup — keep yaml-ts off here.
+         ((yaml-mode) . hs-indentation-mode))
   :bind (("C-c h TAB" . hs-cycle)
          ("C-c h `" . hs-toggle-all))
   :config
@@ -139,8 +151,8 @@
 (use-package vundo
   :straight t
   :config
-  (setq vundo-compact-display t
-        vundo-roll-back-on-quit t))
+  ;; vundo-roll-back-on-quit stock package default is already t.
+  (setq vundo-compact-display t))
 
 
 ;; [undohist] Persist undo history

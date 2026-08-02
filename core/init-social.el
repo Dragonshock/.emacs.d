@@ -1,7 +1,9 @@
 ;; -*- lexical-binding: t; -*-
 (use-package telega
+  ;; Include Makefile + server/ so `telega-server-build' can recompile
+  ;; against `telega-server-libs-prefix' (straight's default files omit them).
   :straight (:host github :repo "zevlg/telega.el"
-                   :files (:defaults "contrib/*.el" "etc"))
+                   :files (:defaults "contrib/*.el" "etc" "Makefile" "server"))
   :preface
   (defun +telega-install-tdlib ()
     "Fetch and install telega's expected TDLib commit under ~/.local."
@@ -19,6 +21,20 @@
        (mapconcat #'shell-quote-argument (list script version prefix) " ")
        'compilation-mode
        (lambda (_) "*telega-install-tdlib*"))))
+
+  (defun +telega--server-src-directory ()
+    "Directory that contains telega's top-level Makefile and server/ sources.
+Prefer the straight git repo; fall back to `telega--lib-directory'."
+    (or (and (boundp 'straight-base-dir)
+             (let ((dir (expand-file-name "straight/repos/telega.el"
+                                          straight-base-dir)))
+               (and (file-exists-p (expand-file-name "Makefile" dir))
+                    (file-directory-p (expand-file-name "server" dir))
+                    dir)))
+        (and (boundp 'telega--lib-directory)
+             telega--lib-directory
+             (file-exists-p (expand-file-name "Makefile" telega--lib-directory))
+             telega--lib-directory)))
 
   (defun +telega-toggle-archive ()
     "Toggle telega root buffer between the main and archive filters."
@@ -229,6 +245,22 @@
                                             telega-capf-markdown-precode
                                             telega-capf-botcmd))
 
+  ;; `telega-server-build' runs `make server-reinstall' in
+  ;; `telega--lib-directory'.  With straight that is build/telega/, which
+  ;; historically lacked Makefile/server/; point builds at the git repo.
+  (defadvice! +telega-server-build-from-repo-a (fn &rest args)
+    :around #'telega-server-build
+    (let* ((src (+telega--server-src-directory))
+           (telega--lib-directory (or src telega--lib-directory)))
+      (unless (and telega--lib-directory
+                   (file-exists-p (expand-file-name "Makefile"
+                                                    telega--lib-directory)))
+        (user-error
+         "telega Makefile not found (looked in %s).  \
+Update straight recipe files or run make from straight/repos/telega.el"
+         telega--lib-directory))
+      (apply fn args)))
+
   ;; `telega-proxies' is obsolete since telega 0.8.621; proxies are now added
   ;; from `telega-before-auth-hook' via `telega--addProxy'.
   (when (eq system-type 'gnu/linux)
@@ -239,24 +271,9 @@
                               :type (:@type "proxyTypeSocks5"))
                   :enable-p 'enable :comment "local socks5"))))
 
-  ;; HACK: Work around upstream bot command completion returning nested lists.
-  ;; Each mapped candidate list is freshly allocated, so `mapcan' is safe here.
-  (defun telega-completions--bot-commands (chat)
-    "Return bot command completion candidates for CHAT."
-    (let* ((info (telega-chat--info chat))
-           (telega-full-info-offline-p nil)
-           (full-info (telega--full-info info)))
-      (if (telega-chatbuf-match-p '(type bot))
-          (telega-completions--bot-commands-list
-           (telega--tl-get full-info :bot_info :commands))
-        (mapcan (lambda (bot-commands)
-                  (telega-completions--bot-commands-list
-                   (plist-get bot-commands :commands)
-                   (telega-msg-sender-username
-                    (telega-user-get
-                     (plist-get bot-commands :bot_user_id))
-                    'with-@)))
-                (plist-get full-info :bot_commands)))))
+  ;; Do not redef telega-completions--bot-commands: package already uses
+  ;; mapcan (telega-completions.el).  Local copy was checkout-drift; MERGE
+  ;; LOCK: do not reintroduce a frozen redef when syncing roife.
 
   ;; HACK: Show full name only in chatbuf
   (defadvice! +telega-message-header-username-only-a

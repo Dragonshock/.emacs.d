@@ -1,16 +1,29 @@
 ;;; -*- lexical-binding: t -*-
 
 
-;; [visual-fill-column] Center text in markdown and org
+;; [visual-fill-column] Center text in prose modes only.
+;; Do not hook bare text-mode: yaml-ts-mode / toml-ts-mode derive text-mode and
+;; would get column-centered soft-wrap under treesit remaps.
 (use-package visual-fill-column
   :straight t
-  :hook (text-mode . visual-fill-column-mode)
+  :hook ((org-mode markdown-ts-mode text-mode) . +maybe-visual-fill-column)
+  :init
+  (defun +maybe-visual-fill-column ()
+    "Enable visual-fill-column for prose; skip treesit data languages."
+    (unless (derived-mode-p 'yaml-ts-mode 'toml-ts-mode 'yaml-mode 'conf-mode
+                            'conf-toml-mode)
+      (visual-fill-column-mode 1)))
   :config
   (setq-default visual-fill-column-center-text t))
 
 
-;; [visual-line-mode] Soft line-wrapping
-(add-hook 'text-mode-hook 'visual-line-mode)
+;; [visual-line-mode] Soft line-wrapping for prose only (same exclusions).
+(defun +maybe-visual-line-mode ()
+  "Enable `visual-line-mode' for prose; skip yaml/toml conf modes."
+  (unless (derived-mode-p 'yaml-ts-mode 'toml-ts-mode 'yaml-mode 'conf-mode
+                          'conf-toml-mode)
+    (visual-line-mode 1)))
+(add-hook 'text-mode-hook #'+maybe-visual-line-mode)
 
 
 ;; [edit-indirect] Edit code blocks indirectly
@@ -18,9 +31,12 @@
   :straight t)
 
 
-;; [pangu] Add pangu spaces
+;; [pangu] Add pangu spaces between CJK and Latin
 (use-package pangu-spacing
-  :straight t)
+  :straight t
+  :hook ((org-mode markdown-ts-mode) . pangu-spacing-mode)
+  ;; pangu-spacing-real-insert-separtor defaults to nil (overlay-only) — no setq.
+  )
 
 (use-package markdown-ts-mode
   :straight (:type built-in)
@@ -44,10 +60,11 @@
 
 ;; [typst-ts-mode]
 (use-package typst-ts-mode
-  ;; Upstream migrated from SourceHut to Codeberg.
+  ;; Upstream migrated from SourceHut to Codeberg (local checkout re-pointed).
   :straight (:host codeberg :repo "meow_king/typst-ts-mode")
   :custom
-  (typst-ts-watch-options "--open"))
+  ;; 0.12+: list of CLI args (was a string on 0.10 SourceHut).
+  (typst-ts-watch-options '("--open")))
 
 ;; [auctex]
 (use-package tex
@@ -72,9 +89,15 @@
 
 ;; [cdlatex]
 (use-package cdlatex
-  :straight t)
+  :straight t
+  :hook ((LaTeX-mode . turn-on-cdlatex)
+         (latex-mode . turn-on-cdlatex)))
 
 
 ;; [reftex]
 (use-package reftex
-  :straight t)
+  :straight t
+  :hook ((LaTeX-mode . turn-on-reftex)
+         (latex-mode . turn-on-reftex))
+  :config
+  (setq reftex-plug-into-AUCTeX t))

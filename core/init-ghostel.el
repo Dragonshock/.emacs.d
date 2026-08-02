@@ -26,12 +26,14 @@
 ;; 安装: 首次使用时自动下载预编译原生模块（无需 zig）。
 ;; 模块目录: set in init-basic via no-littering (`var/ghostel/`).
 ;; 若 Elisp 要求的最低版本高于 sidecar（ghostel-module.version），
-;; 会按 `ghostel-module-auto-install' 策略重装（当前 Elisp 要求 ≥0.45.0）。
+;; 会按 `ghostel-module-auto-install' 策略重装。
+;; 唯一模块目录: var/ghostel/（no-littering）。勿使用 ~/.emacs.d/ghostel/ 残留。
 
 (use-package ghostel
   :straight t
   ;; ── 全局快捷键 ──
-  ;; C-x p m 留给 magit-status（init-tools）；终端用 project map 的 m/M。
+  ;; C-x p m = magit-status（init-tools）。Ghostel 用 C-x m 与 project map 的 t/T，
+  ;; 勿再绑 "m"（会被 magit 覆盖，且 switch 菜单无 dispatch KEY）。
   :bind (("C-x m" . ghostel)
          :map ghostel-semi-char-mode-map
          ;; Keep C-g for Emacs quit (roife); otherwise it may go to the shell.
@@ -41,8 +43,8 @@
          ("M-p" . (lambda () (interactive) (ghostel-send-key "p" "ctrl")))
          ("M-n" . (lambda () (interactive) (ghostel-send-key "n" "ctrl")))
          :map project-prefix-map
-         ("m" . ghostel-project)              ; 在当前项目目录打开
-         ("M" . ghostel-project-list-buffers)) ; 列出项目相关的 ghostel buffer
+         ("t" . ghostel-project)               ; project terminal
+         ("T" . ghostel-project-list-buffers)) ; project ghostel buffers
 
   :init
   ;; ── 原生模块 ──
@@ -62,10 +64,12 @@
     (ghostel-send-key "k" "ctrl"))
 
   :config
-  ;; ── 项目切换命令注册（project.el 加载后才可用） ──
+  ;; ── 项目切换命令注册（第三元为 dispatch KEY，与 C-x p t/T 对齐） ──
   (with-eval-after-load 'project
-    (add-to-list 'project-switch-commands '(ghostel-project "Ghostel") t)
-    (add-to-list 'project-switch-commands '(ghostel-project-list-buffers "Ghostel buffers") t))
+    (add-to-list 'project-switch-commands
+                 '(ghostel-project "Ghostel" ?t) t)
+    (add-to-list 'project-switch-commands
+                 '(ghostel-project-list-buffers "Ghostel buffers" ?T) t))
 
   ;; Name project terminals as popper-friendly buffers (used by +eshell-toggle C-u).
   (defadvice! +ghostel-project-popup-buffer-name (_orig root)
@@ -87,8 +91,7 @@
   ;;   (setq ghostel-enable-url-detection nil
   ;;         ghostel-enable-file-detection nil)
 
-  ;; ── Shell 集成（默认 t：bash/zsh/fish 自动注入） ──
-  (setq ghostel-shell-integration t)
+  ;; ghostel-shell-integration package default is already t — no setq.
 
   ;; ── 从 Shell 调用 Emacs 函数 ──
   (add-to-list 'ghostel-eval-cmds '("magit-status-setup-buffer" magit-status-setup-buffer))

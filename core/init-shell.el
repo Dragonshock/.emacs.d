@@ -180,23 +180,37 @@ Eshell looks up `eshell/NAME' (slash), not `eshell-NAME' (hyphen)."
         (eshell/cd dir))))
 
 
-  ;; view file
+  ;; view file — quit-restore is Emacs 31's 4-list
+  ;; (TYPE QUAD SELWIN BUFFER).  Reuse + different buffer → TYPE `other';
+  ;; QUAD size is height if vertically combined else width (window.el).
+  ;; Exit action mirrors stock `view-file': only kill if we opened a new
+  ;; buffer, and then only if unmodified (never raw `kill-buffer' on a
+  ;; file-visiting buffer — that can discard unsaved edits on View-quit).
   (defun +eshell-view-file (file)
     "View FILE.  A version of `view-file' which properly rets the eshell prompt."
     (interactive "fView file: ")
     (unless (file-exists-p file) (error "%s does not exist" file))
-    (let ((buffer (find-file-noselect file)))
+    (let ((had-a-buf (get-file-buffer file))
+          (buffer (find-file-noselect file)))
       (if (eq (get (buffer-local-value 'major-mode buffer) 'mode-class)
               'special)
           (progn
             (switch-to-buffer buffer)
             (message "Not using View mode because the major mode is special"))
-        (let ((undo-window (list (window-buffer) (window-start)
-                                 (+ (window-point)
-                                    (length (funcall eshell-prompt-function))))))
+        (let* ((return-buffer (window-buffer))
+               (return-start (window-start))
+               (return-point (+ (window-point)
+                                (length (funcall eshell-prompt-function))))
+               (return-size (if (window-combined-p)
+                                (window-total-height)
+                              (window-total-width))))
           (switch-to-buffer buffer)
-          (view-mode-enter (cons (selected-window) (cons nil undo-window))
-                           'kill-buffer)))))
+          (view-mode-enter
+           (list 'other
+                 (list return-buffer return-start return-point return-size)
+                 (selected-window)
+                 buffer)
+           (and (not had-a-buf) #'kill-buffer-if-not-modified))))))
 
   ;; Sync buffer name
   (add-hook! (eshell-directory-change-hook eshell-mode-hook)
@@ -275,8 +289,8 @@ Eshell looks up `eshell/NAME' (slash), not `eshell-NAME' (hyphen)."
 ;; is a plain string list, then mapcar's it for edit-distance.  Emacs 31 Eshell
 ;; bare-command completion returns a programmed completion table (function /
 ;; completion-table-dynamic via eshell--complete-commands-list).  Materialize
-;; with all-completions first.  Do not remove this override without replacing
-;; or forking the package — stock 0.2 breaks the eshell preoutput filter.
+;; with all-completions first.  MERGE LOCK: keep vs roife/upstream; stock 0.2
+;; breaks the eshell preoutput filter on Emacs 31.
 (use-package eshell-did-you-mean
   :straight t
   :after esh-mode
@@ -289,7 +303,5 @@ Eshell looks up `eshell/NAME' (slash), not `eshell-NAME' (hyphen)."
   (eshell-did-you-mean-setup))
 
 
-;; Ghostel lives in `init-ghostel.el` (loaded earlier). Eshell still uses
-;; `ghostel-project' from `+eshell-toggle' with a prefix argument.
-;; NOTE: upstream renamed that call to `ghostel'; the ghostel version pinned
-;; here still defines `ghostel-project', so keep the old name.
+;; Ghostel lives in `init-ghostel.el` (loaded earlier). Eshell prefix still
+;; calls `ghostel-project' (still defined by ghostel; project-scoped terminal).

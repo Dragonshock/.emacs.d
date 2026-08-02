@@ -84,10 +84,13 @@
         hl-todo-highlight-punctuation ":")
 
   (defun +hl-todo-add-keywords (keys color)
-    (dolist (keyword keys)
-      (if-let* ((item (assoc keyword hl-todo-keyword-faces)))
-          (setf (cdr item) color)
-        (push `(,keyword . ,color) hl-todo-keyword-faces))))
+    "Add KEYS→COLOR to `hl-todo-keyword-faces' via setopt so the custom :set runs."
+    (let ((faces (copy-tree hl-todo-keyword-faces)))
+      (dolist (keyword keys)
+        (if-let* ((item (assoc keyword faces)))
+            (setcdr item color)
+          (push (cons keyword color) faces)))
+      (setopt hl-todo-keyword-faces faces)))
 
   ;; HACK: `hl-todo' won't update face when changing theme, so we must add a hook for it
   (add-hook! enable-theme-functions :unless-daemonp-call-immediately
@@ -107,13 +110,15 @@
 
 
 ;; [beacon] Highlight line at cursor after switching window
+;; Do not customize pulse-highlight-face (doc forbids it). Do not set
+;; pulse-highlight-start-face background to `unspecified': pulse-reset-face
+;; uses face-background and then fades from nil → default = invisible flash.
+;; Stock faces already pick light/dark yellow backgrounds.
 (use-package pulse
-  :custom-face
-  (pulse-highlight-start-face ((t (:inherit region :background unspecified))))
-  (pulse-highlight-face ((t (:inherit region :background unspecified :extend t))))
-  ;; dumb-jump is only on `xref-backend-functions' here; pulse via xref, not
-  ;; the unused `dumb-jump-after-jump' hook.
-  :hook (((imenu-after-jump xref-after-jump) . +recenter-and-pulse)
+  ;; Stock `xref-after-jump-hook' is already (recenter xref-pulse-momentarily);
+  ;; do not also hook +recenter-and-pulse (double pulse aborts the first).
+  ;; imenu-after-jump defaults to nil — keep our recenter+pulse there.
+  :hook ((imenu-after-jump . +recenter-and-pulse)
          ((bookmark-after-jump magit-diff-visit-file next-error) . +recenter-and-pulse-line))
   :init
   (setq pulse-delay 0.1
@@ -137,11 +142,11 @@
     (recenter)
     (+pulse-momentary-line))
 
+  ;; No pager-page-up: command not present in this config (pending advice noise).
   (dolist (cmd '(recenter-top-bottom
                  other-window switch-to-buffer
                  aw-select
                  windmove-do-window-select
-                 pager-page-up
                  treemacs-select-window
                  tab-bar-select-tab))
     (advice-add cmd :after #'+pulse-momentary-line))
@@ -150,9 +155,9 @@
                  pop-global-mark))
     (advice-add cmd :after #'+recenter-and-pulse))
 
-  (dolist (cmd '(symbol-overlay-basic-jump
-                 compile-goto-error))
-    (advice-add cmd :after #'+recenter-and-pulse-line))
+  ;; Do not advice symbol-overlay-basic-jump: jump-to-definition loops it and
+  ;; multi-pulse aborts.  Use public symbol-overlay-jump-hook (once per jump).
+  (advice-add 'compile-goto-error :after #'+recenter-and-pulse-line)
   )
 
 
@@ -175,6 +180,8 @@
   :hook (((prog-mode yaml-mode yaml-ts-mode) . symbol-overlay-mode))
   :config
   (setq symbol-overlay-temp-highlight-on-region t)
+  ;; Public hook runs once per jump-call (not once per basic-jump in a loop).
+  (add-hook 'symbol-overlay-jump-hook #'+recenter-and-pulse-line)
   )
 
 

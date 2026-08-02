@@ -1,14 +1,27 @@
 ;;; -*- lexical-binding: t -*-
 
-(defadvice! +window-rotate-stacked-after-maximize-a (&rest _)
-  :after #'toggle-frame-maximized
+;; Prefer side-by-side splits on wide frames (stock split-width-threshold is 150
+;; columns; with large CJK fonts a "maximized" frame can still be < 150 cols and
+;; stay vertical).  120 is a practical default for Sarasa 16pt on modern displays.
+(setq split-width-threshold 120
+      split-height-threshold 80)
+
+(defun +window-rotate-stacked-if-two-vertical (&rest _)
+  "If FRAME has exactly two vertically stacked windows, rotate to side-by-side.
+Shared by maximize and true fullscreen (macOS often uses `fullboth', not
+`maximized', so an advice only on `toggle-frame-maximized' never fired)."
   (let* ((frame (selected-frame))
+         (fs (frame-parameter frame 'fullscreen))
          (wins (window-list frame 'no-minibuf)))
-    (when (and (eq (frame-parameter frame 'fullscreen) 'maximized)
+    (when (and (memq fs '(maximized fullboth fullwidth fullheight))
                (= (length wins) 2)
+               ;; nil AXIS ⇒ vertical combination (top/bottom stack).
                (window-combined-p (car wins) nil))
       (with-selected-frame frame
         (window-layout-rotate-anticlockwise (frame-root-window frame))))))
+
+(advice-add #'toggle-frame-maximized :after #'+window-rotate-stacked-if-two-vertical)
+(advice-add #'toggle-frame-fullscreen :after #'+window-rotate-stacked-if-two-vertical)
 
 ;; [ace-window] Add number for each window
 (use-package ace-window
@@ -48,18 +61,16 @@
                 (+aw--select-window (1+ n))))))
 
 
-;; [winner] Restore old window configurations
+;; [winner] Window-layout undo/redo (stock keys C-c <left>/<right>).
+;; Do not set winner-dont-bind-my-keys t without rebinding — mode would
+;; record history but stay key-dead (audit silent-nop).
 (use-package winner
-  :commands (winner-undo winner-redo)
-  :init
-  (setq winner-dont-bind-my-keys t)
   :hook (after-init . winner-mode)
   :config
   (setq winner-boring-buffers
         '("*Completions*" "*Compile-Log*" "*inferior-lisp*" "*Fuzzy Completions*"
           "*Apropos*" "*Help*" "*cvs*" "*Buffer List*" "*Ibuffer*"
-          "*esh command on file*"))
-  )
+          "*esh command on file*")))
 
 
 ;; [popper] Enforce rules for popup windows like *Help*
