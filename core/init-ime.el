@@ -18,12 +18,9 @@
   :demand t
   :init
   (setq liberime-auto-build t
-        liberime-user-data-dir "~/Library/Rime/")
-  :config
-  ;; Retry after package load: first require may race with auto-build, or run
-  ;; before `load-suffixes' regains the dynamic-module extension.
-  (unless (liberime-workable-p)
-    (liberime-load)))
+        liberime-user-data-dir (if (eq system-type 'darwin)
+                                   "~/Library/Rime/"
+                                 "~/.local/share/fcitx5/rime")))
 
 ;; rimel falls back to echo-area prompt when posframe is missing from load-path.
 (use-package posframe
