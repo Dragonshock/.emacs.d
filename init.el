@@ -37,7 +37,7 @@
                      'init-social
                      'init-gnus
                      'init-elfeed
-                     'init-media
+                     ;; 'init-media
                      'init-test
                      ))
 

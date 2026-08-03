@@ -15,12 +15,24 @@
 
 (use-package liberime
   :straight (liberime :type git :host github :repo "emacs-rime/liberime")
+  :demand t
   :init
   (setq liberime-auto-build t
-        liberime-user-data-dir "~/Library/Rime/"))
+        liberime-user-data-dir "~/Library/Rime/")
+  :config
+  ;; Retry after package load: first require may race with auto-build, or run
+  ;; before `load-suffixes' regains the dynamic-module extension.
+  (unless (liberime-workable-p)
+    (liberime-load)))
+
+;; rimel falls back to echo-area prompt when posframe is missing from load-path.
+(use-package posframe
+  :straight t
+  :demand t)
 
 (use-package rimel
   :straight (rimel :type git :host github :repo "emacs-rime/rimel")
+  :demand t
   :custom-face
   (rimel-candidate-label-face ((t (:inherit font-lock-comment-face :height 0.85))))
   (rimel-page-indicator-face ((t (:inherit font-lock-comment-face :height 0.85))))
@@ -40,7 +52,8 @@
                                    rimel-predicate-org-in-src-block-p
                                    rimel-predicate-org-latex-mode-p
                                    rimel-predicate-tex-math-or-command-p))
-  :bind ("C-SPC" . toggle-input-method))
+  ;; C-\\ is Emacs' stock toggle-input-method binding; keep it explicit.
+  :bind ("C-\\" . toggle-input-method))
 
 (register-input-method "rimel" "Chinese" #'rimel-activate
                        (if (char-displayable-p 12563) (char-to-string 12563) "中")
@@ -49,6 +62,7 @@
 ;; [sis] automatically switch input source
 (use-package sis
   :straight t
+  :demand t
   :hook (;; Enable the inline-english-mode for all buffers.
          ;; When add space after chinese char, automatically switch to english mode
          (after-init . sis-global-inline-mode)
@@ -90,10 +104,7 @@
         (backward-delete-char 1))))
   (setq sis-inline-tighten-tail-rule #'+sis-remove-tail-space-before-cc-punc)
 
-  ;; Context mode
-  (add-hook 'meow-insert-exit-hook #'sis-set-english)
-  (add-to-list 'sis-context-hooks 'meow-insert-enter-hook)
-
+  ;; Context mode (native Emacs keys: no Meow insert-state hooks).
   ;; Ignore some mode with context mode
   (defadvice! +sis-context-guess-ignore-modes (fn &rest args)
     :around #'sis--context-guess
@@ -102,13 +113,15 @@
       (apply fn args)))
 
   (defun +sis-context-switching-other (back-detect fore-detect)
-    (when (and meow-insert-mode
-               (or (and (derived-mode-p 'org-mode 'markdown-ts-mode 'text-mode)
-                        (sis--context-other-p back-detect fore-detect))
-                   (and (derived-mode-p 'telega-chat-mode)
-                        (or (and (= (point) telega-chatbuf--input-marker) ; beginning of input
-                                 (eolp))
-                            (sis--context-other-p back-detect fore-detect)))))
+    "Prefer Chinese (other) in prose/chat buffers when surrounding text suggests it."
+    (when (or (and (derived-mode-p 'org-mode 'markdown-ts-mode 'text-mode)
+                   (sis--context-other-p back-detect fore-detect))
+              (and (derived-mode-p 'telega-chat-mode)
+                   (or (and (boundp 'telega-chatbuf--input-marker)
+                            telega-chatbuf--input-marker
+                            (= (point) telega-chatbuf--input-marker)
+                            (eolp))
+                       (sis--context-other-p back-detect fore-detect))))
       'other))
 
   (add-to-list 'sis-context-detectors #'+sis-context-switching-other)
