@@ -38,6 +38,22 @@
   ;; pangu-spacing-real-insert-separtor defaults to nil (overlay-only) — no setq.
   )
 
+;; [valign] Pixel-perfect visual alignment for Org/Markdown tables (GUI).
+;; Overlays only — does not touch fonts/fontset. Text-based alignment left intact.
+;; Org: org-modern-table is disabled in init-org.el so table display is not
+;; contested; other org-modern prettifications stay enabled.
+(use-package valign
+  :straight t
+  :hook ((org-mode . valign-mode)
+         (markdown-ts-mode . valign-mode)
+         ;; classic markdown-mode if ever used without treesit remap
+         (markdown-mode . valign-mode))
+  :config
+  ;; Thinner visual bars on org/markdown pipe tables.
+  (setq valign-fancy-bar t)
+  ;; Keep default valign-max-table-size (4000 chars); large tables are laggy.
+  )
+
 (use-package markdown-ts-mode
   :straight (:type built-in)
   :mode (("\\.md\\'" . markdown-ts-mode)

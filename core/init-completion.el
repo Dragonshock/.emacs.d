@@ -144,12 +144,14 @@
 
 (use-package consult
   :straight t
-  :bind (([remap bookmark-jump]                 . consult-bookmark)           ; C-x r b
+  ;; Remaps kept as-is (dakra-equivalent entry points).  Extra binds follow
+  ;; dakra/dmacs + consult README.  C-c h left to hs (init-tools); history via
+  ;; M-r in minibuffer and the C-c / M-s keys below where free.
+  :bind (;; ── existing remaps (do not remove) ──
+         ([remap bookmark-jump]                 . consult-bookmark)           ; C-x r b
          ([remap list-registers]                . consult-register)
-         ([remap goto-line]                     . consult-goto-line)          ; M-g g
+         ([remap goto-line]                     . consult-goto-line)          ; M-g g / M-g M-g
          ([remap imenu]                         . consult-imenu)
-         ("M-s i"                               . consult-imenu)
-         ("M-s I"                               . consult-imenu-multi)
          ([remap locate]                        . consult-locate)
          ([remap load-theme]                    . consult-theme)
          ([remap man]                           . consult-man)
@@ -158,11 +160,48 @@
          ([remap switch-to-buffer-other-window] . consult-buffer-other-window); C-x 4 b
          ([remap switch-to-buffer-other-frame]  . consult-buffer-other-frame) ; C-x 5 b
          ([remap yank-pop]                      . consult-yank-pop)           ; M-y
-         ("M-s l"                               . consult-line)
-         ("M-s r"                               . consult-ripgrep)
-         ("M-s d"                               . consult-fd)
+         ;; ── C-c (mode-specific); skip C-c h — hs uses C-c h TAB / ` ──
+         ("C-c M" . consult-mode-command)
+         ("C-c k" . consult-kmacro)
+         ;; ── C-x ──
+         ("C-x M-:" . consult-complex-command)
+         ;; ── registers (dakra) ──
+         ("M-#"   . consult-register-load)
+         ("M-'"   . consult-register-store)
+         ("C-M-#" . consult-register)
+         ;; ── misc ──
+         ("<help> a" . consult-apropos)
+         ;; ── M-g (goto-map); goto-line already via remap ──
+         ("M-g e" . consult-compile-error)
+         ("M-g o" . consult-outline)
+         ("M-g m" . consult-mark)
+         ("M-g k" . consult-global-mark)
+         ;; M-i kept for minuet (init-prog); imenu via remap + M-g i / M-s i
+         ("M-g i" . consult-imenu)
+         ("M-g I" . consult-imenu-multi)
+         ;; ── M-s (search-map) ──
+         ("M-s d" . consult-find)          ; dakra uses consult-find; keep fd
+         ("M-s D" . consult-locate)
+         ("M-s g" . consult-grep)
+         ("M-s G" . consult-git-grep)
+         ("M-s r" . consult-ripgrep)
+         ("M-s l" . consult-line)
+         ("M-s L" . consult-line-multi)
+         ("M-s m" . consult-multi-occur)
+         ("M-s k" . consult-keep-lines)
+         ("M-s u" . consult-focus-lines)
+         ("M-s i" . consult-imenu)
+         ("M-s I" . consult-imenu-multi)
+         ("M-s e" . consult-isearch-history)
+         ;; ── global search primary (dakra) ──
+         ("C-s" . consult-line)
+         :map isearch-mode-map
+         ("M-e"   . consult-isearch-history)
+         ("M-s e" . consult-isearch-history)
+         ("M-s l" . consult-line)
+         ("M-s L" . consult-line-multi)
          :map minibuffer-mode-map
-         ("M-r"                                 . consult-history))
+         ("M-r" . consult-history))
   ;; Register/xref UI must be wired before first use; :config is too late under
   ;; always-defer (stock register-preview / xref UI until consult loads).
   :init

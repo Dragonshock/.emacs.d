@@ -130,7 +130,9 @@ Shared by maximize and true fullscreen (macOS often uses `fullboth', not
           "\\*Graphviz Preview: .*\\*"
 
           gptel-mode
-          ghostel-mode
+          ;; ghostel-mode intentionally omitted: dakra opens terminals via
+          ;; same-window (display-buffer--same-window-action); Popper bottom
+          ;; half-splits fight that.  Use C-x m / C-x p m without popup wrap.
 
           (lambda (buffer)
             (with-current-buffer buffer

@@ -1,8 +1,10 @@
 ;;; -*- lexical-binding: t -*-
-;;; init-agent-shell.el --- Grok Build + Claude Code via agent-shell (ACP) -*- lexical-binding: t; -*-
+;;; init-agent-shell.el --- Grok Build + Claude Code + Pi via agent-shell (ACP) -*- lexical-binding: t; -*-
 
-;; Dual ACP agents in agent-shell, aimed at a Zed-like Agent panel:
-;; pick Grok Build or Claude Code, side panel chat, model/mode in-session.
+;; Triple ACP agents in agent-shell (Grok Build, Claude Code, Pi).
+;; UX aligned with agent-shell author (viewport-first) + package same-window
+;; display (applied 2026-08-03: V1 D1a V3 V4 from
+;; dev-docs/notes/agent-shell-ux-align-recommendations-2026-08-02.md).
 ;;
 ;; Grok uses the OFFICIAL agent-shell-xai.el (upstream PR #720) — process
 ;; contract, welcome screen and auth all come from the package:
@@ -11,6 +13,9 @@
 ;;            written by `grok login'; no API key involved)
 ;; Claude:  claude-agent-acp (npm: @agentclientprotocol/claude-agent-acp)
 ;;          — not the bare `claude' CLI; that is only for `claude login'.
+;; Pi:      pi-acp adapter (npm: pi-acp) → spawns `pi --mode rpc'
+;;          — agent-shell never talks to bare `pi' over ACP; see
+;;          dev-docs/notes/how-agent-shell-works-with-pi-2026-08-02.md
 ;;
 ;; Grok model: ACP IDs like "grok-4.5" via `agent-shell-xai-default-model-id'.
 ;; Zed's default_model "grok-build" is NOT a valid Grok ACP model id.
@@ -20,14 +25,18 @@
 ;;
 ;; Keys (agent-shell DWIM):
 ;;   C-c C-g          start or reuse a shell; picker when creating a NEW one
-;;   C-u C-c C-g      force a new shell (picker: Grok / Claude) — open 2nd agent
+;;   C-u C-c C-g      force a new shell (picker: Grok / Claude / Pi)
 ;;   C-u C-u C-c C-g  pick among existing shells
+;;   C-c C-;          compose a multi-line prompt (agent-shell-prompt-compose)
 ;;   C-c C-v          set session model (when advertised)
 ;;   C-c C-m          set session mode
 ;;   C-c C-t          set thought level (when advertised)
 ;;   C-<tab>          cycle session mode
+;;   C-c C-o          switch viewport ↔ shell buffer
+;;   Viewport view:   y / c / m / r (and ? for help)
 ;;   M-x +agent-shell-start-grok    always new Grok
 ;;   M-x +agent-shell-start-claude  always new Claude
+;;   M-x +agent-shell-start-pi      always new Pi
 ;;
 ;; Preferred agent: (preselect . grok-build) — still shows the picker with
 ;; Grok first (grok-build is the official config's :identifier).  Never use
@@ -38,6 +47,7 @@
 ;;   - Grok: ~/.grok/bin/grok + `grok login'
 ;;   - Claude: `npm i -g @agentclientprotocol/claude-agent-acp'
 ;;             + `claude login' (or existing subscription login)
+;;   - Pi: `pi` + `pi-acp` on PATH (Homebrew/npm); absolute paths set below
 
 (eval-when-compile
   (require 'cl-lib))
@@ -50,12 +60,21 @@
 Same binary as `+telega-grok-bin' (init-social.el) uses for unread
 summaries.")
 
+(defconst +agent-shell-pi-acp-bin
+  "/opt/homebrew/bin/pi-acp"
+  "Absolute path to the pi-acp ACP adapter (not bare `pi').")
+
+(defconst +agent-shell-pi-bin
+  "/opt/homebrew/bin/pi"
+  "Absolute path to the pi coding-agent CLI.
+Passed to pi-acp as PI_ACP_PI_COMMAND so the adapter does not rely on PATH.")
+
 (defconst +agent-shell-bin-dirs
   (list (file-name-directory +agent-shell-grok-bin)
         (expand-file-name "~/.local/bin")
         "/opt/homebrew/bin"
         "/usr/local/bin")
-  "Directories that may hold ACP agent CLIs (grok, claude-agent-acp).
+  "Directories that may hold ACP agent CLIs (grok, claude-agent-acp, pi-acp, pi).
 
 GUI and daemon Emacs often lack npm global bins; keep Homebrew and
 ~/.local/bin here.  If `npm prefix -g` is elsewhere, add \"PREFIX/bin\".")
@@ -96,6 +115,26 @@ for subscription/login auth."
   (agent-shell--dwim :config (agent-shell-anthropic-make-claude-code-config)
                      :new-shell t))
 
+(defun +agent-shell-start-pi ()
+  "Start a new interactive Pi coding agent shell (via pi-acp).
+
+agent-shell speaks ACP to `pi-acp'; pi-acp spawns `pi --mode rpc'.
+Requires both binaries (see `+agent-shell-pi-acp-bin' and
+`+agent-shell-pi-bin').  Use Pi's /login inside the shell if needed."
+  (interactive)
+  (require 'agent-shell)
+  (require 'agent-shell-pi)
+  (+agent-shell-ensure-path)
+  (unless (file-executable-p +agent-shell-pi-acp-bin)
+    (user-error
+     "Cannot find pi-acp at %s. Install: npm i -g pi-acp" +agent-shell-pi-acp-bin))
+  (unless (file-executable-p +agent-shell-pi-bin)
+    (user-error
+     "Cannot find pi at %s. Install: npm i -g @earendil-works/pi-coding-agent"
+     +agent-shell-pi-bin))
+  (agent-shell--dwim :config (agent-shell-pi-make-agent-config)
+                     :new-shell t))
+
 ;;; Package setup
 
 (use-package agent-shell
@@ -103,12 +142,17 @@ for subscription/login auth."
   ;; Autoload only library entry points; +agent-shell-start-* are defined
   ;; in this file when init loads it (do not map them to the agent-shell feature).
   :commands (agent-shell agent-shell-anthropic-start-claude-code
-                         agent-shell-xai-start-grok)
-  :bind (("C-c C-g" . agent-shell))
+                         agent-shell-xai-start-grok
+                         agent-shell-pi-start-agent
+                         agent-shell-prompt-compose)
+  :bind (("C-c C-g" . agent-shell)
+         ;; V3: multi-line compose (works with or without prefer-viewport).
+         ("C-c C-;" . agent-shell-prompt-compose))
   :config
   (+agent-shell-ensure-path)
   ;; Official Grok Build support (agent-shell-xai.el, upstream PR #720).
   (require 'agent-shell-xai)
+  (require 'agent-shell-pi)
 
   ;; Absolute CLI path (do not depend on PATH alone), preferred model, and
   ;; inherited environment — the official client passes this list verbatim,
@@ -118,19 +162,28 @@ for subscription/login auth."
         agent-shell-xai-environment
         (agent-shell-make-environment-variables :inherit-env t))
 
-  ;; Dual base: Grok Build (official config) + Claude Code (claude-agent-acp).
+  ;; Pi: ACP adapter + pin pi binary for the adapter (daemon-safe).
+  (setq agent-shell-pi-acp-command (list +agent-shell-pi-acp-bin)
+        agent-shell-pi-environment
+        (agent-shell-make-environment-variables
+         "PI_ACP_PI_COMMAND" +agent-shell-pi-bin
+         :inherit-env t))
+
+  ;; Triple base: Grok Build + Claude Code + Pi (pi-acp).
   ;; preselect grok-build: picker still shown on NEW shell; Grok first.
   (setq agent-shell-agent-configs
         (list #'agent-shell-xai-make-grok-config
-              #'agent-shell-anthropic-make-claude-code-config)
+              #'agent-shell-anthropic-make-claude-code-config
+              #'agent-shell-pi-make-agent-config)
         agent-shell-preferred-agent-config '(preselect . grok-build)
         ;; Agents own native MCP/plugins; editor-forwarded MCP is opt-in later.
         agent-shell-mcp-servers nil
-        agent-shell-display-action
-        '((display-buffer-reuse-window display-buffer-in-direction)
-          (direction . right)
-          (window-width . 0.42)
-          (reusable-frames . visible)))
+        ;; V1: author primary interaction (view latest turn + compose + y/c/m/r).
+        agent-shell-prefer-viewport-interaction t
+        ;; V4: expand tool-use fragments by default (thought stays folded).
+        agent-shell-tool-use-expand-by-default t
+        ;; D1a: package/author default — same-window (was right 0.42 Zed-style).
+        agent-shell-display-action '(display-buffer-same-window))
 
   ;; Only agent-shell defcustom with a :set setter (validates the value);
   ;; use setopt so it runs — agent-shell is loaded here, so the setter exists.
@@ -156,6 +209,13 @@ for subscription/login auth."
 
   (unless (executable-find "claude-agent-acp")
     (warn "Cannot find claude-agent-acp. Install: npm i -g @agentclientprotocol/claude-agent-acp (then `claude login')."))
+
+  (unless (file-executable-p +agent-shell-pi-acp-bin)
+    (warn "Cannot find pi-acp at %s. Install: npm i -g pi-acp" +agent-shell-pi-acp-bin))
+
+  (unless (file-executable-p +agent-shell-pi-bin)
+    (warn "Cannot find pi at %s. Install: npm i -g @earendil-works/pi-coding-agent"
+          +agent-shell-pi-bin))
 
   ;; Avoid zoom thrashing the agent window (same idea as former grok-ide).
   (with-eval-after-load 'zoom

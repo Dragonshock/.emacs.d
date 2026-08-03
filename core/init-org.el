@@ -120,7 +120,11 @@
   :straight t
   :after org
   :hook ((org-mode . org-modern-mode)
-         (org-agenda-finalize . org-modern-agenda)))
+         (org-agenda-finalize . org-modern-agenda))
+  :custom
+  ;; Tables: leave pixel alignment to valign (init-writing.el).
+  ;; org-modern table display props conflict with valign overlays.
+  (org-modern-table nil))
 
 (use-package org-modern-indent
   :straight (org-modern-indent :type git :host github :repo "jdtsmith/org-modern-indent")

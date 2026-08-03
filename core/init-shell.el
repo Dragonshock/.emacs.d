@@ -42,52 +42,60 @@
    )
 
 
+  (defun +ghostel-toggle-project ()
+    "Toggle the current project's Ghostel terminal window.
+Uses stock `ghostel-project' buffer identity (no Ghostel-popup rename)."
+    (require 'ghostel)
+    (let* ((root (project-root (project-current t)))
+           (identity (ghostel--project-buffer-name root))
+           (buf (ghostel--find-buffer-by-identity identity))
+           (win (and buf (get-buffer-window buf))))
+      (cond
+       ((and win (eq (selected-window) win))
+        (ignore-errors (delete-window win)))
+       (win (select-window win))
+       (t (ghostel-project)))))
+
   (defun +eshell-toggle (&optional arg)
-    "Toggle a persistent Eshell popup window for the current project or directory.
-If the popup is visible but unselected, select it.
-If the popup is focused, kill it.
-If no project is found, create a temporary Eshell instance in the current directory."
+    "Toggle a persistent Eshell popup, or with ARG a project Ghostel terminal.
+If the target window is visible but unselected, select it.
+If it is focused, delete the window.
+Plain call: Eshell popup for the current project/directory.
+Prefix ARG: `ghostel-project' (stock buffer name / display, dakra-aligned)."
     (interactive "P")
     (require 'eshell)
-    (require 'project)  ;; Ensure we load project.el
-    (let* ((project (project-current)) ;; Get the current project
-           (dir-name (directory-file-name default-directory))
-           (root-name (if project
-                          (file-name-nondirectory (directory-file-name (project-root project))) ;; Use project name
-                        (file-name-nondirectory dir-name))) ;; Use current directory name if no project
-           (popup-buffer-name (format "%s-popup: %s" (if arg "Ghostel" "Eshell") root-name))
-           (win (get-buffer-window popup-buffer-name)))
-
-      ;; If an argument is provided, you can add some custom behavior, like opening a GPT prompt.
-      ;; If Eshell window exists, either focus or kill it.
-      (if win
-          (if (eq (selected-window) win)
-              (ignore-errors (delete-window win)) ;; Close window if already focused
-            (select-window win)) ;; Focus the Eshell window if it exists but not selected
-        ;; If no Eshell window, create one.
-        ;; `display-comint-buffer-action' was removed in Emacs 31 (obsolete
-        ;; since 30.1): letting it bound silently did nothing there.  Match
-        ;; the `(category . comint)' action eshell passes instead (Emacs 30+).
-        (let ((display-buffer-alist
-               (cons '((category . comint)
-                       (display-buffer-at-bottom)
-                       (inhibit-same-window . nil))
-                     display-buffer-alist)))
-          (if arg
-              (with-current-buffer (ghostel-project)
-                ;; display current buffer
-                (display-buffer (current-buffer)))
-            ;; Open a eshell
-            (let ((eshell-buffer-name popup-buffer-name))
-              (with-current-buffer (eshell)
-                (unless (string= dir-name (directory-file-name default-directory))
-                  (eshell/cd dir-name)
-                  (eshell-send-input))
-                ;; Add a hook to close the window when Eshell exits
-                (add-hook 'eshell-exit-hook
-                          (lambda ()
-                            (ignore-errors (delete-window (get-buffer-window popup-buffer-name))))
-                          nil t))))))))
+    (require 'project)
+    (if arg
+        (+ghostel-toggle-project)
+      (let* ((project (project-current))
+             (dir-name (directory-file-name default-directory))
+             (root-name (if project
+                            (file-name-nondirectory
+                             (directory-file-name (project-root project)))
+                          (file-name-nondirectory dir-name)))
+             (popup-buffer-name (format "Eshell-popup: %s" root-name))
+             (win (get-buffer-window popup-buffer-name)))
+        (if win
+            (if (eq (selected-window) win)
+                (ignore-errors (delete-window win))
+              (select-window win))
+          ;; `display-comint-buffer-action' was removed in Emacs 31 (obsolete
+          ;; since 30.1).  Match the `(category . comint)' action eshell uses.
+          (let ((display-buffer-alist
+                 (cons '((category . comint)
+                         (display-buffer-at-bottom)
+                         (inhibit-same-window . nil))
+                       display-buffer-alist))
+                (eshell-buffer-name popup-buffer-name))
+            (with-current-buffer (eshell)
+              (unless (string= dir-name (directory-file-name default-directory))
+                (eshell/cd dir-name)
+                (eshell-send-input))
+              (add-hook 'eshell-exit-hook
+                        (lambda ()
+                          (ignore-errors
+                            (delete-window (get-buffer-window popup-buffer-name))))
+                        nil t)))))))
 
   (defun +eshell/define-alias ()
     "Define alias for eshell.

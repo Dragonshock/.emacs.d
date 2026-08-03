@@ -8,7 +8,7 @@
  ;; [Selected-window] — must be default/global (plain setq is buffer-local here).
  ;; Font compacting can be terribly expensive, but may increase memory use
  inhibit-compacting-font-caches t)
- ;; highlight-nonselected-windows stock default is already nil — do not setq.
+;; highlight-nonselected-windows stock default is already nil — do not setq.
 
 (setq-default cursor-in-non-selected-windows nil)
 
@@ -97,7 +97,7 @@
 
 
 ;; Font: Same width and height for emoji, chinese and english characters
-(defvar +font-size (if (eq system-type 'darwin) 16 26))
+(defvar +font-size (if (eq system-type 'darwin) 14 26))
 
 (defun +apply-default-frame-geometry-h (&optional frame force)
   "Re-apply 120x50 and center geometry for FRAME once after font setup.
@@ -116,13 +116,13 @@ does not clobber maximized/custom sizes.  FORCE non-nil re-applies."
   (defun +setup-fonts ()
     "Setup fonts."
     (when (display-graphic-p)
-      (set-face-attribute 'default nil :font (font-spec :family "Sarasa Mono SC" :size +font-size))
-      (set-face-font 'fixed-pitch "Sarasa Mono SC")
-      (set-face-font 'fixed-pitch-serif "Sarasa Mono Slab SC")
+      (set-face-attribute 'default nil :font (font-spec :family "TX-02" :size +font-size))
+      (set-face-font 'fixed-pitch "TX-02")
+      (set-face-font 'fixed-pitch-serif "TX-02") ; Sarasa Mono Slab SC
       (set-face-font 'variable-pitch "Sarasa UI SC")
 
       (dolist (charset '(han cjk-misc))
-        (set-fontset-font t charset (font-spec :family "Sarasa Mono SC")))
+        (set-fontset-font t charset (font-spec :family "LXGW WenKai Mono"))) ; Sarasa Mono SC
 
       ;; Emoji script (Emacs 28+ NEWS); 'prepend so color emoji wins composition.
       ;; Do not bind color-emoji fonts to broad 'unicode — that can miss script

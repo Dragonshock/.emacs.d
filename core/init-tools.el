@@ -132,17 +132,22 @@ Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
 
 ;; [project] Project manager
 (use-package project
+  ;; Ghostel takes C-x p m/M (dakra README). Magit uses v (VCS).
   :bind (:map project-prefix-map
-              ("m" . magit-status))
+              ("v" . magit-status))
   :config
   ;; Third element is the dispatch KEY (required for a working switch menu).
+  ;; Ghostel lives here (not only init-ghostel add-to-list): this setq would
+  ;; otherwise clobber after-load additions from earlier modules.
   (setq project-switch-commands '((project-find-file "File" ?f)
                                   (project-find-regexp "Regexp" ?g)
                                   (project-switch-to-buffer "Buffer" ?b)
                                   (project-dired "Dired" ?d)
                                   (project-eshell "Eshell" ?e)
                                   (project-search "Search" ?s)
-                                  (magit-status "Magit" ?m)))
+                                  (ghostel-project "Ghostel" ?m)
+                                  (ghostel-project-list-buffers "Ghostel buffers" ?M)
+                                  (magit-status "Magit" ?v)))
 
   )
 

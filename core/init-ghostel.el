@@ -13,9 +13,6 @@
 ;;   increases redraw work and often freezes Emacs under high-throughput TUIs.
 ;; - Prefer native PTY (default) for local shells; TRAMP always uses Emacs
 ;;   process filters and can block the UI on large remote output.
-;; - Do not enable ghostel-comint-global-mode if you use agent-shell
-;;   (shell-maker is comint-derived; double-filtering hurts streaming).
-
 ;;; Code:
 
 ;; ── Ghostel 主配置 ──────────────────────────────────────────
@@ -28,23 +25,24 @@
 ;; 若 Elisp 要求的最低版本高于 sidecar（ghostel-module.version），
 ;; 会按 `ghostel-module-auto-install' 策略重装。
 ;; 唯一模块目录: var/ghostel/（no-littering）。勿使用 ~/.emacs.d/ghostel/ 残留。
+;;
+;; Keybinds follow dakra README Quick Start (project map m/M; magit uses
+;; C-x p v — see init-tools).
 
 (use-package ghostel
   :straight t
-  ;; ── 全局快捷键 ──
-  ;; C-x p m = magit-status（init-tools）。Ghostel 用 C-x m 与 project map 的 t/T，
-  ;; 勿再绑 "m"（会被 magit 覆盖，且 switch 菜单无 dispatch KEY）。
   :bind (("C-x m" . ghostel)
          :map ghostel-semi-char-mode-map
-         ;; Keep C-g for Emacs quit (roife); otherwise it may go to the shell.
-         ("C-g"  . keyboard-quit)
+         ("C-s" . consult-line)
+         ;; README mentions ghostel-backward-kill-word, but that command is
+         ;; not in the package; semi-char already sends M-<backspace> to PTY.
          ("C-k"  . +ghostel-send-C-k-and-kill)
          ;; Eshell-style history: M-p/n → C-p/n for the shell.
          ("M-p" . (lambda () (interactive) (ghostel-send-key "p" "ctrl")))
          ("M-n" . (lambda () (interactive) (ghostel-send-key "n" "ctrl")))
          :map project-prefix-map
-         ("t" . ghostel-project)               ; project terminal
-         ("T" . ghostel-project-list-buffers)) ; project ghostel buffers
+         ("m" . ghostel-project)
+         ("M" . ghostel-project-list-buffers))
 
   :init
   ;; ── 原生模块 ──
@@ -64,23 +62,8 @@
     (ghostel-send-key "k" "ctrl"))
 
   :config
-  ;; ── 项目切换命令注册（第三元为 dispatch KEY，与 C-x p t/T 对齐） ──
-  (with-eval-after-load 'project
-    (add-to-list 'project-switch-commands
-                 '(ghostel-project "Ghostel" ?t) t)
-    (add-to-list 'project-switch-commands
-                 '(ghostel-project-list-buffers "Ghostel buffers" ?T) t))
-
-  ;; Name project terminals as popper-friendly buffers (used by +eshell-toggle C-u).
-  (defadvice! +ghostel-project-popup-buffer-name (_orig root)
-    :around #'ghostel--project-buffer-name
-    "Name `ghostel-project' buffers as Popper popup buffers for ROOT."
-    (let* ((project-name (file-name-nondirectory
-                          (directory-file-name root)))
-           (remote (file-remote-p root))
-           (remote-suffix (when remote
-                            (format "@%s" (string-trim remote "/" ":")))))
-      (format "Ghostel-popup: %s%s" project-name (or remote-suffix ""))))
+  ;; project-switch-commands (?m / ?M) live in init-tools so the project
+  ;; setq does not clobber them (init-ghostel loads before init-tools).
 
   ;; ── 渲染：保持上游默认 ──
   ;; ghostel-timer-delay 默认 0.033（~30fps）。不要降到 0.016：
@@ -116,27 +99,18 @@
         ghostel-ssh-install-terminfo 'auto)
   )
 
-;; ── Ghostel Compile（默认关闭全局劫持） ─────────────────────
-;;
-;; 全局开启后，所有 compile / recompile / project-compile 走 ghostel，
-;; 大构建日志会放大 redraw 压力。按需手动:
-;;   M-x ghostel-compile
-;;   M-x ghostel-compile-global-mode
-;;
-;; (use-package ghostel-compile
-;;   :straight nil
-;;   :hook (after-init . ghostel-compile-global-mode))
+;; ── Ghostel Compile（对齐上游 README：全局开启） ────────────
+;; 大构建日志会放大 redraw 压力；若卡顿可改回手动 M-x ghostel-compile。
+(use-package ghostel-compile
+  :straight nil
+  :hook (after-init . ghostel-compile-global-mode))
 
-;; ── Ghostel Comint（默认关闭全局劫持） ──────────────────────
-;;
-;; 全局开启会挂到每一个 comint 派生 buffer（含未来 agent-shell /
-;; shell-maker），与 agent 流式输出叠滤容易卡顿或显示错乱。
-;; 若只要 shell/python REPL 的真彩色，可按 mode hook 局部开启:
-;;   (add-hook 'shell-mode-hook #'ghostel-comint-mode)
-;;
-;; (use-package ghostel-comint
-;;   :straight nil
-;;   :hook (after-init . ghostel-comint-global-mode))
+;; ── Ghostel Comint（对齐上游 README：全局开启） ─────────────
+;; shell-maker / agent-shell 亦为 comint 派生；若叠滤卡顿，可关掉
+;; global 并只在 shell-mode-hook 局部开 ghostel-comint-mode。
+(use-package ghostel-comint
+  :straight nil
+  :hook (after-init . ghostel-comint-global-mode))
 
 ;; ── Ghostel Eshell：视觉命令转到 Ghostel ────────────────────
 (use-package ghostel-eshell
@@ -152,10 +126,11 @@
 ;;   C-c C-l  → line
 ;;   M-RET    → char → 回到 semi-char
 ;;
-;; semi-char 保留给 Emacs: C-c C-x C-u C-h M-x M-: C-\ （及本配置的 C-g）
+;; semi-char 保留给 Emacs: C-c C-x C-u C-h M-x M-: C-\
 ;;   C-c C-c  SIGINT · C-c C-z SIGTSTP · C-c C-d EOF
 ;;   C-c M-w  复制全部 scrollback · C-y bracketed paste
 ;;   C-c C-n/p  超链接 · C-c M-n/p  提示符导航（进 emacs mode）
+;;   C-s consult-line（README）· M-<backspace> 默认进 PTY（README 函数名未实现）
 
 (provide 'init-ghostel)
 

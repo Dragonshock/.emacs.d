@@ -20,14 +20,22 @@
    dired-free-space nil
    )
 
-  ;; Emacs 30.1+: insert-directory-program defaults to "gls" when present on
-  ;; darwin — do not setq it.  Only suppress --dired when BSD ls is all we have.
-  (when (and (eq system-type 'darwin) (not (executable-find "gls")))
-    (setq dired-use-ls-dired nil))
-
-  (when (or (not (eq system-type 'darwin)) (executable-find "gls"))
-    ;; ls-lisp-use-insert-directory-program stock default is already t off Win/Android.
-    (setq dired-listing-switches "-alh --group-directories-first"))
+  ;; Emacs 30.1+ stock `insert-directory-program' is computed via
+  ;; custom-initialize-delay *before* site-start.  On emacs-plus GUI
+  ;; launches, EMACS_PLUS_PATH is injected only in site-start, so the
+  ;; stock default often freezes as "ls" even when gls exists.  Re-bind
+  ;; here (user init runs after site-start).  Use an absolute path so
+  ;; later PATH changes cannot reintroduce BSD ls.
+  (cond
+   ((and (eq system-type 'darwin) (executable-find "gls"))
+    (setq insert-directory-program (executable-find "gls")
+          dired-listing-switches "-alh --group-directories-first"))
+   ((eq system-type 'darwin)
+    ;; BSD ls only: no GNU long options, no --dired.
+    (setq dired-use-ls-dired nil
+          dired-listing-switches "-alh"))
+   (t
+    (setq dired-listing-switches "-alh --group-directories-first")))
   )
 
 ;; [dired-git-info] Show git info in dired
