@@ -43,17 +43,17 @@
   "Get window number for current window, as set by `ace-window'."
   (let ((path (window-parameter (selected-window) 'ace-window-path)))
     (when (and path (not (string-empty-p path)))
-      (concat " " path " "))))
+      (concat " " path))))
 
 (defsubst +mode-line-macro-indicator ()
   "Display current Emacs macro being recorded."
-  (cond (defining-kbd-macro " MacroDef ")
-        (executing-kbd-macro " MacroExc ")))
+  (cond (defining-kbd-macro " MacroDef")
+        (executing-kbd-macro " MacroExc")))
 
 (defsubst +mode-line-overwrite-readonly-indicator ()
   "Display whether it is in overwrite mode or read-only buffer."
-  (let ((ro (when buffer-read-only "%% "))
-        (ov (when overwrite-mode "# ")))
+  (let ((ro (when buffer-read-only " %%"))
+        (ov (when overwrite-mode " #")))
     (concat ro ov)))
 
 (defsubst +mode-line-symbol-overlay-indicator ()
@@ -68,8 +68,8 @@
       (if (symbol-overlay-assoc symbol)
           (concat  " " (number-to-string (1+ count))
                    "/" (number-to-string (+ count (length after)))
-                   " sym "
-                   (and (cadr keyword) "in scope "))))))
+                   " sym"
+                   (and (cadr keyword) " in scope"))))))
 
 
 ;;; Cache remote host name
@@ -112,31 +112,52 @@
 (advice-add #'rename-buffer :after #'+mode-line-update-project-crumb)
 (advice-add #'set-visited-file-name :after #'+mode-line-update-project-crumb)
 (advice-add #'pop-to-buffer :after #'+mode-line-update-project-crumb)
-;; Do not advice popup-create/delete: popup.el (auto-complete era) is not
-;; installed; nadvice would only park pending advice on undefined symbols.
+(advice-add #'popup-create :after #'+mode-line-update-project-crumb)
+(advice-add #'popup-delete :after #'+mode-line-update-project-crumb)
+
+;;; Cache envrc status
+(defvar-local +mode-line-envrc nil)
+(defun +mode-line-update-envrc (&optional buffer)
+  "Cache envrc status for BUFFER."
+  (setq buffer (or buffer (current-buffer)))
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (setq +mode-line-envrc
+            (pcase (and (bound-and-true-p envrc-mode)
+                        envrc--status)
+              ('on t)
+              ('error 'error)
+              (_ nil)))))
+  (force-mode-line-update t))
+(defun +mode-line-envrc-after-apply (buffer _result)
+  "Update the cached envrc status after applying BUFFER's environment."
+  (+mode-line-update-envrc buffer))
+(add-hook 'envrc-mode-hook #'+mode-line-update-envrc)
+(advice-add #'envrc--apply :after #'+mode-line-envrc-after-apply)
+
 
 (defsubst +mode-line-normal ()
   "Formatting active-long mode-line."
   (let* ((meta-face (+mode-line-get-window-name-face))
          (active-p (mode-line-window-selected-p))
          (panel-face `(:inherit ,meta-face :inverse-video ,active-p)))
-    `((:propertize ,(+mode-line-get-window-name)
+    `((:propertize ,(+mode-line-get-window-name) face ,panel-face)
+      (:propertize ,(+mode-line-overwrite-readonly-indicator) face ,panel-face)
+      (:propertize ,(pcase +mode-line-envrc
+                      ('error " ⎇[error]")
+                      (_ (when +mode-line-envrc " ⎇")))
                    face ,panel-face)
-      (:propertize ,(+mode-line-overwrite-readonly-indicator)
-                   face ,panel-face)
+      (:propertize mode-line-process face ,panel-face)
       (,active-p (:propertize
                   ,(concat (+mode-line-macro-indicator)
                            (+mode-line-symbol-overlay-indicator))
                   face ,panel-face))
+      (:propertize " " face ,panel-face)
       " "
       ,(or +mode-line-project-crumb
            `(:propertize "%b" face ,meta-face))
       " "
-      ;; Guard: breadcrumb-imenu-crumbs throws args-out-of-range in
-      ;; special buffers (agent-shell, comint, etc.) during redisplay.
-      (:eval (when (or buffer-file-name
-                       (derived-mode-p 'prog-mode 'text-mode 'org-mode 'conf-mode))
-               (ignore-errors (breadcrumb-imenu-crumbs))))
+      (:eval (breadcrumb-imenu-crumbs))
       (:propertize +mode-line-remote-host-name
                    face +mode-line-host-name-active-face)
       " "
@@ -179,16 +200,16 @@
         '(tab-bar-tab-name-format-hints
           tab-bar-tab-name-format-truncated
           (lambda (name &rest _) (concat " " name " "))
-          tab-bar-tab-name-format-face
-          ;; Emacs 30.1+/31: hover face (default list includes this after face).
-          tab-bar-tab-name-format-mouse-face))
+          tab-bar-tab-name-format-face))
 
   (defvar +tab-bar-gnus-indicator-cache nil)
   (defvar +tab-bar-telega-indicator-cache nil)
   (defvar +tab-bar-elfeed-indicator-cache nil)
+  (defvar +tab-bar-emms-indicator-cache nil)
 
   (setq tab-bar-format '((lambda () +tab-bar-telega-indicator-cache)
                          (lambda () +tab-bar-elfeed-indicator-cache)
+                         (lambda () +tab-bar-emms-indicator-cache)
                          (lambda () +tab-bar-gnus-indicator-cache)
                          tab-bar-format-tabs))
 
@@ -259,6 +280,23 @@
                                                         'face 'font-lock-keyword-face)
                                  elfeed))))))
         (force-mode-line-update t))))
+
+  (with-eval-after-load 'emms
+    (defun +tab-bar-emms-indicator-update (&rest _)
+      "Update the cached EMMS track indicator in the tab bar."
+      (setq +tab-bar-emms-indicator-cache
+            (when (and (bound-and-true-p emms-player-playing-p))
+              (let ((text (propertize (concat " " (if emms-player-paused-p "Ⅱ" "♫") " ")
+                                      'face 'font-lock-keyword-face)))
+                `((tab-bar-emms menu-item ,text emms-playlist-mode-go)))))
+      (force-mode-line-update t))
+
+    (dolist (hook '(emms-player-started-hook
+                    emms-player-paused-hook
+                    emms-player-stopped-hook
+                    emms-player-finished-hook))
+      (add-hook hook #'+tab-bar-emms-indicator-update t))
+    (+tab-bar-emms-indicator-update))
 
   ;; WORKAROUND: fresh tab-bar for daemon
   (add-hook! (server-after-make-frame-hook window-setup-hook) :call-immediately

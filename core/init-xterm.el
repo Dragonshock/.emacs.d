@@ -12,6 +12,9 @@
                         'truncation
                         (make-glyph-code ?… 'shadow))
 
+;; Disable auto-composition in terminal.
+(setq-default auto-composition-mode "xterm-256color")
+
 
 ;; [Kitty Graphics Protocol] Implements support for Kitty's "graphics protocol",
 ;; which allows the terminal to display images and videos inline.
@@ -19,7 +22,7 @@
   :straight (:type git :host github :repo "cashmeredev/kitty-graphics.el")
   :hook (tty-setup . kitty-graphics-setup)
   :init
-  (setq kitty-graphics-enable-video t))
+  (setq kitty-gfx-enable-video t))
 
 
 ;; [Kitty Keyboard Protocol] Implements support for Kitty's "keyboard protocol",
@@ -34,23 +37,15 @@
   :hook (tty-setup . global-kkp-mode))
 
 
-;; []
+;; [xterm]
 (use-package term/xterm
   :straight nil
   ;; Emacs 31 enables `xterm-mouse-mode' on compatible terminals by default.
   ;; A bare mode symbol on `tty-setup' would toggle it off after enable.
   :init
-  ;; Trust boundary: hardcoding OSC-52 clipboard ops bypasses xterm's
-  ;; 'check probe. Keep modifyOtherKeys + reportBackground (theme/keys).
-  ;; Drop getSelection (clipboard read — not auto-enabled in Emacs 31 check
-  ;; path for security/timeout reasons). Keep setSelection for yank-to-terminal.
-  ;; term/tmux.el and term/screen.el let-bind xterm-extra-capabilities from
-  ;; their own vars (defaults only modifyOtherKeys); keep them in sync.
-  (let ((caps '(modifyOtherKeys reportBackground setSelection)))
-    (setq xterm-extra-capabilities caps
-          xterm-tmux-extra-capabilities caps
-          xterm-screen-extra-capabilities caps
-          xterm-set-window-title t))
+  (setq xterm-extra-capabilities '(modifyOtherKeys reportBackground
+                                                   getSelection setSelection)
+        xterm-set-window-title t)
 
   (defun +xterm-report-background ()
     "Query the terminal background color and reload the matching theme."

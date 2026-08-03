@@ -224,6 +224,10 @@ Prefer the straight git repo; fall back to `telega--lib-directory'."
         telega-symbol-pin "%"
         telega-symbol-folder ""
         telega-symbol-photo ""
+        ;; Avoid Telega's explicit `compose-chars' strings.
+        telega-topic-brackets '("⟦" "⟧")
+        telega-symbol-forward "→"
+        telega-symbol-story-reply "↩"
 
         ;; filters
         telega-filters-custom nil

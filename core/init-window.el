@@ -218,7 +218,12 @@ ENTRY may be a regexp string, major-mode symbol, or predicate."
   (setq auto-dim-other-buffers-dim-on-focus-out nil
         auto-dim-other-buffers-dim-on-switch-to-minibuffer nil)
 
-  (add-hook 'auto-dim-other-buffers-never-dim-buffer-functions #'minibufferp)
+  ;; `adob--rescan-windows' does not honor this option.
+  (defadvice! +auto-dim-other-buffers-respect-minibuffer-option-a (fn)
+    :around #'adob--rescan-windows
+    (when (or auto-dim-other-buffers-dim-on-switch-to-minibuffer
+              (not (window-minibuffer-p)))
+      (funcall fn)))
 
   ;; 让行号也参与 dim
   (setq auto-dim-other-buffers-affected-faces

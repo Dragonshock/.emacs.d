@@ -5,23 +5,20 @@
 # Emacs runtime files
 /.cache/
 /auto-save-list/
-/cache/
-/data/
-/state/
 /etc/
 /var/
-/rss/
 
 # Package and native build artifacts
 /straight/
+/eln-cache/
 /elpa/
 *.elc
 *.sqlite*
 
 # Local configuration and credentials
-.env
 private.el
 emacs.pdmp
+
 
 # ---- Legacy root runtime (pre-no-littering; still may appear at ~/.emacs.d) ----
 eln-cache/
@@ -106,3 +103,4 @@ eww-bookmarks
 .claude/settings.local.json
 .grok/
 __pycache__/
+rss/
