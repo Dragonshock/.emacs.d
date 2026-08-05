@@ -163,31 +163,22 @@ does not clobber maximized/custom sizes.  FORCE non-nil re-applies."
 
 (defvar +light-theme 'doom-gruvbox-light)
 (defvar +dark-theme 'doom-gruvbox)
-;; Themes are session-global.  Auto-pick only when none is loaded so mixed
-;; emacsclient -c / -t does not flip doom-gruvbox ↔ light for all frames.
-;; Explicit THEME (incl. ns-system-appearance-change-functions) still switches.
+;; Align with upstream roife: always re-detect dark/light and switch when the
+;; picked theme differs.  First pass may run before xterm OSC 11; tty-setup-hook
+;; re-runs after reportBackground so TUI can correct light → dark.
 (add-hook! (tty-setup-hook server-after-make-frame-hook) :unless-daemonp-call-immediately
   (defun +load-theme (&optional theme)
-    "Load THEME, or pick dark/light once when no theme is enabled yet."
-    (if theme
-        (unless (member theme custom-enabled-themes)
-          (mapc #'disable-theme custom-enabled-themes)
-          (load-theme theme t))
-      (when (null custom-enabled-themes)
-        (let ((picked
-               (if (if (display-graphic-p)
-                       ;; `ns-system-appearance' is from the emacs-plus
-                       ;; system-appearance patch, not stock Emacs NS.
-                       (cond ((and (eq system-type 'darwin)
-                                   (boundp 'ns-system-appearance))
-                              (eq ns-system-appearance 'dark))
-                             (t t))
-                     (eq (or (terminal-parameter nil 'background-mode)
-                             (frame-parameter nil 'background-mode))
-                         'dark))
-                   +dark-theme
-                 +light-theme)))
-          (load-theme picked t))))))
+    (setq theme (if (if (display-graphic-p)
+                        (cond ((eq system-type 'darwin) (eq ns-system-appearance 'dark))
+                              (t t))
+                      (eq (or (terminal-parameter nil 'background-mode)
+                              (frame-parameter nil 'background-mode))
+                          'dark))
+                    +dark-theme
+                  +light-theme))
+    (unless (member theme custom-enabled-themes)
+      (mapc #'disable-theme custom-enabled-themes)
+      (load-theme theme t))))
 
 ;; [window-divider] Display window divider
 (setq window-divider-default-places t

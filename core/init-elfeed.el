@@ -1,7 +1,11 @@
 ;;; -*- lexical-binding: t -*-
 
-(defvar +elfeed-local-dir (expand-file-name "rss/" user-emacs-directory)
-  "Directory for generated local Atom feeds (HN, Reddit, …).")
+(defvar +elfeed-local-dir (no-littering-expand-var-file-name "rss/")
+  "Directory for local Atom feeds (HN, Reddit, …) under no-littering `var/rss/'.")
+
+(defvar +elfeed-hn-atom
+  (expand-file-name "hackernews.atom" +elfeed-local-dir)
+  "Path of the HN Atom file written by scripts/hn-elfeed.py.")
 
 (defvar +elfeed-reddit-atom
   (expand-file-name "reddit-emacs.atom" +elfeed-local-dir)
@@ -10,6 +14,10 @@
 (defun +elfeed-file-feed (filename &rest tags)
   "Build an Elfeed feed entry for local FILENAME under `+elfeed-local-dir' with TAGS."
   (cons (concat "file://" (expand-file-name filename +elfeed-local-dir)) tags))
+
+(defun +elfeed-hn-feed (&rest tags)
+  "Build the Hacker News file:// feed entry with TAGS (default hackernews)."
+  (cons (concat "file://" +elfeed-hn-atom) (or tags '(hackernews))))
 
 (defun +elfeed-feed-url (feed)
   "Return the URL string of FEED (string or (url . tags) entry)."
@@ -28,10 +36,11 @@ Safe to call repeatedly; does not duplicate entries."
         (setq elfeed-feeds (append elfeed-feeds (list entry)))))))
 
 (defvar +elfeed-hn-llm nil
-  "When non-nil, `scripts/update-elfeed-feeds' runs DeepSeek HN summarization.
+  "Force-enable HN DeepSeek when non-nil even on background updates.
 
-Background `elfeed-update-background' never enables this.  Use
-`+elfeed-update-with-hn-llm' or set this to t before interactive `g'.")
+Interactive `elfeed-update' (search `g') always runs HN generation.
+`elfeed-update-background' never does, unless this variable is non-nil.
+Shell gate remains ELFEED_HN_LLM (see scripts/update-elfeed-feeds).")
 
 ;; [elfeed] Read rss within Emacs
 (use-package elfeed
@@ -39,19 +48,14 @@ Background `elfeed-update-background' never enables this.  Use
   :init
   (require 'auth-source)
 
-  ;; Local generators (scripts/update-elfeed-feeds) rewrite rss/*.atom, then
-  ;; the original update fetches file:// and remote feeds.
-  ;; HN DeepSeek is gated by env ELFEED_HN_LLM (see +elfeed-hn-llm).
-  (defadvice! +elfeed-update-after-local-feeds-a (fn &rest args)
-    :around '(elfeed-update elfeed-update-background)
-    "Refresh local feeds asynchronously, then call FN with ARGS.
-
-If a local-feed process is already running, still invoke FN so remote
-feeds keep updating.  Auth-source / GPG failures for the Reddit token
-are ignored so a cancelled pinentry cannot abort the whole update.
-Missing Reddit token is a soft-skip in the Python script (exit 0).
-DeepSeek HN runs only when `+elfeed-hn-llm' is non-nil or ELFEED_HN_LLM
-is already set in the environment."
+  ;; Local generators rewrite Atom files, then the original update fetches
+  ;; file:// + remote feeds.  All local atoms live under var/rss/ (no-littering).
+  ;; Interactive update always enables HN; background never pays DeepSeek unattended.
+  ;; Two :around hooks (not one shared) so RUN-HN is reliable — nadvice's
+  ;; FN argument is a wrapper object, not eq to #'elfeed-update.
+  (defun +elfeed--update-after-local-feeds (fn args run-hn)
+    "Refresh local feeds asynchronously, then apply FN to ARGS.
+When RUN-HN is non-nil (or `+elfeed-hn-llm'), export ELFEED_HN_LLM=1."
     (if (process-live-p (get-process "elfeed-local-feeds"))
         (progn
           (message "Local feed update is already running; updating remote feeds only")
@@ -67,7 +71,7 @@ is already set in the environment."
                       nil))))
         (when token
           (setenv "REDDIT_PRIVATE_RSS_TOKEN" token))
-        (when +elfeed-hn-llm
+        (when (or run-hn +elfeed-hn-llm)
           (setenv "ELFEED_HN_LLM" "1"))
         (make-process :name "elfeed-local-feeds"
                       :buffer (get-buffer-create "*elfeed-local-feeds*")
@@ -82,14 +86,23 @@ is already set in the environment."
                           (+elfeed-ensure-reddit-feed)
                           (apply fn args)))))))
 
+  (defadvice! +elfeed-update-after-local-feeds-a (fn &rest args)
+    :around #'elfeed-update
+    "Like `+elfeed--update-after-local-feeds' with HN generation enabled."
+    (+elfeed--update-after-local-feeds fn args t))
+
+  (defadvice! +elfeed-update-background-after-local-feeds-a (fn &rest args)
+    :around #'elfeed-update-background
+    "Like `+elfeed--update-after-local-feeds' without HN (unless forced)."
+    (+elfeed--update-after-local-feeds fn args nil))
+
   (defun +elfeed-update-with-hn-llm ()
-    "Like `elfeed-update', but allow DeepSeek HN summarization once."
+    "Alias of `elfeed-update' (interactive path always runs HN generation)."
     (interactive)
-    (let ((+elfeed-hn-llm t))
-      (elfeed-update)))
+    (elfeed-update))
 
   ;; Background refresh: first run ~1 min after init, then every 2 hours.
-  ;; Never sets +elfeed-hn-llm — remote/file feeds only + optional Reddit.
+  ;; Skips HN DeepSeek — remote/file feeds + optional Reddit only.
   (run-at-time "1 min" (* 60 60 2) #'elfeed-update-background)
   :bind (:map elfeed-search-mode-map
               ("g" . elfeed-update)
@@ -99,11 +112,12 @@ is already set in the environment."
               ("j" . scroll-up-line)
               ("k" . scroll-down-line))
   :config
-  (setq elfeed-db-directory (expand-file-name "elfeed" user-emacs-directory)
-        ;; Keep enclosures out of the db tree (data/ + index).
-        elfeed-enclosure-default-dir (expand-file-name "elfeed/enclosures" user-emacs-directory)
-        elfeed-feeds (list
-                      (+elfeed-file-feed "hackernews.atom" 'hackernews)
+  ;; elfeed-db-directory / elfeed-enclosure-default-dir: leave to no-littering
+  ;; (var/elfeed/db/, var/elfeed/enclosures/).  Do not override to config root.
+  (make-directory +elfeed-local-dir t)
+  (setq elfeed-feeds (list
+                      ;; HN atom: var/rss/hackernews.atom (scripts/hn-elfeed.py)
+                      (+elfeed-hn-feed 'hackernews)
                       ;; emacs
                       '("https://karthinks.com/index.xml" karthinks)
                       '("https://emacsredux.com/atom.xml" redux)

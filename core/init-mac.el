@@ -47,19 +47,10 @@ Do not hook `after-init': `emt-mode' -> `emt-ensure' may call
                 (error-message-string err)))))
   :hook (window-setup . +emt-enable-or-install))
 
-;; emacs-plus passes APPEARANCE as `dark' or `light' (not via display-graphic-p).
-;; Prefer the hook arg so headless/selected non-GUI frames don't force light/dark wrong.
+;; emacs-plus system-appearance patch.  Re-detect via +load-theme (upstream).
 (add-hook! ns-system-appearance-change-functions
-  (defun +mac-auto-change-theme-with-system (appearance)
-    (let ((theme (pcase appearance
-                   ('dark +dark-theme)
-                   ('light +light-theme)
-                   (_ nil))))
-      (if theme
-          (unless (member theme custom-enabled-themes)
-            (mapc #'disable-theme custom-enabled-themes)
-            (load-theme theme t))
-        (+load-theme)))))
+  (defun +mac-auto-change-theme-with-system (&rest _)
+    (+load-theme)))
 
 ;; Prevent accidental touch
 (unbind-key "C-<wheel-down>")

@@ -2,7 +2,7 @@
 *~
 .DS_Store
 
-# Emacs runtime files
+# Emacs runtime files (no-littering)
 /.cache/
 /auto-save-list/
 /etc/
@@ -19,20 +19,22 @@
 private.el
 emacs.pdmp
 
-
-# ---- Legacy root runtime (pre-no-littering; still may appear at ~/.emacs.d) ----
-eln-cache/
+# ---- Runtime that must not land at config root (defense in depth) ----
+# After layout cleanup these should not reappear; ignore if they do.
 modules/
 ghostel/
 elfeed/
 eshell/
 url/
+url.bak.*/
 rime/
 tramp
 transient/
+tree-sitter
 tree-sitter/
 recentf
 places
+places.eld
 history
 org-persist/
 .tree-sitter/
@@ -45,6 +47,7 @@ emms/
 librime/
 cnfonts/
 autosaves
+backups/
 ispell/
 .persistent-scratch
 persp-confs/
@@ -57,21 +60,16 @@ custom.el
 .mc-lists.el
 projects
 agent/
-
-# ---- 本地补充 (Dragonshock) ----
-# Emacs 状态文件 (后缀形式)
-recentf.eld
-places.eld
+rss/
 network-security.eld
-
-# ediff 合并时的临时冲突文件
+recentf.eld
+geiser-history.racket
+eww-bookmarks
 \#*#
 .*-merge.*
+__pycache__/
 
-# 备份目录 (本地用,不进版本库)
-backups/
-
-# Agent handoffs / local secrets (never push)
+# ---- Secrets (never push) ----
 .agent-handoff/
 *.authinfo
 *.authinfo.gpg
@@ -84,23 +82,14 @@ authinfo.gpg
 secrets.el
 local.el
 
-# history
-geiser-history.racket
-
-# Local agent / scratch (do not publish)
+# ---- Local agent / docs workspace (not part of upstream config tree) ----
 .agents/
+.agent-shell/
 .scratch/
+.grok/
 AGENTS.md
 docs/
+dev-docs/
 skills-lock.json
 CONTEXT.md
-dev-docs/
-
-# bookmarks
-eww-bookmarks
-
-# Claude Code: 共享 .claude/settings.json 与 skills，本地覆盖不提交
 .claude/settings.local.json
-.grok/
-__pycache__/
-rss/

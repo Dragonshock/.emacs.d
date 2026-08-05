@@ -75,7 +75,7 @@
   ;; REPL 开在另一窗口，代码与交互并排
   (geiser-repl-use-other-window t)
   (geiser-repl-history-filename
-   (expand-file-name "geiser-history" user-emacs-directory))
+   (no-littering-expand-var-file-name "geiser-history"))
   (geiser-repl-query-on-kill-p nil)
   (geiser-mode-autodoc-p t)
   :config

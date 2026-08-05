@@ -27,7 +27,9 @@
                  chirp-cache-directory
                  chirp-compose-temporary-directory
                  ghostel-module-directory
-                 (file-name-directory typst-ts-lsp-download-path)))
+                 (file-name-directory typst-ts-lsp-download-path)
+                 ;; Local Atom feeds (elfeed); keep ready before scripts run.
+                 (no-littering-expand-var-file-name "rss/")))
     (make-directory directory t)))
 
 ;; Never write numbered backups / auto-saves for credential-like paths

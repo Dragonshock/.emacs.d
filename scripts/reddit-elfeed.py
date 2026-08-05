@@ -24,7 +24,7 @@ from pathlib import Path
 
 USER_AGENT = "elfeed-emacs-rss/1.0 (personal Elfeed reader)"
 DEFAULT_USERNAME = "Complex_Outcome697"
-OUTPUT = Path(__file__).resolve().parent.parent / "rss/reddit-emacs.atom"
+OUTPUT = Path(__file__).resolve().parent.parent / "var" / "rss" / "reddit-emacs.atom"
 
 
 def private_feed_url(token: str, username: str) -> str:
