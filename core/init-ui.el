@@ -97,7 +97,7 @@
 
 
 ;; Font: Same width and height for emoji, chinese and english characters
-(defvar +font-size (if (eq system-type 'darwin) 14 26))
+(defvar +font-size (if (eq system-type 'darwin) 12 26))
 
 (defun +apply-default-frame-geometry-h (&optional frame force)
   "Re-apply 120x50 and center geometry for FRAME once after font setup.

@@ -130,8 +130,9 @@ Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
   (setq hs-display-lines-hidden t))
 
 
-;; [project] Project manager
+;; [project] Project manager (Emacs 31 built-in; do not pull ELPA clone)
 (use-package project
+  :straight (:type built-in)
   ;; Ghostel takes C-x p m/M (dakra README). Magit uses v (VCS).
   :bind (:map project-prefix-map
               ("v" . magit-status))

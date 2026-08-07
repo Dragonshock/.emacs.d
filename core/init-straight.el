@@ -35,6 +35,14 @@
       (eval-print-last-sexp)))
   (load bootstrap-file nil 'nomessage))
 
+;; Emacs 31 ships project/xref at the same major version as GNU ELPA.
+;; Dependents (consult-dir, breadcrumb, geiser, …) must not clone ELPA
+;; copies or we hit: Feature 'project' loaded from A is now provided by B.
+;; Must be set before any package that declares a dependency on them.
+(setq straight-built-in-pseudo-packages
+      (append '(project xref)
+              straight-built-in-pseudo-packages))
+
 ;; [use-package] config
 (setq use-package-always-demand (daemonp)
       use-package-always-defer (not (daemonp))
