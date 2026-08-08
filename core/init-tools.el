@@ -37,19 +37,11 @@
 
 
 ;; [arxiv.el] Search, browse, and save arXiv papers
-;; Package has no autoloads; :bind/:commands load it (always-defer is on for
-;; non-daemon sessions). Align binds with upstream README.
-(use-package arxiv
-  :straight (:type git :host github :repo "roife/arxiv.el")
-  :bind (("C-c a s" . arxiv-search-builder)
-         ("C-c a o" . arxiv-open)
-         ("C-c a a" . arxiv-search-author)
-         ("C-c a c" . arxiv-search-category)
-         ("C-c a l" . arxiv-latest)
-         ("C-c a w" . arxiv-past-week))
-  :config
-  (setq arxiv-browser-function #'arxiv-eww-browse-url)
-  (arxiv-url-handler-mode 1))
+;; (use-package arxiv
+;;   :straight (:type git :host github :repo "roife/arxiv.el")
+;;   :config
+;;   (setq arxiv-browser-function #'arxiv-eww-browse-url)
+;;   (arxiv-url-handler-mode 1))
 
 
 ;; [avy] Jump with several key strock
@@ -62,15 +54,7 @@
          ("C-, ," . avy-isearch))
   :config
   ;; overlay is used during isearch, `pre' style makes avy keys evident.
-  (setq avy-styles-alist '((avy-isearch . pre)))
-  )
-
-
-;; [avy-pinyin] Avy support for pinyin
-(use-package ace-pinyin
-  :straight t
-  :after avy
-  :init (ace-pinyin-global-mode t))
+  (setq avy-styles-alist '((avy-isearch . pre))))
 
 
 ;; [link-hint] Open URL in text with avy
@@ -234,4 +218,20 @@ Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
                      ;; init-straight.el ensures emacs is on PATH.
                      :pre-build ("make" "all")))
 
-;; minuet lives in init-prog.el (enabled by upstream merge).
+
+;; [browse-url] Pass a URL to browser
+(use-package browse-url
+  :defines dired-mode-map
+  :bind (("C-, o" . browse-url-at-point)
+         ("C-, e" . browse-url-emacs))
+  :config
+  (setq browse-url-browser-function #'eww-browse-url))
+
+;; [eww] Builtin browser
+(use-package eww
+  :config
+  (setq shr-max-image-proportion 0.5))
+
+(use-package xwidget
+  :config
+  (setq xwidget-webkit-buffer-name-format "*XWidget: %T*"))

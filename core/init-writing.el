@@ -30,8 +30,7 @@
 (use-package edit-indirect
   :straight t)
 
-
-;; [pangu] Add pangu spaces between CJK and Latin
+;; [pangu] Add pangu spaces
 (use-package pangu-spacing
   :straight t
   :hook ((org-mode markdown-ts-mode) . pangu-spacing-mode)

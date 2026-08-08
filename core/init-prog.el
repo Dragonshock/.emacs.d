@@ -90,36 +90,36 @@
                 ;; Prefer pylsp section name (pyls is the deprecated Palantir server).
                 ;; Flat plist per eglot docstring (alist is less reliable).
                 '(:pylsp (:plugins (:jedi_completion (:fuzzy t)))
-                  :rust-analyzer (:cargo (:allTargets t :features "all")
-                                  :checkOnSave :json-false
-                                  :completion (:termSearch (:enable t)
-                                                           :fullFunctionSignatures (:enable t))
-                                  :hover (:memoryLayout (:size "both")
-                                                        :show (:traitAssocItems 5)
-                                                        :documentation (:keywords (:enable :json-false)))
-                                  :inlayHints (:lifetimeElisionHints (:enable "skip_trivial" :useParameterNames t)
-                                                                     :closureReturnTypeHints (:enable "always")
-                                                                     :discriminantHints (:enable t)
-                                                                     :genericParameterHints (:lifetime (:enable t)))
-                                  :semanticHighlighting (:operator (:specialization (:enable t))
-                                                                   :punctuation (:enable t :specialization (:enable t)))
-                                  :workspace (:symbol (:search (:kind "all_symbols"
-                                                                      :scope "workspace_and_dependencies")))
-                                  :references (:excludeImports t
-                                               :excludeTests t)
-                                  :lru (:capacity 1024)
-                                  :diagnostics (:enable :json-false))
-                  ;; typescript preferences belong in CONTACT :initializationOptions
-                  ;; (workspace/configuration does not feed tsserver preferences).
-                  :java (:configuration
-                         (:runtimes [(:name "JavaSE-17"
-                                            :path "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home/")
-                                     (:name "JavaSE-21"
-                                            :path "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/"
-                                            :default t)])
-                         :import (:gradle (:enabled t
-                                           :wrapper (:enabled t)))
-                         :autobuild (:enabled :json-false))))
+                         :rust-analyzer (:cargo (:allTargets t :features "all")
+                                                :checkOnSave :json-false
+                                                :completion (:termSearch (:enable t)
+                                                                         :fullFunctionSignatures (:enable t))
+                                                :hover (:memoryLayout (:size "both")
+                                                                      :show (:traitAssocItems 5)
+                                                                      :documentation (:keywords (:enable :json-false)))
+                                                :inlayHints (:lifetimeElisionHints (:enable "skip_trivial" :useParameterNames t)
+                                                                                   :closureReturnTypeHints (:enable "always")
+                                                                                   :discriminantHints (:enable t)
+                                                                                   :genericParameterHints (:lifetime (:enable t)))
+                                                :semanticHighlighting (:operator (:specialization (:enable t))
+                                                                                 :punctuation (:enable t :specialization (:enable t)))
+                                                :workspace (:symbol (:search (:kind "all_symbols"
+                                                                                    :scope "workspace_and_dependencies")))
+                                                :references (:excludeImports t
+                                                                             :excludeTests t)
+                                                :lru (:capacity 1024)
+                                                :diagnostics (:enable :json-false))
+                         ;; typescript preferences belong in CONTACT :initializationOptions
+                         ;; (workspace/configuration does not feed tsserver preferences).
+                         :java (:configuration
+                                (:runtimes [(:name "JavaSE-17"
+                                                   :path "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home/")
+                                            (:name "JavaSE-21"
+                                                   :path "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/"
+                                                   :default t)])
+                                :import (:gradle (:enabled t
+                                                           :wrapper (:enabled t)))
+                                :autobuild (:enabled :json-false))))
 
   ;; typescript-language-server: import preference via initialize options only.
   (add-to-list 'eglot-server-programs
@@ -346,6 +346,13 @@
 
 ;; Classic rust-mode kept as dependency/fallback; .rs remaps to rust-ts-mode.
 (use-package rust-mode
+  :straight t
+  :init
+  (setq rust-mode-treesitter-derive t
+        rust-format-goto-problem nil))
+
+
+(use-package fish-mode
   :straight t)
 
 
@@ -469,6 +476,21 @@
 (use-package envrc
   :straight t
   :hook (emacs-startup . envrc-global-mode))
+
+
+;; [log-view-mode]
+(use-package logview
+  :straight t
+  :custom
+  (logview-additional-level-mappings
+   '(("Pipeline levels" . ((error       "ERROR")
+                           (warning     "WARN ")
+                           (information "INFO ")
+                           (debug       "DEBUG")
+                           (trace       "TRACE")))))
+  (logview-additional-submodes
+   '(("Pipeline" . ((format . "[TIMESTAMP] [LEVEL] [NAME] MESSAGE")
+                    (levels . "Pipeline levels"))))))
 
 
 ;; [minuet-ai] AI-powered inline code completion

@@ -153,7 +153,7 @@
  uniquify-buffer-name-style 'forward
 
  ;; Fix alignment problem
- truncate-string-ellipsis "…"
+ truncate-string-ellipsis "⁝"
 
  ;; Shell command
  shell-command-prompt-show-cwd t
@@ -208,15 +208,15 @@
 
 
 ;; [gcmh] Run GC when Emacs is idle, not while commands are active.
-(use-package gcmh
-  :straight t
-  :unless (fboundp 'igc-info)
-  :hook (emacs-startup . gcmh-mode)
-  :config
-  (setq gcmh-idle-delay 'auto
-        gcmh-auto-idle-delay-factor 10
-        gcmh-high-cons-threshold (* 128 1024 1024)
-        gcmh-low-cons-threshold +gc-cons-threshold))
+;; (use-package gcmh
+;;   :straight t
+;;   :unless (fboundp 'igc-info)
+;;   :hook (emacs-startup . gcmh-mode)
+;;   :config
+;;   (setq gcmh-idle-delay 'auto
+;;         gcmh-auto-idle-delay-factor 10
+;;         gcmh-high-cons-threshold (* 128 1024 1024)
+;;         gcmh-low-cons-threshold +gc-cons-threshold))
 
 
 ;; History
@@ -450,12 +450,6 @@
         minibuffer-follows-selected-frame nil))
 
 
-;; [repeat] Enable repeatable commands
-(use-package repeat
-  :straight nil
-  :hook (after-init . repeat-mode))
-
-
 ;; [comint] Command interpreter
 (use-package comint
   :config
@@ -499,8 +493,9 @@
   :hook (after-init . +exec-path-from-shell-maybe-initialize))
 
 
-;; backup-walker (2013) is unmaintained and uses obsolete cl / easy-mmode-defmap /
-;; point-at-bol.  Prefer built-in `diff-backup' / `file-newest-backup' / VC.
+;; [backup walker] A utility to view Emacs backup files.
+(use-package backup-walker
+  :straight t)
 
 
 ;; [info] Add local Info manuals after system dirs (do not replace Info-directory-list;
@@ -509,3 +504,7 @@
   :config
   (add-to-list 'Info-additional-directory-list
                (expand-file-name "~/Documents/Info")))
+
+
+;; [posframe]
+(use-package posframe :straight t)

@@ -55,7 +55,7 @@ Shared by maximize and true fullscreen (macOS often uses `fullboth', not
         (message "No specified window: %d" number))))
 
   (dotimes (n 9)
-    (bind-key (format "M-%d" (1+ n))
+    (bind-key (format "C-%d" (1+ n))
               (lambda ()
                 (interactive)
                 (+aw--select-window (1+ n))))))
@@ -197,7 +197,8 @@ ENTRY may be a regexp string, major-mode symbol, or predicate."
   :straight t
   :hook (window-setup . zoom-mode)
   :config
-  (setq zoom-ignored-major-modes '(ediff-mode vundo-mode minibuffer-mode speedbar-mode))
+  (setq zoom-minibuffer-preserve-layout nil
+        zoom-ignored-major-modes '(ediff-mode vundo-mode minibuffer-mode speedbar-mode))
 
   (defun +zoom-fix-window-size-h ()
     (setq-local window-size-fixed t))

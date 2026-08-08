@@ -22,10 +22,11 @@
                                    "~/Library/Rime/"
                                  "~/.local/share/fcitx5/rime")))
 
-;; rimel falls back to echo-area prompt when posframe is missing from load-path.
-(use-package posframe
-  :straight t
-  :demand t)
+(use-package liberime-regexp
+  :straight (:host github :repo "roife/liberime-regexp")
+  :hook (liberime-after-start . liberime-regexp-enable)
+  :config
+  (setq liberime-regexp-candidate-limit 40))
 
 (use-package rimel
   :straight (rimel :type git :host github :repo "emacs-rime/rimel")
@@ -48,29 +49,26 @@
                                    rimel-predicate-current-uppercase-letter-p
                                    rimel-predicate-org-in-src-block-p
                                    rimel-predicate-org-latex-mode-p
-                                   rimel-predicate-tex-math-or-command-p))
-  ;; C-\\ is Emacs' stock toggle-input-method binding; keep it explicit.
-  :bind ("C-\\" . toggle-input-method))
+                                   rimel-predicate-tex-math-or-command-p)))
 
 (register-input-method "rimel" "Chinese" #'rimel-activate
-                       (if (char-displayable-p 12563) (char-to-string 12563) "中")
+                       (or (char-displayable-p 12563) "中")
                        "Rimel - Rime input method via liberime")
 
 ;; [sis] automatically switch input source
 (use-package sis
   :straight t
-  :demand t
-  :hook (;; Enable the inline-english-mode for all buffers.
-         ;; When add space after chinese char, automatically switch to english mode
-         (after-init . sis-global-inline-mode)
+  :hook (;; When add space after chinese char, automatically switch to english mode
+         (liberime-after-start . sis-global-inline-mode)
          ;; Enable the context-mode for all buffers
-         (after-init . sis-global-context-mode)
+         (liberime-after-start . sis-global-context-mode)
          ;; Colored cursor
-         (after-init . sis-global-cursor-color-mode))
-  :config
+         (liberime-after-start . sis-global-cursor-color-mode))
+  :init
   ;; Use rimel as default
   (sis-ism-lazyman-config nil "rimel" 'native)
-
+  (sis-get) ; HACK: set sis--ism
+  :config
   ;; HACK: Set cursor color automatically
   (add-hook! (enable-theme-functions server-after-make-frame-hook) :unless-daemonp-call-immediately
     (defun +sis-set-cursor-color (&rest _)

@@ -20,18 +20,14 @@
 (use-package emt
   :straight (:host github :repo "roife/emt"
                    :files ("*.el" "module/*" "module"))
-  :commands (emt-mode emt-download-module emt-ensure
-                      emt-forward-word emt-backward-word)
   :init
-  ;; Keep dylib under no-littering `var/' (upstream path policy).
   (setq emt-lib-path
         (concat (no-littering-expand-var-file-name "modules/libEMT")
                 module-file-suffix))
-  (defun +emt-enable-or-install ()
-    "Enable `emt-mode' without interactive prompts during startup.
+  :hook (after-init . emt-mode))
 
 If the native module is missing, do NOT auto-download (no integrity pin
-on the remote artifact).  Leave a recovery message for interactive install.
+                                                          on the remote artifact).  Leave a recovery message for interactive install.
 
 Do not hook `after-init': `emt-mode' -> `emt-ensure' may call
 `yes-or-no-p' while early-init still has inhibit-redisplay/message."
@@ -55,3 +51,16 @@ Do not hook `after-init': `emt-mode' -> `emt-ensure' may call
 ;; Prevent accidental touch
 (unbind-key "C-<wheel-down>")
 (unbind-key "C-<wheel-up>")
+
+(global-set-key (kbd "s-a") #'mark-whole-buffer)
+(global-set-key (kbd "s-x") #'kill-region)
+(global-set-key (kbd "s-s") #'save-buffer)
+(global-set-key (kbd "s-v") #'yank)
+(global-set-key (kbd "s-c") #'copy-region-as-kill)
+(global-set-key (kbd "s-z") #'undo)
+(global-set-key (kbd "s-Z") #'undo-redo)
+(global-set-key (kbd "s-f") #'isearch-forward)
+(global-set-key (kbd "s-w") #'tab-close)
+(global-set-key (kbd "s-t") #'tab-new)
+(global-set-key (kbd "s-o") #'other-window)
+(global-set-key (kbd "s-,") nil)

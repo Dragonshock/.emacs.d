@@ -153,7 +153,7 @@
                            (+mode-line-symbol-overlay-indicator))
                   face ,panel-face))
       (:propertize " " face ,panel-face)
-      " "
+      " %l "
       ,(or +mode-line-project-crumb
            `(:propertize "%b" face ,meta-face))
       " "
@@ -193,7 +193,7 @@
         tab-bar-close-button-show nil
         tab-bar-tab-hints t)
 
-  (customize-set-variable 'tab-bar-select-tab-modifiers '(super))
+  (customize-set-variable 'tab-bar-select-tab-modifiers '(meta))
 
   ;; truncate for [tab name] and add count
   (setq tab-bar-tab-name-format-functions
