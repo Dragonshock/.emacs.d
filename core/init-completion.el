@@ -15,6 +15,8 @@
   (setq vertico-cycle t
         vertico-count 15)
 
+  (vertico-mouse-mode)
+
   ;; WORKAROUND: https://github.com/minad/vertico#problematic-completion-commands
   (setq org-refile-use-outline-path 'file
         org-outline-path-complete-in-steps nil))
@@ -211,7 +213,7 @@
   (advice-add #'register-preview :override #'consult-register-window)
   :config
   (setq consult-narrow-key "<"
-        consult-async-min-input 2
+        consult-async-min-input 1
         consult-async-refresh-delay 0.05)
 
   ;; better preview

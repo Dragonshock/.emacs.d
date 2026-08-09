@@ -113,7 +113,13 @@
    org-appear-inside-latex t
 
    org-appear-delay 0.1
-   org-appear-trigger 'always))
+
+   org-appear-trigger 'manual)
+
+  (add-hook! org-mode-hook :call-immediately
+    (defun +org-add-appear-hook ()
+      (add-hook! meow-insert-enter-hook :local #'org-appear-manual-start)
+      (add-hook! meow-insert-exit-hook :local #'org-appear-manual-stop))))
 
 
 (use-package org-modern
@@ -128,8 +134,8 @@
 
 (use-package org-modern-indent
   :straight (org-modern-indent :type git :host github :repo "jdtsmith/org-modern-indent")
-  ;; :hook loads the package under always-defer; bare :config never runs alone.
-  :hook (org-mode . org-modern-indent-mode))
+  :config
+  (add-hook! org-mode-hook :depth 90 #'org-modern-indent-mode))
 
 
 ;; [ox]

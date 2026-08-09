@@ -99,7 +99,10 @@
         (backward-delete-char 1))))
   (setq sis-inline-tighten-tail-rule #'+sis-remove-tail-space-before-cc-punc)
 
-  ;; Context mode (native Emacs keys: no Meow insert-state hooks).
+  ;; Context mode
+  (add-hook! meow-insert-exit-hook #'sis-set-english)
+  (add-to-list 'sis-context-hooks 'meow-insert-enter-hook)
+
   ;; Ignore some mode with context mode
   (defadvice! +sis-context-guess-ignore-modes (fn &rest args)
     :around #'sis--context-guess

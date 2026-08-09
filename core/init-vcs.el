@@ -56,7 +56,7 @@
 
   ;; Integration with magit
   (with-eval-after-load 'magit
-    (add-hook 'magit-post-refresh-hook #'diff-hl-magit-post-refresh))
+    (add-hook! magit-post-refresh-hook #'diff-hl-magit-post-refresh))
 
   ;; WORKAROUND: Integration with ws-butler
   (with-eval-after-load 'ws-butler
@@ -244,7 +244,16 @@
 
 ;; [smerge] VC/Git already calls `smerge-start-session' on conflicts.
 (use-package smerge-mode
-  :defer t)
+  :preface
+  (defun +smerge-try-smerge ()
+    (when (and buffer-file-name
+               (save-excursion
+                 (goto-char (point-min))
+                 (re-search-forward "^<<<<<<< " nil t))
+               (vc-backend buffer-file-name))
+      (require 'smerge-mode)
+      (smerge-mode 1)))
+  :hook (find-file . +smerge-try-smerge))
 
 
 ;; [browse-at-remote] Open github/gitlab/bitbucket page

@@ -23,6 +23,12 @@
    regexp-search-ring-max 200))
 
 
+;; [ezf] Use Emacs completion from terminal shells
+(use-package ezf
+  :straight (:type git :host github :repo "roife/ezf")
+  :demand t)
+
+
 ;; [speedbar]
 (use-package speedbar
   :init
@@ -112,29 +118,6 @@ Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
   ;; Leave `hs-show-indicators' at default nil; do not set `hs-indicator-type'
   ;; alone (it only applies when indicators are enabled).
   (setq hs-display-lines-hidden t))
-
-
-;; [project] Project manager (Emacs 31 built-in; do not pull ELPA clone)
-(use-package project
-  :straight (:type built-in)
-  ;; Ghostel takes C-x p m/M (dakra README). Magit uses v (VCS).
-  :bind (:map project-prefix-map
-              ("v" . magit-status))
-  :config
-  ;; Third element is the dispatch KEY (required for a working switch menu).
-  ;; Ghostel lives here (not only init-ghostel add-to-list): this setq would
-  ;; otherwise clobber after-load additions from earlier modules.
-  (setq project-switch-commands '((project-find-file "File" ?f)
-                                  (project-find-regexp "Regexp" ?g)
-                                  (project-switch-to-buffer "Buffer" ?b)
-                                  (project-dired "Dired" ?d)
-                                  (project-eshell "Eshell" ?e)
-                                  (project-search "Search" ?s)
-                                  (ghostel-project "Ghostel" ?m)
-                                  (ghostel-project-list-buffers "Ghostel buffers" ?M)
-                                  (magit-status "Magit" ?v)))
-
-  )
 
 
 ;; [vundo] Undo tree

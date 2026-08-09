@@ -11,8 +11,7 @@
 
 
 ;; Make script file executable with `chmod +x' after save
-(add-hook 'after-save-hook
-          #'executable-make-buffer-file-executable-if-script-p)
+(add-hook! after-save-hook #'executable-make-buffer-file-executable-if-script-p)
 
 
 ;; [autorevert]
@@ -177,7 +176,7 @@ Global `window-selection-change-functions' also receives a frame."
   :config
   ;; unfold outlines when using ediff
   (with-eval-after-load 'outline
-    (add-hook 'ediff-prepare-buffer-hook #'outline-show-all))
+    (add-hook! ediff-prepare-buffer-hook #'outline-show-all))
 
   ;; Restore window config after quitting ediff
   (defvar +ediff-saved-window-config nil)
@@ -222,7 +221,7 @@ Global `window-selection-change-functions' also receives a frame."
       (telega-button-backward 1 nil 'no-error)))
 
   ;; Install explicitly in case `beginend-global-mode' is already enabled.
-  (add-hook 'telega-root-mode-hook #'beginend-telega-root-mode))
+  (add-hook! telega-root-mode-hook #'beginend-telega-root-mode))
 
 
 ;; Alternatives to [hungry-delete]

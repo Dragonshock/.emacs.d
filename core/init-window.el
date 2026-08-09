@@ -200,18 +200,17 @@ ENTRY may be a regexp string, major-mode symbol, or predicate."
   (setq zoom-minibuffer-preserve-layout nil
         zoom-ignored-major-modes '(ediff-mode vundo-mode minibuffer-mode speedbar-mode))
 
-  (defun +zoom-fix-window-size-h ()
-    (setq-local window-size-fixed t))
+  (add-hook! vundo-mode-hook
+    (defun +zoom-fix-window-size-h ()
+      (setq-local window-size-fixed t)))
 
-  (defun +zoom-fix-window-width-h ()
-    (setq-local window-size-fixed 'width))
+  (add-hook! speedbar-mode-hook
+    (defun +zoom-fix-window-width-h ()
+      (setq-local window-size-fixed 'width)))
 
-  (defun +zoom-fix-window-height-h ()
-    (setq-local window-size-fixed 'height))
-
-  (add-hook 'vundo-mode-hook #'+zoom-fix-window-size-h)
-  (add-hook 'speedbar-mode-hook #'+zoom-fix-window-width-h)
-  (add-hook 'ediff-mode-hook #'+zoom-fix-window-height-h))
+  (add-hook! ediff-mode-hook
+    (defun +zoom-fix-window-height-h ()
+      (setq-local window-size-fixed 'height))))
 
 ;; [auto-dim-other-buffers] Dim non-active buffers
 (use-package auto-dim-other-buffers

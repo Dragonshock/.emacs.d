@@ -168,7 +168,7 @@ Mail only: Hacker News and other feeds are updated by Elfeed
   :after gnus
   :config
   (gnus-demon-add-handler #'gnus-demon-scan-news 30 nil)
-  (add-hook 'gnus-started-hook #'gnus-demon-init))
+  (add-hook! gnus-started-hook #'gnus-demon-init))
 
 
 ;; [gnus-sum] summary mode

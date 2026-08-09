@@ -248,12 +248,10 @@
                   "\\bpasswd\\'\\|"
                   "\\bcredentials\\'"))
 
-  ;; Emacs 31 `save-place-alist-to-file' already uses `prin1' (no `pp'); no advice needed.
-
-  ;; Recenter after restore (Emacs 29+: public hook, not advice on finder).
-  (add-hook 'save-place-after-find-file-hook
-            (lambda ()
-              (when buffer-file-name (ignore-errors (recenter)))))
+  ;; recenters the view after the jump
+  (defadvice! +save-place-recenter-a (&rest _)
+    :after #'save-place-find-file-hook
+    (when buffer-file-name (ignore-errors (recenter))))
   )
 
 
@@ -508,3 +506,18 @@
 
 ;; [posframe]
 (use-package posframe :straight t)
+
+
+;; [project] Project manager
+(use-package project
+  :straight (:type built-in)
+  :bind (:map project-prefix-map
+              ("m" . magit-status))
+  :config
+  (setq project-switch-commands '((project-find-file "File")
+                                  (project-find-regexp "Regexp")
+                                  (project-switch-to-buffer "Buffer")
+                                  (project-dired "Dired")
+                                  (project-eshell "Eshell")
+                                  (project-search "Search")
+                                  (magit-status "Magit"))))

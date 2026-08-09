@@ -64,38 +64,38 @@ Plain call: Eshell popup for the current project/directory.
 Prefix ARG: `ghostel-project' (stock buffer name / display, dakra-aligned)."
     (interactive "P")
     (require 'eshell)
-    (require 'project)
-    (if arg
-        (+ghostel-toggle-project)
-      (let* ((project (project-current))
-             (dir-name (directory-file-name default-directory))
-             (root-name (if project
-                            (file-name-nondirectory
-                             (directory-file-name (project-root project)))
-                          (file-name-nondirectory dir-name)))
-             (popup-buffer-name (format "Eshell-popup: %s" root-name))
-             (win (get-buffer-window popup-buffer-name)))
-        (if win
-            (if (eq (selected-window) win)
-                (ignore-errors (delete-window win))
-              (select-window win))
-          ;; `display-comint-buffer-action' was removed in Emacs 31 (obsolete
-          ;; since 30.1).  Match the `(category . comint)' action eshell uses.
-          (let ((display-buffer-alist
-                 (cons '((category . comint)
-                         (display-buffer-at-bottom)
-                         (inhibit-same-window . nil))
-                       display-buffer-alist))
-                (eshell-buffer-name popup-buffer-name))
-            (with-current-buffer (eshell)
-              (unless (string= dir-name (directory-file-name default-directory))
-                (eshell/cd dir-name)
-                (eshell-send-input))
-              (add-hook 'eshell-exit-hook
-                        (lambda ()
-                          (ignore-errors
-                            (delete-window (get-buffer-window popup-buffer-name))))
-                        nil t)))))))
+    (require 'project)  ;; Ensure we load project.el
+    (let* ((project (project-current)) ;; Get the current project
+           (dir-name (directory-file-name default-directory))
+           (root-name (if project
+                          (file-name-nondirectory (directory-file-name (project-root project))) ;; Use project name
+                        (file-name-nondirectory dir-name))) ;; Use current directory name if no project
+           (popup-buffer-name (format "%s-popup: %s" (if arg "Ghostel" "Eshell") root-name))
+           (win (get-buffer-window popup-buffer-name)))
+
+      ;; If an argument is provided, you can add some custom behavior, like opening a GPT prompt.
+      ;; If Eshell window exists, either focus or kill it.
+      (if win
+          (if (eq (selected-window) win)
+              (ignore-errors (delete-window win)) ;; Close window if already focused
+            (select-window win)) ;; Focus the Eshell window if it exists but not selected
+        ;; If no Eshell window, create one
+        (let ((display-comint-buffer-action '(display-buffer-at-bottom
+                                              (inhibit-same-window . nil))))
+          (if arg
+              (with-current-buffer (ghostel-project)
+                ;; display current buffer
+                (display-buffer (current-buffer)))
+            ;; Open a eshell
+            (let ((eshell-buffer-name popup-buffer-name))
+              (with-current-buffer (eshell)
+                (unless (string= dir-name (directory-file-name default-directory))
+                  (eshell/cd dir-name)
+                  (eshell-send-input))
+                ;; Add a hook to close the window when Eshell exits
+                (add-hook! eshell-exit-hook :local
+                  (ignore-errors
+                    (delete-window (get-buffer-window popup-buffer-name)))))))))))
 
   (defun +eshell/define-alias ()
     "Define alias for eshell.
@@ -121,7 +121,7 @@ Eshell looks up `eshell/NAME' (slash), not `eshell-NAME' (hyphen)."
     (eshell/alias "gch" "git checkout $*")
     (eshell/alias "gcb" "git checkout -b $*")
     )
-  (add-hook 'eshell-first-time-mode-hook #'+eshell/define-alias)
+  (add-hook! eshell-first-time-mode-hook #'+eshell/define-alias)
   ;; Don't auto-write our aliases! Let us manage our own `eshell-aliases-file' via elisp
   (advice-add #'eshell-write-aliases-list :override #'ignore)
 

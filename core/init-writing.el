@@ -17,18 +17,8 @@
   (setq-default visual-fill-column-center-text t))
 
 
-;; [visual-line-mode] Soft line-wrapping for prose only (same exclusions).
-(defun +maybe-visual-line-mode ()
-  "Enable `visual-line-mode' for prose; skip yaml/toml conf modes."
-  (unless (derived-mode-p 'yaml-ts-mode 'toml-ts-mode 'yaml-mode 'conf-mode
-                          'conf-toml-mode)
-    (visual-line-mode 1)))
-(add-hook 'text-mode-hook #'+maybe-visual-line-mode)
-
-
-;; [edit-indirect] Edit code blocks indirectly
-(use-package edit-indirect
-  :straight t)
+;; [visual-line-mode] Soft line-wrapping
+(add-hook! text-mode-hook #'visual-line-mode)
 
 ;; [pangu] Add pangu spaces
 (use-package pangu-spacing

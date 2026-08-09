@@ -91,29 +91,25 @@
       eol-mnemonic-undecided "?")
 
 (defvar-local +mode-line-encoding nil)
-(add-hook! find-file-hook
-  (defun +mode-line-update-encoding (&rest _)
-    "Get encoding and EOL type of current buffer."
-    (setq +mode-line-encoding
-          (unless (and (memq (coding-system-category buffer-file-coding-system)
-                             '(coding-category-undecided coding-category-utf-8))
-                       (eq (coding-system-eol-type buffer-file-coding-system) 0))
-            "%Z"))))
-(advice-add #'after-insert-file-set-coding :after #'+mode-line-update-encoding)
-(advice-add #'set-buffer-file-coding-system :after #'+mode-line-update-encoding)
+(defadvice! +mode-line-update-encoding (&rest _)
+  :after '(after-insert-file-set-coding set-buffer-file-coding-system)
+  "Get encoding and EOL type of current buffer."
+  (setq +mode-line-encoding
+        (unless (and (memq (coding-system-category buffer-file-coding-system)
+                           '(coding-category-undecided coding-category-utf-8))
+                     (eq (coding-system-eol-type buffer-file-coding-system) 0))
+          "%Z")))
+(add-hook! find-file-hook #'+mode-line-update-encoding)
 
 ;; [project-crumb]
 (defvar-local +mode-line-project-crumb nil)
+(defadvice! +mode-line-update-project-crumb (&rest _)
+  :after '(rename-buffer set-visited-file-name pop-to-buffer popup-create popup-delete)
+  (setq +mode-line-project-crumb
+        (breadcrumb-project-crumbs)))
 (add-hook! (find-file-hook after-save-hook clone-indirect-buffer-hook Info-selection-hook
                            window-configuration-change-hook)
-  (defun +mode-line-update-project-crumb (&rest _)
-    (setq +mode-line-project-crumb
-          (breadcrumb-project-crumbs))))
-(advice-add #'rename-buffer :after #'+mode-line-update-project-crumb)
-(advice-add #'set-visited-file-name :after #'+mode-line-update-project-crumb)
-(advice-add #'pop-to-buffer :after #'+mode-line-update-project-crumb)
-(advice-add #'popup-create :after #'+mode-line-update-project-crumb)
-(advice-add #'popup-delete :after #'+mode-line-update-project-crumb)
+  #'+mode-line-update-project-crumb)
 
 ;;; Cache envrc status
 (defvar-local +mode-line-envrc nil)
@@ -129,11 +125,11 @@
               ('error 'error)
               (_ nil)))))
   (force-mode-line-update t))
-(defun +mode-line-envrc-after-apply (buffer _result)
+(defadvice! +mode-line-envrc-after-apply (buffer _result)
+  :after #'envrc--apply
   "Update the cached envrc status after applying BUFFER's environment."
   (+mode-line-update-envrc buffer))
-(add-hook 'envrc-mode-hook #'+mode-line-update-envrc)
-(advice-add #'envrc--apply :after #'+mode-line-envrc-after-apply)
+(add-hook! envrc-mode-hook #'+mode-line-update-envrc)
 
 
 (defsubst +mode-line-normal ()
@@ -184,7 +180,10 @@
 
 ;; [tab-bar] Tab bar
 (use-package tab-bar
-  ;; Turn on tab-bar in early-init to speedup
+  :bind (("M-t" . tab-new)
+         ("M-w" . tab-close)
+         ("M-<tab>" . tab-next)
+         ("M-S-<tab>" . tab-previous))
   :config
   (setq tab-bar-separator ""
         tab-bar-new-tab-choice "*scratch*"
@@ -194,6 +193,7 @@
         tab-bar-tab-hints t)
 
   (customize-set-variable 'tab-bar-select-tab-modifiers '(meta))
+  (customize-set-variable 'tab-bar-show nil)
 
   ;; truncate for [tab name] and add count
   (setq tab-bar-tab-name-format-functions
@@ -201,6 +201,25 @@
           tab-bar-tab-name-format-truncated
           (lambda (name &rest _) (concat " " name " "))
           tab-bar-tab-name-format-face))
+
+  (defadvice! +tab-bar-echo (&rest _)
+    :after '(tab-bar-select-tab tab-bar-new-tab tab-bar-close-tab)
+    "Display the current tab bar in the echo area."
+    (interactive)
+    (message
+     "%s"
+     (cl-loop for tab in (funcall tab-bar-tabs-function)
+              for i from 1
+              for current = (eq (car tab) 'current-tab)
+              for face = (funcall tab-bar-tab-face-function tab)
+              concat (if (= i 1) "" " ")
+              concat (propertize
+                      (format "%d %s" i
+                              (tab-bar-tab-name-format-truncated
+                               (alist-get 'name tab) tab i))
+                      'face (if current
+                                `(:inherit ,face :inverse-video t)
+                              face)))))
 
   (defvar +tab-bar-gnus-indicator-cache nil)
   (defvar +tab-bar-telega-indicator-cache nil)
@@ -232,7 +251,10 @@
         (force-mode-line-update t))))
 
   (with-eval-after-load 'telega
-    (defun +tab-bar-telega-indicator-update (&rest _)
+    (defadvice! +tab-bar-telega-indicator-update (&rest _)
+      :after '(telega--on-updateUnreadChatCount
+               telega--on-updateChatUnreadMentionCount
+               telega--on-updateChatUnreadReactionCount)
       "Update the cached Telega status in the tab bar."
       (when (and (featurep 'telega)
                  (telega-server-live-p))
@@ -255,11 +277,7 @@
                 telega-chats-fetched-hook
                 telega-kill-hook
                 telega-online-status-hook)
-      #'+tab-bar-telega-indicator-update)
-
-    (advice-add 'telega--on-updateUnreadChatCount :after #'+tab-bar-telega-indicator-update)
-    (advice-add 'telega--on-updateChatUnreadMentionCount :after #'+tab-bar-telega-indicator-update)
-    (advice-add 'telega--on-updateChatUnreadReactionCount :after #'+tab-bar-telega-indicator-update))
+      #'+tab-bar-telega-indicator-update))
 
   (with-eval-after-load 'elfeed
     (add-hook! (elfeed-db-update-hook elfeed-tag-hook elfeed-untag-hook)
@@ -291,11 +309,11 @@
                 `((tab-bar-emms menu-item ,text emms-playlist-mode-go)))))
       (force-mode-line-update t))
 
-    (dolist (hook '(emms-player-started-hook
-                    emms-player-paused-hook
-                    emms-player-stopped-hook
-                    emms-player-finished-hook))
-      (add-hook hook #'+tab-bar-emms-indicator-update t))
+    (add-hook! (emms-player-started-hook
+                emms-player-paused-hook
+                emms-player-stopped-hook
+                emms-player-finished-hook)
+      :append #'+tab-bar-emms-indicator-update)
     (+tab-bar-emms-indicator-update))
 
   ;; WORKAROUND: fresh tab-bar for daemon
