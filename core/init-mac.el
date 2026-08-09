@@ -20,14 +20,18 @@
 (use-package emt
   :straight (:host github :repo "roife/emt"
                    :files ("*.el" "module/*" "module"))
+  :commands (emt-mode emt-download-module emt-ensure
+                      emt-forward-word emt-backward-word)
   :init
+  ;; Keep dylib under no-littering `var/' (upstream path policy).
   (setq emt-lib-path
         (concat (no-littering-expand-var-file-name "modules/libEMT")
                 module-file-suffix))
-  :hook (after-init . emt-mode))
+  (defun +emt-enable-or-install ()
+    "Enable `emt-mode' without interactive prompts during startup.
 
 If the native module is missing, do NOT auto-download (no integrity pin
-                                                          on the remote artifact).  Leave a recovery message for interactive install.
+on the remote artifact).  Leave a recovery message for interactive install.
 
 Do not hook `after-init': `emt-mode' -> `emt-ensure' may call
 `yes-or-no-p' while early-init still has inhibit-redisplay/message."
