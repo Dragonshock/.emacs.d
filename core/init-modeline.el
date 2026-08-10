@@ -180,10 +180,10 @@
 
 ;; [tab-bar] Tab bar
 (use-package tab-bar
-  :bind (("M-t" . tab-new)
-         ("M-w" . tab-close)
-         ("M-<tab>" . tab-next)
-         ("M-S-<tab>" . tab-previous))
+  ;; :bind (("M-t" . tab-new)
+  ;;        ("M-w" . tab-close)
+  ;;        ("M-<tab>" . tab-next)
+  ;;        ("M-S-<tab>" . tab-previous))
   :config
   (setq tab-bar-separator ""
         tab-bar-new-tab-choice "*scratch*"
