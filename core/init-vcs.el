@@ -8,7 +8,9 @@
   ;; enabling it would run real `auto-revert-mode' (timer + file notifications)
   ;; in every VC-tracked buffer, which is exactly what `+auto-revert-mode' in
   ;; init-edit.el exists to avoid.
-  (setq vc-allow-async-revert t
+  (setq vc-handled-backends '(Git)
+        vc-consult-headers nil
+        vc-allow-async-revert t
         ;; Emacs 31: `t' rewrites published history with no prompt — prefer ask.
         vc-allow-rewriting-published-history 'ask
         vc-dir-auto-hide-up-to-date 'revert))

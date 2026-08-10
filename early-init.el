@@ -27,11 +27,13 @@
     (expand-file-name "var/eln-cache/" user-emacs-directory))))
 
 ;; Keep early startup quiet unless we're debugging init.
-;; Leave stock defaults for jit-compilation and async-report (both t on 31).
-;; Emacs 30+: only override the kind filter and battery/missing-source behavior.
+;; Match upstream (roife): only report native-comp warnings when debugging
+;; (`emacs --debug-init` sets init-file-debug). Default nil suppresses the
+;; common "function is not known to be defined" popups from third-party
+;; packages (emt / easy-kill / reader, etc.). Keep eln-cache redirect above.
 (setq ad-redefinition-action 'accept
       jka-compr-verbose init-file-debug
-      native-comp-async-warnings-errors-kind (if init-file-debug 'all 'important)
+      native-comp-async-report-warnings-errors init-file-debug
       native-comp-warning-on-missing-source init-file-debug
       native-comp-async-on-battery-power nil
       warning-suppress-types '((defvaralias) (lexical-binding))

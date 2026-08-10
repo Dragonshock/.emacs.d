@@ -165,12 +165,6 @@ Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
   :config (setq undo-hl-flash-duration 0.1))
 
 
-;; [imenu] Jump to function definitions
-(use-package imenu
-  :commands (imenu--make-index-alist)
-  :hook ((prog-mode conf-mode yaml-mode markdown-ts-mode org-mode) . (lambda () (imenu--make-index-alist t))))
-
-
 ;; [re-builder]
 (use-package re-builder
   :straight nil

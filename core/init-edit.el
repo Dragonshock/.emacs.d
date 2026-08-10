@@ -166,6 +166,7 @@ Global `window-selection-change-functions' also receives a frame."
   :config
   (+jinx-ensure-build-env)
   ;; Skip CJK runs (upstream fix); English-only dict otherwise flags 中文.
+  (setq jinx-delay 0.5)
   (add-to-list 'jinx-exclude-regexps '(t "\\cc")))
 
 

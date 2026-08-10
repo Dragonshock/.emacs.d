@@ -52,7 +52,9 @@
   (setq ghostel-module-auto-install 'download
         ;; OSC 52: programs can set the kill-ring/clipboard.  Useful over
         ;; SSH; disabled by upstream default for security.
-        ghostel-enable-osc52 t)
+        ghostel-enable-osc52 t
+        ;; Align with upstream: cap scrollback at 50 MiB (default is 5 MiB).
+        ghostel-max-scrollback (* 50 1024 1024))
 
   :preface
   (defun +ghostel-send-C-k-and-kill ()

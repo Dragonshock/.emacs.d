@@ -1,9 +1,5 @@
 ;;; -*- lexical-binding: t -*-
 
-(use-package prog-mode
-  :hook ((prog-mode . prettify-symbols-mode)))
-
-
 ;; [compile]
 (use-package compile
   :config
@@ -371,7 +367,7 @@
 
 
 (use-package verilog-mode
-  :straight t
+  :straight (:type built-in)
   :config
   (setq verilog-align-ifelse t
         verilog-auto-delete-trailing-whitespace t
@@ -479,6 +475,7 @@
                    (default-value 'text-property-default-nonsticky))
         t)
   (setq indent-bars-display-on-blank-lines nil
+        indent-bars-depth-update-delay 0.15
         indent-bars-width-frac 0.1
         indent-bars-color '(highlight :face-bg t :blend 0.2)
         indent-bars-highlight-current-depth nil

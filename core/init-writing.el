@@ -51,9 +51,15 @@
   ;; Hide markup / inline images are buffer-local (:local t) — set defaults.
   (setq-default markdown-ts-hide-markup t
                 markdown-ts-inline-images t)
-  ;; Fold bodies on open, keep all heading levels visible
-  (setq markdown-ts-default-folding 'fold-headings)
-  ;; fontify/context/table modes already default to t in Emacs 31 markdown-ts-mode.
+  (setq
+   ;; Fold bodies on open, keep all heading levels visible
+   markdown-ts-default-folding 'fold-headings
+   ;; Highlight fenced code blocks with the embedded language's mode
+   markdown-ts-fontify-code-blocks-natively t
+   ;; TAB/newline run in the code block's language when point is inside it
+   markdown-ts-enable-code-block-context-mode t
+   ;; org-table-like editing/auto-align when point is in a pipe table
+   markdown-ts-enable-table-mode t)
 
   ;; markdown-ts-mode gives all 6 heading levels the same face; inherit the
   ;; Org level faces instead so they differ and follow the current theme.
@@ -61,6 +67,12 @@
     (set-face-attribute (intern (format "markdown-ts-heading-%d" (1+ i))) nil
                         :inherit (intern (format "org-level-%d" (1+ i)))
                         :weight 'unspecified)))
+
+
+;; [md-babel] Execute Markdown fenced blocks through Org Babel
+(use-package md-babel
+  :straight (:host github :repo "roife/md-babel")
+  :hook (markdown-ts-mode . md-babel-mode))
 
 
 ;; [typst-ts-mode]
@@ -101,7 +113,7 @@
 
 ;; [reftex]
 (use-package reftex
-  :straight t
+  :straight (:type built-in)
   :hook ((LaTeX-mode . turn-on-reftex)
          (latex-mode . turn-on-reftex))
   :config

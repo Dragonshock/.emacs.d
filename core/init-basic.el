@@ -82,6 +82,7 @@
  ;; Will improve long line display performance
  bidi-inhibit-bpa t
  bidi-paragraph-direction 'left-to-right
+ bidi-display-reordering nil
 
  ;; Leave long-line-threshold / large-hscroll-threshold / syntax-wholeline-max
  ;; at stock defaults (DOC: do not lower except for debugging; stock ~50000 /
@@ -348,7 +349,21 @@
                   eldoc-mode
                   flymake-mode
                   ws-butler-mode
-                  auto-composition-mode))
+                  auto-composition-mode
+                  diff-hl-mode
+                  display-fill-column-indicator-mode
+                  goggles-mode
+                  highlight-changes-mode
+                  highlight-parentheses-mode
+                  hl-line-mode
+                  indent-bars-mode
+                  jinx-mode
+                  ligature-mode
+                  prettify-symbols-mode
+                  rainbow-delimiters-mode
+                  scrollview-mode
+                  symbol-overlay-mode
+                  whitespace-mode))
     (add-to-list 'so-long-minor-modes mode))
 
   ;; Do not set bidi-display-reordering to nil (debug-only / unsupported).
@@ -385,18 +400,17 @@
  fast-but-imprecise-scrolling t
 
  ;; Keep 5 lines when scrolling
- scroll-step 0
- scroll-margin 3
- scroll-up-aggressively 0.01 ; less jumpy
- scroll-down-aggressively 0.01
- scroll-conservatively 101
+ scroll-step 6
+ scroll-margin 6
+ scroll-up-aggressively 0.25
+ scroll-down-aggressively 0.25
  ;; Reduce cursor lag by a tiny bit by not auto-adjusting `window-vscroll' for tall lines.
  auto-window-vscroll nil
 
  ;; [hscroll]
  auto-hscroll-mode t
- hscroll-step 0
- hscroll-margin 2)
+ hscroll-step 0.3
+ hscroll-margin 6)
 
 (defvar +scrolling-lines 10)
 (defun +scroll-other-window () (interactive) (scroll-other-window +scrolling-lines))
