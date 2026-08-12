@@ -148,7 +148,7 @@ Shared by maximize and true fullscreen (macOS often uses `fullboth', not
   (with-eval-after-load 'popper
     (setq popper-mode-line
           '(:eval `(:propertize " POP |"
-                                face (:inherit ,(+mode-line-get-window-name-face)
+                                face (:inherit +mode-line-meta-face
                                                :inverse-video ,(mode-line-window-selected-p))))))
 
   ;; Enable indicator in minibuffer

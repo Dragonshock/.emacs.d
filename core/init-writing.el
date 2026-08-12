@@ -6,19 +6,11 @@
 ;; would get column-centered soft-wrap under treesit remaps.
 (use-package visual-fill-column
   :straight t
-  :hook ((org-mode markdown-ts-mode text-mode) . +maybe-visual-fill-column)
-  :init
-  (defun +maybe-visual-fill-column ()
-    "Enable visual-fill-column for prose; skip treesit data languages."
-    (unless (derived-mode-p 'yaml-ts-mode 'toml-ts-mode 'yaml-mode 'conf-mode
-                            'conf-toml-mode)
-      (visual-fill-column-mode 1)))
   :config
   (setq-default visual-fill-column-center-text t))
 
-
 ;; [visual-line-mode] Soft line-wrapping
-(add-hook! text-mode-hook #'visual-line-mode)
+(add-hook! (org-mode-hook markdown-ts-mode-hook) #'visual-line-mode)
 
 ;; [pangu] Add pangu spaces
 (use-package pangu-spacing
