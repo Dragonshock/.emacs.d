@@ -158,7 +158,7 @@ Requires both binaries (see `+agent-shell-pi-acp-bin' and
   ;; inherited environment — the official client passes this list verbatim,
   ;; and `grok' needs HOME/PATH from the login environment (~/.grok/auth.json).
   (setq agent-shell-xai-acp-command (list +agent-shell-grok-bin "agent" "stdio")
-        agent-shell-xai-default-model-id "grok-4.5"
+        agent-shell-xai-default-model-id "grok-4.6"
         agent-shell-xai-environment
         (agent-shell-make-environment-variables :inherit-env t))
 
