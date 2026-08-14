@@ -50,6 +50,17 @@
 
 (load (expand-file-name "init.el" user-emacs-directory) nil t)
 
+;; During install (batch only), pre-download ghostel's precompiled native
+;; module so the terminal emulator is ready without a first-run download.
+;; Idempotent: skipped when the module is already present.
+(when (and noninteractive
+           (require 'ghostel nil t)
+           (boundp 'ghostel-module-directory)
+           (fboundp 'ghostel-download-module)
+           (not (file-exists-p
+                 (expand-file-name "ghostel-module.so" ghostel-module-directory))))
+  (ignore-errors (ghostel-download-module)))
+
 (let ((failed (nreverse cloud-agent--failed-modules)))
   (if failed
       (message "cloud-agent-bootstrap: %d core module(s) had skipped packages: %s"

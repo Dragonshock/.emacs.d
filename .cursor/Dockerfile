@@ -1,15 +1,18 @@
 # Cloud Agent base image for this Emacs configuration.
 #
-# Ubuntu ships Emacs 29, but this configuration targets Emacs 30+ (for example
-# init-edit.el calls `kill-ring-deindent-mode', new in Emacs 30). So we build
-# Emacs 30.x from source with native compilation, tree-sitter, dynamic modules
-# and a GTK3/X11 GUI, plus the external tools the config shells out to
-# (ripgrep, fd, mpv, ffmpeg, exiftool, universal-ctags, isync, enchant for
-# jinx, and difftastic for magit-difftastic).
+# Ubuntu ships Emacs 29, but this configuration targets Emacs 31 (it uses
+# Emacs 31 APIs such as the `system-sleep' library and `kill-ring-deindent-mode';
+# the code even notes it "runs on 31.0.91 builds"). So we build Emacs 31.0.91
+# from source with native compilation, tree-sitter, dynamic modules and a
+# GTK3/X11 GUI, plus the external tools the config shells out to (ripgrep, fd,
+# mpv, ffmpeg, exiftool, universal-ctags, isync, enchant for jinx, and
+# difftastic for magit-difftastic).
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-ARG EMACS_VERSION=30.2
+# Emacs 31 is not yet a stable release; 31.0.91 is the current pretest and the
+# version this configuration is written against.
+ARG EMACS_VERSION=31.0.91
 ARG DIFFT_VERSION=0.70.0
 
 # Build toolchain + Emacs build dependencies + runtime tools used by the config.
@@ -24,8 +27,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       enchant-2 libenchant-2-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Build and install Emacs from the GNU release tarball.
-RUN curl -fsSL "https://ftpmirror.gnu.org/emacs/emacs-${EMACS_VERSION}.tar.xz" -o /tmp/emacs.tar.xz \
+# Build and install Emacs from source. Prefer a stable GNU release if one
+# exists for this version; otherwise fall back to the pretest/alpha tarball.
+RUN ( curl -fsSL "https://ftpmirror.gnu.org/emacs/emacs-${EMACS_VERSION}.tar.xz" -o /tmp/emacs.tar.xz \
+      || curl -fsSL "https://alpha.gnu.org/gnu/emacs/pretest/emacs-${EMACS_VERSION}.tar.xz" -o /tmp/emacs.tar.xz ) \
     && mkdir -p /tmp/emacs-src \
     && tar -xf /tmp/emacs.tar.xz -C /tmp/emacs-src --strip-components=1 \
     && cd /tmp/emacs-src \
@@ -46,13 +51,12 @@ RUN curl -fsSL "https://github.com/Wilfred/difftastic/releases/download/${DIFFT_
     && chmod +x /usr/local/bin/difft \
     && rm -f /tmp/difft.tar.gz
 
-# Convenience launcher: load the config resiliently (skips the two packages
-# that cannot build on Linux) via scripts/cloud-agent-bootstrap.el in the
-# checkout that install links to ~/.emacs.d.
+# Convenience launcher: load the config via the ~/.config/emacs-cloud profile
+# that install creates, so global modes activate (after-init-hook fires) while
+# still tolerating the two packages that cannot build on Linux.
 RUN printf '%s\n' \
       '#!/usr/bin/env bash' \
-      'exec emacs -q --init-directory="$HOME/.emacs.d" \' \
-      '  -l "$HOME/.emacs.d/scripts/cloud-agent-bootstrap.el" "$@"' \
+      'exec emacs --init-directory="$HOME/.config/emacs-cloud" "$@"' \
       > /usr/local/bin/emacs-dev \
     && chmod +x /usr/local/bin/emacs-dev
 
