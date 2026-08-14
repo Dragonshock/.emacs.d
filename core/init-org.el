@@ -76,7 +76,12 @@
   :straight t
   :after org
   :config
-  (setf (alist-get 'mermaid org-babel-load-languages) t))
+  (setf (alist-get 'mermaid org-babel-load-languages) t)
+  ;; Tracked CLI theme/label config at config root (see README).
+  (setq org-babel-default-header-args:mermaid
+        (append (bound-and-true-p org-babel-default-header-args:mermaid)
+                `((:config . ,(expand-file-name "mermaid-config-emacs.json"
+                                                user-emacs-directory))))))
 
 
 ;; [org-entities]

@@ -6,6 +6,7 @@
                      (float-time (time-subtract nil before-init-time))
                      (float-time (time-subtract after-init-time before-init-time)))))
 
+;; Keep README.md "Module load order" in sync with this list.
 (defvar +init-files (list
                      'init-util
                      'init-straight
