@@ -79,8 +79,7 @@
   :after '(rename-buffer set-visited-file-name pop-to-buffer popup-create popup-delete)
   (setq +mode-line-project-crumb
         (breadcrumb-project-crumbs)))
-(add-hook! (find-file-hook after-save-hook clone-indirect-buffer-hook Info-selection-hook
-                           window-configuration-change-hook)
+(add-hook! (find-file-hook after-save-hook clone-indirect-buffer-hook Info-selection-hook)
   #'+mode-line-update-project-crumb)
 
 ;;; Cache envrc status

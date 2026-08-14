@@ -114,12 +114,19 @@ GUI and daemon Emacs often lack npm global bins; keep Homebrew and
         (unless (and path (string-match-p (regexp-quote dir) path))
           (setenv "PATH" (concat dir path-separator (or path ""))))))))
 
+(defun +agent-shell-cursor-cli-p (bin)
+  "Return non-nil if BIN is the Cursor CLI, not some other program named agent."
+  (when (and bin (file-executable-p bin))
+    (let ((path (expand-file-name bin)))
+      (or (string-suffix-p "/.local/bin/agent" path)
+          (string-match-p "/\\.cursor/" path)))))
+
 (defun +agent-shell-resolved-cursor-bin ()
   "Return the Cursor CLI (`agent') path, or nil."
   (+agent-shell-ensure-path)
-  (or (and (file-executable-p +agent-shell-cursor-bin)
-           +agent-shell-cursor-bin)
-      (executable-find "agent")))
+  (seq-find #'+agent-shell-cursor-cli-p
+            (delq nil (list +agent-shell-cursor-bin
+                            (executable-find "agent")))))
 
 ;;; Entry commands (always a NEW shell of that agent; picker is on C-c C-g)
 
@@ -330,10 +337,13 @@ Requires both binaries (see `+agent-shell-pi-acp-bin' and
     (warn "Cannot find pi at %s. Install: npm i -g @earendil-works/pi-coding-agent"
           +agent-shell-pi-bin))
 
-  ;; Avoid zoom thrashing the agent window (same idea as former grok-ide).
+  ;; Avoid zoom thrashing agent / viewport windows (same idea as former grok-ide).
   (with-eval-after-load 'zoom
     (when (boundp 'zoom-ignored-major-modes)
-      (add-to-list 'zoom-ignored-major-modes 'agent-shell-mode))))
+      (dolist (mode '(agent-shell-mode
+                      agent-shell-viewport-view-mode
+                      agent-shell-viewport-edit-mode))
+        (add-to-list 'zoom-ignored-major-modes mode))))
 
 (provide 'init-agent-shell)
 

@@ -197,8 +197,18 @@ ENTRY may be a regexp string, major-mode symbol, or predicate."
   :straight t
   :hook (window-setup . zoom-mode)
   :config
-  (setq zoom-minibuffer-preserve-layout nil
-        zoom-ignored-major-modes '(ediff-mode vundo-mode minibuffer-mode speedbar-mode))
+  (setq zoom-minibuffer-preserve-layout t
+        zoom-ignored-major-modes
+        '(ediff-mode vundo-mode minibuffer-mode speedbar-mode
+          agent-shell-mode
+          agent-shell-viewport-view-mode
+          agent-shell-viewport-edit-mode))
+  ;; vertico-buffer is a real window (half-frame).  With preserve-layout
+  ;; nil, zoom and that split fight on window-size-change-functions and
+  ;; pin a CPU core.  Ignore typical minibuffer/vertico buffer names too.
+  (when (boundp 'zoom-ignored-buffer-name-regexps)
+    (dolist (re '("\\` \\*Minibuf-" "\\` \\*Vertico" "\\` \\*agent-shell"))
+      (add-to-list 'zoom-ignored-buffer-name-regexps re)))
 
   (add-hook! vundo-mode-hook
     (defun +zoom-fix-window-size-h ()
