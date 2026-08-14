@@ -1,7 +1,7 @@
 ;;; -*- lexical-binding: t -*-
-;;; init-agent-shell.el --- Grok Build + Claude Code + Pi via agent-shell (ACP) -*- lexical-binding: t; -*-
+;;; init-agent-shell.el --- Grok Build + Cursor + Claude Code + Pi via agent-shell (ACP) -*- lexical-binding: t; -*-
 
-;; Triple ACP agents in agent-shell (Grok Build, Claude Code, Pi).
+;; ACP agents in agent-shell (Grok Build, Cursor, Claude Code, Pi).
 ;; UX aligned with agent-shell author (viewport-first) + package same-window
 ;; display (applied 2026-08-03: V1 D1a V3 V4 from
 ;; dev-docs/notes/agent-shell-ux-align-recommendations-2026-08-02.md).
@@ -11,32 +11,45 @@
 ;;   command: grok agent stdio       (absolute path set below)
 ;;   auth:    ACP authenticate with `cached_token' (~/.grok/auth.json,
 ;;            written by `grok login'; no API key involved)
+;; Cursor:  official Cursor CLI ACP (`agent acp`); auth is `agent login'
+;;          outside Emacs (agent-shell-cursor-authentication :none).
 ;; Claude:  claude-agent-acp (npm: @agentclientprotocol/claude-agent-acp)
 ;;          — not the bare `claude' CLI; that is only for `claude login'.
 ;; Pi:      pi-acp adapter (npm: pi-acp) → spawns `pi --mode rpc'
 ;;          — agent-shell never talks to bare `pi' over ACP; see
 ;;          dev-docs/notes/how-agent-shell-works-with-pi-2026-08-02.md
 ;;
-;; Grok model: ACP IDs such as "grok-4.6" via `agent-shell-xai-default-model-id'.
-;; Grok Build also advertises "grok-build" as an ACP model id (CLI coding
-;; default, currently 4.6).  That is distinct from the agent-shell config
+;; Grok model: new sessions prefer "grok-4.6" via
+;; `agent-shell-xai-default-model-id'.  Do NOT pass `-m' on the CLI command
+;; (that pins the process).  Switch mid-session with C-c C-v (or viewport `v')
+;; among advertised ACP ids (`grok-4.6', `grok-build', `grok-4.5', …).
+;; `grok-build' as an ACP model id is distinct from the agent-shell config
 ;; :identifier `grok-build' used in `agent-shell-preferred-agent-config'.
+;;
+;; Grok effort: Grok Build advertises reasoning effort as ACP session *modes*
+;; (minimal / low / medium / high / xhigh), not thought_level.  Switch with
+;; C-c C-m, C-<tab>, or viewport `s'.  Leave
+;; `agent-shell-xai-default-session-mode-id' nil so effort is not pinned;
+;; do not pass `--effort' on the CLI command.  C-c C-t is thought_level
+;; (Claude/Codex); Grok typically does not advertise that category.
 ;;
 ;; MCP: agent-shell-mcp-servers stays nil — each agent uses its own native
 ;; MCP/plugins (same idea as Zed agent-owned context servers).
 ;;
 ;; Keys (agent-shell DWIM):
 ;;   C-c C-g          start or reuse a shell; picker when creating a NEW one
-;;   C-u C-c C-g      force a new shell (picker: Grok / Claude / Pi)
+;;   C-u C-c C-g      force a new shell (picker: Grok / Cursor / Claude / Pi)
 ;;   C-u C-u C-c C-g  pick among existing shells
 ;;   C-c C-;          compose a multi-line prompt (agent-shell-prompt-compose)
 ;;   C-c C-v          set session model (when advertised)
-;;   C-c C-m          set session mode
-;;   C-c C-t          set thought level (when advertised)
+;;   C-c C-m          set session mode (Grok: reasoning effort, incl. xhigh)
+;;   C-c C-t          set thought level (when advertised; not Grok effort)
 ;;   C-<tab>          cycle session mode
 ;;   C-c C-o          switch viewport ↔ shell buffer
 ;;   Viewport view:   y / c / m / r (and ? for help)
+;;                    v model, s mode/effort, t thought level
 ;;   M-x +agent-shell-start-grok    always new Grok
+;;   M-x +agent-shell-start-cursor  always new Cursor
 ;;   M-x +agent-shell-start-claude  always new Claude
 ;;   M-x +agent-shell-start-pi      always new Pi
 ;;
@@ -47,6 +60,8 @@
 ;; Prerequisites:
 ;;   - Emacs 29.1+
 ;;   - Grok: ~/.grok/bin/grok + `grok login'
+;;   - Cursor: ~/.local/bin/agent + `agent login'
+;;             (curl https://cursor.com/install -fsS | bash; needs `agent acp')
 ;;   - Claude: `npm i -g @agentclientprotocol/claude-agent-acp'
 ;;             + `claude login' (or existing subscription login)
 ;;   - Pi: `pi` + `pi-acp` on PATH (Homebrew/npm); absolute paths set below
@@ -62,6 +77,10 @@
 Same binary as `+telega-grok-bin' (init-social.el) uses for unread
 summaries.")
 
+(defconst +agent-shell-cursor-bin
+  (expand-file-name "~/.local/bin/agent")
+  "Absolute path to the Cursor CLI (`agent acp`).")
+
 (defconst +agent-shell-pi-acp-bin
   "/opt/homebrew/bin/pi-acp"
   "Absolute path to the pi-acp ACP adapter (not bare `pi').")
@@ -73,10 +92,11 @@ Passed to pi-acp as PI_ACP_PI_COMMAND so the adapter does not rely on PATH.")
 
 (defconst +agent-shell-bin-dirs
   (list (file-name-directory +agent-shell-grok-bin)
+        (file-name-directory +agent-shell-cursor-bin)
         (expand-file-name "~/.local/bin")
         "/opt/homebrew/bin"
         "/usr/local/bin")
-  "Directories that may hold ACP agent CLIs (grok, claude-agent-acp, pi-acp, pi).
+  "Directories that may hold ACP agent CLIs (grok, agent, claude-agent-acp, pi-acp, pi).
 
 GUI and daemon Emacs often lack npm global bins; keep Homebrew and
 ~/.local/bin here.  If `npm prefix -g` is elsewhere, add \"PREFIX/bin\".")
@@ -107,6 +127,23 @@ Requires `+agent-shell-grok-bin' (or `grok' on PATH) and a prior
      "Cannot find Grok Build CLI at %s. Install it and run `grok login'."
      +agent-shell-grok-bin))
   (agent-shell--dwim :config (agent-shell-xai-make-grok-config)
+                     :new-shell t))
+
+(defun +agent-shell-start-cursor ()
+  "Start a new interactive Cursor agent shell (official ACP).
+
+Requires `+agent-shell-cursor-bin' (or `agent' on PATH) and a prior
+`agent login'.  Needs a 2026+ Cursor CLI that provides `agent acp'."
+  (interactive)
+  (require 'agent-shell)
+  (require 'agent-shell-cursor)
+  (+agent-shell-ensure-path)
+  (unless (or (file-executable-p +agent-shell-cursor-bin)
+              (executable-find "agent"))
+    (user-error
+     "Cannot find Cursor CLI at %s. Install: curl https://cursor.com/install -fsS | bash ; then `agent login'."
+     +agent-shell-cursor-bin))
+  (agent-shell--dwim :config (agent-shell-cursor-make-agent-config)
                      :new-shell t))
 
 (defun +agent-shell-start-claude ()
@@ -153,6 +190,7 @@ Requires both binaries (see `+agent-shell-pi-acp-bin' and
   ;; in this file when init loads it (do not map them to the agent-shell feature).
   :commands (agent-shell agent-shell-anthropic-start-claude-code
                          agent-shell-xai-start-grok
+                         agent-shell-cursor-start-agent
                          agent-shell-pi-start-agent
                          agent-shell-prompt-compose)
   :bind (("C-c C-g" . agent-shell)
@@ -162,15 +200,27 @@ Requires both binaries (see `+agent-shell-pi-acp-bin' and
   (+agent-shell-ensure-path)
   ;; Official Grok Build support (agent-shell-xai.el, upstream PR #720).
   (require 'agent-shell-xai)
+  (require 'agent-shell-cursor)
   (require 'agent-shell-anthropic)
   (require 'agent-shell-pi)
 
-  ;; Absolute CLI path (do not depend on PATH alone), preferred model, and
-  ;; inherited environment — the official client passes this list verbatim,
-  ;; and `grok' needs HOME/PATH from the login environment (~/.grok/auth.json).
+  ;; Absolute CLI path (do not depend on PATH alone) and inherited
+  ;; environment — the official client passes this list verbatim, and
+  ;; `grok' needs HOME/PATH from the login environment (~/.grok/auth.json).
+  ;; Prefer grok-4.6 for new sessions; do not pass `-m' / `--effort' (those
+  ;; pin the process).  Switch model with C-c C-v; effort with C-c C-m.
   (setq agent-shell-xai-acp-command (list +agent-shell-grok-bin "agent" "stdio")
         agent-shell-xai-default-model-id "grok-4.6"
+        agent-shell-xai-default-session-mode-id nil
         agent-shell-xai-environment
+        (agent-shell-make-environment-variables :inherit-env t))
+
+  ;; Cursor: official `agent acp'.  Auth is an existing `agent login'
+  ;; (:none — no ACP authenticate).  Do not pass `--model' (CLI default).
+  (setq agent-shell-cursor-acp-command (list +agent-shell-cursor-bin "acp")
+        agent-shell-cursor-authentication
+        (agent-shell-cursor-make-authentication :none t)
+        agent-shell-cursor-environment
         (agent-shell-make-environment-variables :inherit-env t))
 
   ;; Pi: ACP adapter + pin pi binary for the adapter (daemon-safe).
@@ -180,10 +230,11 @@ Requires both binaries (see `+agent-shell-pi-acp-bin' and
          "PI_ACP_PI_COMMAND" +agent-shell-pi-bin
          :inherit-env t))
 
-  ;; Triple base: Grok Build + Claude Code + Pi (pi-acp).
+  ;; Grok Build + Cursor + Claude Code + Pi (pi-acp).
   ;; preselect grok-build: picker still shown on NEW shell; Grok first.
   (setq agent-shell-agent-configs
         (list #'agent-shell-xai-make-grok-config
+              #'agent-shell-cursor-make-agent-config
               #'agent-shell-anthropic-make-claude-code-config
               #'agent-shell-pi-make-agent-config)
         agent-shell-preferred-agent-config '(preselect . grok-build)
@@ -217,6 +268,11 @@ Requires both binaries (see `+agent-shell-pi-acp-bin' and
               (executable-find "grok"))
     (warn "Cannot find Grok Build CLI at %s. Install it and run `grok login'."
           +agent-shell-grok-bin))
+
+  (unless (or (file-executable-p +agent-shell-cursor-bin)
+              (executable-find "agent"))
+    (warn "Cannot find Cursor CLI at %s. Install: curl https://cursor.com/install -fsS | bash ; then `agent login'."
+          +agent-shell-cursor-bin))
 
   (unless (executable-find "claude-agent-acp")
     (warn "Cannot find claude-agent-acp. Install: npm i -g @agentclientprotocol/claude-agent-acp (then `claude login')."))
