@@ -36,11 +36,13 @@
 ;; MCP: agent-shell-mcp-servers stays nil — each agent uses its own native
 ;; MCP/plugins (same idea as Zed agent-owned context servers).
 ;;
-;; Keys (agent-shell DWIM):
-;;   C-c C-g          start or reuse a shell; picker only when creating a NEW one
-;;   C-u C-c C-g      force a new shell (picker: Grok / Cursor / Claude / Pi)
-;;   C-u C-u C-c C-g  pick among existing shells
-;;   C-c c            always new Cursor (does not reuse the Grok shell)
+;; Keys:
+;;   C-c C-g          from a file: picker Grok / Cursor / Claude / Pi
+;;                    (Grok highlighted by default; pick Cursor like Claude/Pi)
+;;                    already in a shell/viewport: toggle that window
+;;   C-u C-c C-g      same picker (always a new shell)
+;;   C-u C-u C-c C-g  pick among existing shells (Grok and Cursor can both exist)
+;;   C-c c            skip the picker; always new Cursor
 ;;   C-c C-;          compose a multi-line prompt (agent-shell-prompt-compose)
 ;;   C-c C-v          set session model (when advertised)
 ;;   C-c C-m          set session mode (Grok: reasoning effort, incl. xhigh)
@@ -54,14 +56,10 @@
 ;;   M-x +agent-shell-start-claude  always new Claude
 ;;   M-x +agent-shell-start-pi      always new Pi
 ;;
-;; Preferred agent: (preselect . grok-build) — still shows the picker with
-;; Grok first (grok-build is the official config's :identifier).  Never use
-;; a bare symbol (that skips the picker).
-;;
-;; Cursor does not appear on a plain C-c C-g when a Grok shell already
-;; exists in the project: DWIM reuses that shell and never opens the
-;; agent picker.  After Grok starts, the next minibuffer is Grok's ACP
-;; *session* list, not the agent list.  Use C-u C-c C-g or C-c c.
+;; Preferred agent: (preselect . grok-build) — picker still shown; Grok is
+;; only the default highlight, not exclusive.  Never use a bare symbol
+;; (that skips the picker).  After you pick an agent, ACP may then prompt
+;; for that agent's *sessions* — that list is per-agent, not the picker.
 ;;
 ;; Prerequisites:
 ;;   - Emacs 29.1+
@@ -123,7 +121,7 @@ GUI and daemon Emacs often lack npm global bins; keep Homebrew and
            +agent-shell-cursor-bin)
       (executable-find "agent")))
 
-;;; Entry commands (always force a NEW shell; DWIM reuse is on C-c C-g)
+;;; Entry commands (always a NEW shell of that agent; picker is on C-c C-g)
 
 (defun +agent-shell-start-grok ()
   "Start a new interactive Grok Build agent shell (official config).
@@ -147,7 +145,7 @@ Requires `+agent-shell-grok-bin' (or `grok' on PATH) and a prior
 
 Requires `+agent-shell-cursor-bin' (or `agent' on PATH) and a prior
 `agent login'.  Needs a 2026+ Cursor CLI that provides `agent acp'.
-Does not reuse an existing Grok shell."
+Grok can stay open in another shell; this only starts Cursor."
   (interactive)
   (require 'agent-shell)
   (require 'agent-shell-cursor)
@@ -161,28 +159,30 @@ Does not reuse an existing Grok shell."
                        :new-shell t)))
 
 (defun +agent-shell (&optional arg)
-  "Start or reuse an agent-shell (DWIM).
+  "Start agent-shell with the Grok / Cursor / Claude / Pi picker.
 
-Plain \\[ +agent-shell] reuses this project's existing shell — typically
-Grok — so the agent picker (and Cursor) never appears.  After Grok ACP
-starts, the minibuffer lists Grok *sessions*, not agents.
+These four do not conflict: each is a separate ACP process and buffer.
+The picker lists Grok, Cursor, Claude, Pi.  Grok is only preselected
+as the default highlight; Cursor is selectable like the other two.
 
-Force the agent picker (Grok / Cursor / Claude / Pi) with a prefix
-argument, or start Cursor with \\[ +agent-shell-start-cursor ]."
+With no prefix: if already in an agent-shell or viewport, toggle that
+window.  Otherwise start a new shell and show the agent picker.
+
+With one \\[universal-argument], always show the picker (new shell).
+With two \\[universal-argument]s, pick among existing shells.
+\\[ +agent-shell-start-cursor] starts Cursor without the picker."
   (interactive "P")
   (require 'agent-shell)
-  (let ((reused (and (not arg)
-                     (not (derived-mode-p 'agent-shell-mode
-                                          'agent-shell-viewport-view-mode
-                                          'agent-shell-viewport-edit-mode))
-                     (ignore-errors (seq-first (agent-shell-project-buffers))))))
-    (agent-shell arg)
-    (when (and reused (buffer-live-p reused))
-      (let ((name (or (map-nested-elt (buffer-local-value 'agent-shell--state reused)
-                                      '(:agent-config :mode-line-name))
-                      (buffer-name reused))))
-        (message "Reusing %s. Cursor is a different agent — C-u C-c C-g or C-c c."
-                 name)))))
+  (cond
+   ((equal arg '(16))
+    (agent-shell '(16)))
+   ((and (not arg)
+         (derived-mode-p 'agent-shell-mode
+                         'agent-shell-viewport-view-mode
+                         'agent-shell-viewport-edit-mode))
+    (agent-shell))
+   (t
+    (agent-shell '(4)))))
 
 (defun +agent-shell-start-claude ()
   "Start a new interactive Claude Code agent shell (ACP).
@@ -276,8 +276,9 @@ Requires both binaries (see `+agent-shell-pi-acp-bin' and
          "PI_ACP_PI_COMMAND" +agent-shell-pi-bin
          :inherit-env t))
 
-  ;; Grok Build + Cursor + Claude Code + Pi (pi-acp).
-  ;; preselect grok-build: picker still shown on NEW shell; Grok first.
+  ;; Four agents, same picker: Grok, Cursor, Claude, Pi.  They do not
+  ;; conflict — each is its own ACP process.  preselect grok-build only
+  ;; highlights Grok as the default; the other three remain selectable.
   (setq agent-shell-agent-configs
         (list #'agent-shell-xai-make-grok-config
               #'agent-shell-cursor-make-agent-config
