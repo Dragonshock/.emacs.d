@@ -37,9 +37,10 @@
 ;; MCP/plugins (same idea as Zed agent-owned context servers).
 ;;
 ;; Keys (agent-shell DWIM):
-;;   C-c C-g          start or reuse a shell; picker when creating a NEW one
+;;   C-c C-g          start or reuse a shell; picker only when creating a NEW one
 ;;   C-u C-c C-g      force a new shell (picker: Grok / Cursor / Claude / Pi)
 ;;   C-u C-u C-c C-g  pick among existing shells
+;;   C-c c            always new Cursor (does not reuse the Grok shell)
 ;;   C-c C-;          compose a multi-line prompt (agent-shell-prompt-compose)
 ;;   C-c C-v          set session model (when advertised)
 ;;   C-c C-m          set session mode (Grok: reasoning effort, incl. xhigh)
@@ -56,6 +57,11 @@
 ;; Preferred agent: (preselect . grok-build) — still shows the picker with
 ;; Grok first (grok-build is the official config's :identifier).  Never use
 ;; a bare symbol (that skips the picker).
+;;
+;; Cursor does not appear on a plain C-c C-g when a Grok shell already
+;; exists in the project: DWIM reuses that shell and never opens the
+;; agent picker.  After Grok starts, the next minibuffer is Grok's ACP
+;; *session* list, not the agent list.  Use C-u C-c C-g or C-c c.
 ;;
 ;; Prerequisites:
 ;;   - Emacs 29.1+
@@ -110,6 +116,13 @@ GUI and daemon Emacs often lack npm global bins; keep Homebrew and
         (unless (and path (string-match-p (regexp-quote dir) path))
           (setenv "PATH" (concat dir path-separator (or path ""))))))))
 
+(defun +agent-shell-resolved-cursor-bin ()
+  "Return the Cursor CLI (`agent') path, or nil."
+  (+agent-shell-ensure-path)
+  (or (and (file-executable-p +agent-shell-cursor-bin)
+           +agent-shell-cursor-bin)
+      (executable-find "agent")))
+
 ;;; Entry commands (always force a NEW shell; DWIM reuse is on C-c C-g)
 
 (defun +agent-shell-start-grok ()
@@ -133,18 +146,43 @@ Requires `+agent-shell-grok-bin' (or `grok' on PATH) and a prior
   "Start a new interactive Cursor agent shell (official ACP).
 
 Requires `+agent-shell-cursor-bin' (or `agent' on PATH) and a prior
-`agent login'.  Needs a 2026+ Cursor CLI that provides `agent acp'."
+`agent login'.  Needs a 2026+ Cursor CLI that provides `agent acp'.
+Does not reuse an existing Grok shell."
   (interactive)
   (require 'agent-shell)
   (require 'agent-shell-cursor)
-  (+agent-shell-ensure-path)
-  (unless (or (file-executable-p +agent-shell-cursor-bin)
-              (executable-find "agent"))
-    (user-error
-     "Cannot find Cursor CLI at %s. Install: curl https://cursor.com/install -fsS | bash ; then `agent login'."
-     +agent-shell-cursor-bin))
-  (agent-shell--dwim :config (agent-shell-cursor-make-agent-config)
-                     :new-shell t))
+  (let ((bin (+agent-shell-resolved-cursor-bin)))
+    (unless bin
+      (user-error
+       "Cannot find Cursor CLI at %s. Install: curl https://cursor.com/install -fsS | bash ; then `agent login'."
+       +agent-shell-cursor-bin))
+    (setq agent-shell-cursor-acp-command (list bin "acp"))
+    (agent-shell--dwim :config (agent-shell-cursor-make-agent-config)
+                       :new-shell t)))
+
+(defun +agent-shell (&optional arg)
+  "Start or reuse an agent-shell (DWIM).
+
+Plain \\[ +agent-shell] reuses this project's existing shell — typically
+Grok — so the agent picker (and Cursor) never appears.  After Grok ACP
+starts, the minibuffer lists Grok *sessions*, not agents.
+
+Force the agent picker (Grok / Cursor / Claude / Pi) with a prefix
+argument, or start Cursor with \\[ +agent-shell-start-cursor ]."
+  (interactive "P")
+  (require 'agent-shell)
+  (let ((reused (and (not arg)
+                     (not (derived-mode-p 'agent-shell-mode
+                                          'agent-shell-viewport-view-mode
+                                          'agent-shell-viewport-edit-mode))
+                     (ignore-errors (seq-first (agent-shell-project-buffers))))))
+    (agent-shell arg)
+    (when (and reused (buffer-live-p reused))
+      (let ((name (or (map-nested-elt (buffer-local-value 'agent-shell--state reused)
+                                      '(:agent-config :mode-line-name))
+                      (buffer-name reused))))
+        (message "Reusing %s. Cursor is a different agent — C-u C-c C-g or C-c c."
+                 name)))))
 
 (defun +agent-shell-start-claude ()
   "Start a new interactive Claude Code agent shell (ACP).
@@ -182,6 +220,12 @@ Requires both binaries (see `+agent-shell-pi-acp-bin' and
   (agent-shell--dwim :config (agent-shell-pi-make-agent-config)
                      :new-shell t))
 
+;; Bind outside use-package :bind.  Those keys would otherwise autoload
+;; `+agent-shell' / `+agent-shell-start-cursor' from the agent-shell
+;; feature, overwriting the defuns in this file.
+(global-set-key (kbd "C-c C-g") #'+agent-shell)
+(global-set-key (kbd "C-c c") #'+agent-shell-start-cursor)
+
 ;;; Package setup
 
 (use-package agent-shell
@@ -193,8 +237,7 @@ Requires both binaries (see `+agent-shell-pi-acp-bin' and
                          agent-shell-cursor-start-agent
                          agent-shell-pi-start-agent
                          agent-shell-prompt-compose)
-  :bind (("C-c C-g" . agent-shell)
-         ;; V3: multi-line compose (works with or without prefer-viewport).
+  :bind (;; V3: multi-line compose (works with or without prefer-viewport).
          ("C-c C-;" . agent-shell-prompt-compose))
   :config
   (+agent-shell-ensure-path)
@@ -217,7 +260,10 @@ Requires both binaries (see `+agent-shell-pi-acp-bin' and
 
   ;; Cursor: official `agent acp'.  Auth is an existing `agent login'
   ;; (:none — no ACP authenticate).  Do not pass `--model' (CLI default).
-  (setq agent-shell-cursor-acp-command (list +agent-shell-cursor-bin "acp")
+  ;; Prefer ~/.local/bin/agent; fall back to `agent' on PATH (GUI Emacs).
+  (setq agent-shell-cursor-acp-command
+        (list (or (+agent-shell-resolved-cursor-bin) +agent-shell-cursor-bin)
+              "acp")
         agent-shell-cursor-authentication
         (agent-shell-cursor-make-authentication :none t)
         agent-shell-cursor-environment
@@ -269,8 +315,7 @@ Requires both binaries (see `+agent-shell-pi-acp-bin' and
     (warn "Cannot find Grok Build CLI at %s. Install it and run `grok login'."
           +agent-shell-grok-bin))
 
-  (unless (or (file-executable-p +agent-shell-cursor-bin)
-              (executable-find "agent"))
+  (unless (+agent-shell-resolved-cursor-bin)
     (warn "Cannot find Cursor CLI at %s. Install: curl https://cursor.com/install -fsS | bash ; then `agent login'."
           +agent-shell-cursor-bin))
 
