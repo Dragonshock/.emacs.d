@@ -48,7 +48,8 @@
           (string-match-p "gh\\.pat\\'" base)
           (string-match-p "/\\.cli-proxy-api/" name)
           (string-match-p "/\\.ssh/" name)
-          (member base '("id_rsa" "id_ed25519" "passwd" "credentials"))))))
+          (member base '("id_rsa" "id_ed25519" "passwd" "credentials"
+                         "private.el" "secrets.el" "local.el"))))))
 
 (setq backup-enable-predicate
       (lambda (name)

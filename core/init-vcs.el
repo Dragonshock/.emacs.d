@@ -163,12 +163,22 @@
 
 ;; [magh.el] Magit-style GitHub frontend powered by the `gh' CLI.
 ;; Upstream github.com/roife/magh.el was DELETED (404). Source of truth is the
-;; local backup clone ~/code/gh.el → straight/repos/magh.el (origin → that path).
-;; MERGE LOCK: do not point recipe at roife/magh.el. Prefer publishing a private
-;; remote later and switching :repo to HTTPS/SSH so rebuilds work off this machine.
+;; local backup clone (default ~/code/gh.el) → straight/repos/magh.el.
+;; Override `+magh-git-repo' in gitignored `private.el'.  MERGE LOCK: do not
+;; point the recipe at roife/magh.el. Prefer a private remote later and switch
+;; :repo to HTTPS/SSH so rebuilds work off this machine.
 ;; Package-Requires Emacs 31.1+ (header); runs on 31.0.91 builds with care.
-(use-package magh
-  :straight (:type git :repo "/Users/dragon/code/gh.el" :local-repo "magh.el")
+(defvar +magh-git-repo (expand-file-name "~/code/gh.el")
+  "Local clone of magh.el (gh.el).  Override in `private.el'.")
+
+(defmacro +magh-package (name &rest body)
+  "Like `use-package' for magh NAME, cloning from `+magh-git-repo'."
+  (declare (indent defun))
+  `(use-package ,name
+     :straight (:type git :repo ,+magh-git-repo :local-repo "magh.el")
+     ,@body))
+
+(+magh-package magh
   :bind (("C-, g g" . magh)
          ("C-, g G" . magh-dispatch)
          ("C-, g d" . magh-repo-status)
@@ -202,8 +212,7 @@
 
 
 ;; [magh-magit] Lightweight asynchronous magh.el summaries in Magit status
-(use-package magh-magit
-  :straight (:type git :repo "/Users/dragon/code/gh.el" :local-repo "magh.el")
+(+magh-package magh-magit
   :after magit
   :demand t
   :config
@@ -218,8 +227,7 @@
 
 
 ;; Structured actions for magh.el candidates in Embark.
-(use-package magh-embark
-  :straight (:type git :repo "/Users/dragon/code/gh.el" :local-repo "magh.el")
+(+magh-package magh-embark
   :after embark
   :demand t
   :config
@@ -227,8 +235,7 @@
 
 
 ;; Keep magh.el's native Issue/PR viewer, with an explicit Forge -> magh.el bridge.
-(use-package magh-forge
-  :straight (:type git :repo "/Users/dragon/code/gh.el" :local-repo "magh.el")
+(+magh-package magh-forge
   :after forge
   :commands (magh-forge-open-current-topic-in-magh)
   :bind (:map forge-topic-mode-map

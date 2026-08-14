@@ -1,0 +1,17 @@
+;;; private.el --- machine-local identity (do not commit)  -*- lexical-binding: t -*-
+
+;; Copy this file to private.el in the same directory and fill in the
+;; values.  init.el loads private.el when it is readable.  .gitignore
+;; excludes private.el; never commit the filled copy.
+
+(setq user-full-name "Your Name"
+      user-mail-address "you@example.com")
+
+;; Reddit username for the private r/emacs Atom URL
+;; (scripts/reddit-elfeed.py).  Leave nil to skip that feed even when
+;; REDDIT_PRIVATE_RSS_TOKEN is present in authinfo.
+(setq +reddit-private-rss-user nil)
+
+;; Local clone of magh.el (used as a git :repo path by init-vcs.el).
+;; Default in init-vcs.el is ~/code/gh.el.
+;; (setq +magh-git-repo (expand-file-name "~/code/gh.el"))
