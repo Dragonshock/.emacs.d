@@ -17,8 +17,10 @@
 ;;          — agent-shell never talks to bare `pi' over ACP; see
 ;;          dev-docs/notes/how-agent-shell-works-with-pi-2026-08-02.md
 ;;
-;; Grok model: ACP IDs like "grok-4.5" via `agent-shell-xai-default-model-id'.
-;; Zed's default_model "grok-build" is NOT a valid Grok ACP model id.
+;; Grok model: ACP IDs such as "grok-4.6" via `agent-shell-xai-default-model-id'.
+;; Grok Build also advertises "grok-build" as an ACP model id (CLI coding
+;; default, currently 4.6).  That is distinct from the agent-shell config
+;; :identifier `grok-build' used in `agent-shell-preferred-agent-config'.
 ;;
 ;; MCP: agent-shell-mcp-servers stays nil — each agent uses its own native
 ;; MCP/plugins (same idea as Zed agent-owned context servers).
@@ -91,11 +93,19 @@ GUI and daemon Emacs often lack npm global bins; keep Homebrew and
 ;;; Entry commands (always force a NEW shell; DWIM reuse is on C-c C-g)
 
 (defun +agent-shell-start-grok ()
-  "Start a new interactive Grok Build agent shell (official config)."
+  "Start a new interactive Grok Build agent shell (official config).
+
+Requires `+agent-shell-grok-bin' (or `grok' on PATH) and a prior
+`grok login' so ACP can authenticate with `cached_token'."
   (interactive)
   (require 'agent-shell)
   (require 'agent-shell-xai)
   (+agent-shell-ensure-path)
+  (unless (or (file-executable-p +agent-shell-grok-bin)
+              (executable-find "grok"))
+    (user-error
+     "Cannot find Grok Build CLI at %s. Install it and run `grok login'."
+     +agent-shell-grok-bin))
   (agent-shell--dwim :config (agent-shell-xai-make-grok-config)
                      :new-shell t))
 
@@ -152,6 +162,7 @@ Requires both binaries (see `+agent-shell-pi-acp-bin' and
   (+agent-shell-ensure-path)
   ;; Official Grok Build support (agent-shell-xai.el, upstream PR #720).
   (require 'agent-shell-xai)
+  (require 'agent-shell-anthropic)
   (require 'agent-shell-pi)
 
   ;; Absolute CLI path (do not depend on PATH alone), preferred model, and
