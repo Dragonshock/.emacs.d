@@ -12,6 +12,8 @@ speeds startup (GC, `eln-cache` under `var/`, frame geometry 120×50).
 | Path | Role | Git |
 |------|------|-----|
 | `early-init.el` `init.el` `core/` | Config source; load order is `+init-files` in `init.el` | tracked |
+| `private.el.example` | Template for machine-local identity | tracked |
+| `private.el` | Name, email, Reddit user, magh clone path | ignored |
 | `scripts/` | Elfeed / Gnus / telega helpers | tracked |
 | `tempel-templates` | Tempel snippets (LaTeX/Org-oriented) | tracked |
 | `mermaid-config-emacs.json` | Mermaid CLI config for Org Babel (`ob-mermaid`) | tracked |
@@ -112,6 +114,11 @@ agent-shell keys (see comments in `core/init-agent-shell.el`): `C-c C-g` start/r
 `C-c C-;` compose. Grok is preselected, not exclusive.
 
 ## Credentials
+
+Copy `private.el.example` to `private.el` (gitignored; loaded from `init.el`)
+and set `user-full-name`, `user-mail-address`, optionally
+`+reddit-private-rss-user` and `+magh-git-repo`. Mail and Reddit private RSS
+do not work until that file exists.
 
 `auth-source` reads `~/.authinfo` and/or `~/.authinfo.gpg` (never commit these;
 `.gitignore` already excludes them).

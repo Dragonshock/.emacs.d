@@ -2,11 +2,12 @@
 
 """Refresh the private r/emacs Atom feed used by Elfeed.
 
-Requires REDDIT_PRIVATE_RSS_TOKEN (set by Emacs from auth-source).
-Optional REDDIT_PRIVATE_RSS_USER (defaults to Complex_Outcome697).
+Requires REDDIT_PRIVATE_RSS_TOKEN (set by Emacs from auth-source)
+and REDDIT_PRIVATE_RSS_USER (set from +reddit-private-rss-user in
+private.el).  There is no baked-in username.
 
-If the token is missing, exit 0 after a skip message so Hacker News
-updates are not reported as a total local-feed failure.
+If the token or username is missing, exit 0 after a skip message so
+Hacker News updates are not reported as a total local-feed failure.
 """
 
 from __future__ import annotations
@@ -23,7 +24,6 @@ from pathlib import Path
 
 
 USER_AGENT = "elfeed-emacs-rss/1.0 (personal Elfeed reader)"
-DEFAULT_USERNAME = "Complex_Outcome697"
 OUTPUT = Path(__file__).resolve().parent.parent / "var" / "rss" / "reddit-emacs.atom"
 
 
@@ -75,7 +75,13 @@ def main() -> int:
         )
         return 0
 
-    username = os.environ.get("REDDIT_PRIVATE_RSS_USER") or DEFAULT_USERNAME
+    username = (os.environ.get("REDDIT_PRIVATE_RSS_USER") or "").strip()
+    if not username:
+        print(
+            "skipping private Reddit feed: REDDIT_PRIVATE_RSS_USER is missing",
+            file=sys.stderr,
+        )
+        return 0
     body = fetch_feed(private_feed_url(token, username))
     validate_feed(body)
     write_feed(body)

@@ -202,12 +202,13 @@ Mail only: Hacker News and other feeds are updated by Elfeed
    gnus-paging-select-next nil))
 
 
-;; Identity / SMTP — independent of Gnus so `compose-mail' / `report-emacs-bug'
+;; SMTP — independent of Gnus so `compose-mail' / `report-emacs-bug'
 ;; work before the first `M-x gnus'.  Do not put these under `:after gnus'.
-;; Align with ~/.config/isyncrc (User) and authinfo smtp.gmail.com login.
-(setq user-full-name "LongZhen"
-      user-mail-address "longzhen9490@gmail.com"
-      send-mail-function #'smtpmail-send-it
+;; Set `user-full-name' / `user-mail-address' in gitignored `private.el'
+;; (see private.el.example).  Align SMTP with ~/.config/isyncrc and
+;; authinfo smtp.gmail.com login; override the smtpmail-* variables in
+;; private.el if you do not use Gmail.
+(setq send-mail-function #'smtpmail-send-it
       smtpmail-smtp-server "smtp.gmail.com"
       smtpmail-smtp-user user-mail-address
       smtpmail-smtp-service 465
