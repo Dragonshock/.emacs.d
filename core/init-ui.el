@@ -124,6 +124,10 @@ does not clobber maximized/custom sizes.  FORCE non-nil re-applies."
       (dolist (charset '(han cjk-misc))
         (set-fontset-font t charset (font-spec :family "LXGW WenKai Mono"))) ; Sarasa Mono SC
 
+      ;; Box Drawing (U+2500–257F): pin TX-02 so agent-shell table
+      ;; borders (│ ─ ┼ ├ ┤) do not fall back to a different-width font.
+      (set-fontset-font t (cons #x2500 #x257F) (font-spec :family "TX-02") nil 'prepend)
+
       ;; Emoji script (Emacs 28+ NEWS); 'prepend so color emoji wins composition.
       ;; Do not bind color-emoji fonts to broad 'unicode — that can miss script
       ;; 'emoji entries or pull non-emoji glyphs into the emoji font.

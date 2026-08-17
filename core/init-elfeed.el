@@ -23,6 +23,48 @@
   "Return the URL string of FEED (string or (url . tags) entry)."
   (if (stringp feed) feed (car feed)))
 
+(defvar +elfeed-ithome-url "https://rsshub.rssforever.com/ithome/it"
+  "IT之家「IT 资讯」分类源（RSSHub）。官网总 RSS 混入智车之家通稿。")
+
+;; V2EX hard ads: scoped to v2ex.com in `+elfeed-tag-promo-entry'.
+(defvar +elfeed-ad-title-regexp
+  (rx (or "中转" "机场" "[招聘]" "[接活]" "[广告]" "免费领"))
+  "Title regexp for V2EX-style hard ads.")
+
+;; IT之家 product PR: brand × shelf signal, minus industry-news exclusions.
+(defvar +elfeed-pr-brand-regexp
+  (rx (or "vivo" "OPPO" "iQOO" "真我" "红米" "REDMI" "小米" "荣耀"
+          "华为" "一加" "realme" "魅族" "三星"
+          "比亚迪" "长城" "魏牌" "奇瑞" "红旗" "吉利" "长安" "一汽"
+          "理想" "问界" "小鹏" "蔚来" "极氪" "阿维塔" "零跑"
+          "丰田" "本田" "大众" "奔驰" "宝马" "奥迪" "捷豹" "路虎"
+          "启境" "深蓝" "方程豹" "腾势" "智己" "飞凡" "iCAR"))
+  "Consumer brands used to detect IT之家 product-PR titles.")
+
+(defvar +elfeed-pr-signal-regexp
+  (rx (or "规格曝光" "开启预售" "限时权益价" "到手价" "万元起" "元起"
+          "预售价" "首发亮相" "高定车色" "车色" "车展"
+          "开售" "预售" "上市"))
+  "Shelf/launch phrasing that, with a brand, marks a title as PR.")
+
+(defvar +elfeed-pr-exclude-regexp
+  (rx (or "专利" "开源" "罢工" "灰度" "推送" "论文" "研究"))
+  "If present, the title is treated as industry news rather than PR.")
+
+(defun +elfeed-ad-title-p (title)
+  "Return non-nil if TITLE looks like a V2EX hard ad."
+  (and (stringp title)
+       (let ((case-fold-search t))
+         (string-match-p +elfeed-ad-title-regexp title))))
+
+(defun +elfeed-pr-title-p (title)
+  "Return non-nil if TITLE looks like an IT之家 product-PR item."
+  (and (stringp title)
+       (let ((case-fold-search t))
+         (and (string-match-p +elfeed-pr-brand-regexp title)
+              (string-match-p +elfeed-pr-signal-regexp title)
+              (not (string-match-p +elfeed-pr-exclude-regexp title))))))
+
 (defun +elfeed-ensure-reddit-feed ()
   "Register the Reddit local feed when its atom file is readable.
 Safe to call repeatedly; does not duplicate entries."
@@ -132,8 +174,9 @@ When RUN-HN is non-nil (or `+elfeed-hn-llm'), export ELFEED_HN_LLM=1."
                       '("https://sspai.com/feed" sspai)
                       '("https://nikonrumors.com/feed/" nikon-rumors)
                       '("https://rss.utgd.net/feed" untaged)
-                      ;; tech
-                      '("https://www.ithome.com/rss/" ithome)
+                      '("https://plink.anyfeeder.com/people-daily" people-daily news)
+                      ;; tech (IT之家: RSSHub 分类源，不用官网总 RSS)
+                      (list +elfeed-ithome-url 'ithome)
                       '("https://feeds.feedburner.com/ruanyifeng" RYF)
                       ;; 知乎日报（RSSHub，知乎官方 rss 已挂）
                       '("https://rsshub.rssforever.com/zhihu/daily" zhihu daily)
@@ -156,7 +199,68 @@ When RUN-HN is non-nil (or `+elfeed-hn-llm'), export ELFEED_HN_LLM=1."
         elfeed-search-title-min-width 30
         elfeed-search-trailing-width 25
         elfeed-show-truncate-long-urls t
-        elfeed-show-unique-buffers t)
+        elfeed-show-unique-buffers t
+        ;; Hide V2EX hard ads (`ad') and IT之家 product PR (`pr').
+        elfeed-search-filter "@6months +unread -ad -pr")
+  (setq-default elfeed-search-filter "@6months +unread -ad -pr")
+
+  (defun +elfeed-entry-feed-url (entry)
+    "Return the feed URL of ENTRY, or nil."
+    (let ((feed (elfeed-entry-feed entry)))
+      (and feed (elfeed-feed-url feed))))
+
+  (defun +elfeed-tag-promo-entry (entry)
+    "Tag ENTRY as `ad' (V2EX hard ad) or `pr' (IT之家 product PR)."
+    (let* ((title (elfeed-entry-title entry))
+           (url (or (+elfeed-entry-feed-url entry) "")))
+      (cond
+       ((and (string-match-p "v2ex\\.com" url)
+             (+elfeed-ad-title-p title))
+        (elfeed-tag entry 'ad))
+       ((and (string-match-p "ithome" url)
+             (+elfeed-pr-title-p title))
+        (elfeed-tag entry 'pr)))))
+
+  (defun +elfeed-dedup-ithome-entry (entry)
+    "Drop `unread' when ENTRY is an RSSHub IT之家 copy of an older link."
+    (let ((url (or (+elfeed-entry-feed-url entry) ""))
+          (link (elfeed-entry-link entry)))
+      (when (and link
+                 (hash-table-p elfeed-db-entries)
+                 (string-match-p "rsshub\\..*/ithome" url))
+        (catch 'found
+          (maphash
+           (lambda (_id other)
+             (when (and (not (eq other entry))
+                        (stringp (elfeed-entry-link other))
+                        (string= (elfeed-entry-link other) link))
+               (elfeed-untag entry 'unread)
+               (throw 'found t)))
+           elfeed-db-entries)))))
+
+  (defun +elfeed-backfill-promo-tags ()
+    "Apply promo tags to every existing entry and save the database."
+    (interactive)
+    (let ((n-ad 0)
+          (n-pr 0))
+      (with-elfeed-db-visit (entry _feed)
+        (let ((had-ad (elfeed-tagged-p 'ad entry))
+              (had-pr (elfeed-tagged-p 'pr entry)))
+          (+elfeed-tag-promo-entry entry)
+          (unless had-ad
+            (when (elfeed-tagged-p 'ad entry)
+              (setq n-ad (1+ n-ad))))
+          (unless had-pr
+            (when (elfeed-tagged-p 'pr entry)
+              (setq n-pr (1+ n-pr))))))
+      (elfeed-db-save)
+      (when (fboundp 'elfeed-search-update)
+        (elfeed-search-update :force))
+      (message "Elfeed promo backfill: %d ad, %d pr" n-ad n-pr)
+      (list :ad n-ad :pr n-pr)))
+
+  (add-hook 'elfeed-new-entry-hook #'+elfeed-tag-promo-entry)
+  (add-hook 'elfeed-new-entry-hook #'+elfeed-dedup-ithome-entry)
 
   (+elfeed-ensure-reddit-feed)
   (make-directory elfeed-enclosure-default-dir t)

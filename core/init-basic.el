@@ -166,6 +166,14 @@
  read-extended-command-predicate #'command-completion-default-include-p
  )
 
+;; [server] GUI Emacs.app does not listen for emacsclient unless started.
+;; Daemon already owns a server; skip in that case.
+(use-package server
+  :demand t
+  :config
+  (unless (server-running-p)
+    (server-start)))
+
 ;; Enable [disabled cmds]
 ;; Enable the disabled narrow commands
 (put 'narrow-to-defun  'disabled nil)
@@ -433,9 +441,16 @@
 ;; [tramp] Edit file remotely
 (use-package tramp
   :config
+  (require 'tramp-sh)
+  ;; Keep ssh ControlMaster for long-lived ACP stdio (agent-shell on VPS).
   (setq tramp-default-method "ssh"
         tramp-backup-directory-alist backup-directory-alist
-        remote-file-name-inhibit-cache 60))
+        remote-file-name-inhibit-cache 60
+        tramp-use-connection-share t
+        tramp-ssh-controlmaster-options
+        (concat "-o ControlMaster=auto "
+                "-o ControlPath=tramp.%%C "
+                "-o ControlPersist=10m")))
 
 
 (use-package tramp-rpc

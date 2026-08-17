@@ -4,13 +4,105 @@
 ;;       mac-command-modifier 'super
 ;;       mac-right-command-modifier 'left)
 
-;; [osx-dictionary] macOS native dictionary app
+;; [osx-dictionary] The Little Dict, not Oxford / LDOCE5.
+;; Result goes in *osx-dictionary* (`osx-dictionary-mode').
+;; Stock osx-dictionary-cli uses DCSGetDefaultDictionary (Oxford) — do not call it.
+;; Runtime bundle is ~/Library/Dictionaries/TLD.dictionary, not the
+;; ~/Desktop/The Little Dict source repo.
+(defconst +tld-bundle-path
+  (expand-file-name "~/Library/Dictionaries/TLD.dictionary"))
+
+(defconst +tld-lookup-source
+  (expand-file-name "scripts/tld-lookup.m" user-emacs-directory))
+
+(defun +tld-lookup-program ()
+  (no-littering-expand-var-file-name "modules/tld-lookup"))
+
+(defun +tld-lookup-ensure ()
+  "Return the tld-lookup binary, compiling it if the source is newer.
+
+Does not run at init.  First `C-c d d' pays for clang (~1s)."
+  (let ((dest (+tld-lookup-program))
+        (src +tld-lookup-source))
+    (unless (file-readable-p src)
+      (user-error "tld-lookup source missing: %s" src))
+    (when (or (not (file-executable-p dest))
+              (file-newer-than-file-p src dest))
+      (unless (executable-find "clang")
+        (user-error "clang not found; cannot build tld-lookup"))
+      (make-directory (file-name-directory dest) t)
+      (with-temp-buffer
+        (let ((status (call-process
+                       "clang" nil t nil
+                       "-O2" "-fobjc-arc"
+                       "-framework" "Foundation"
+                       "-framework" "AppKit"
+                       "-framework" "CoreServices"
+                       "-framework" "Carbon"
+                       "-o" dest src)))
+          (unless (eq status 0)
+            (user-error "tld-lookup compile failed:\n%s" (buffer-string))))))
+    dest))
+
+(defun +tld-lookup-text (word)
+  "Plain-text The Little Dict definition of WORD."
+  (let ((prog (+tld-lookup-ensure)))
+    (unless (file-exists-p +tld-bundle-path)
+      (user-error
+       "The Little Dict not installed at %s — see ~/Desktop/The Little Dict/README.md"
+       +tld-bundle-path))
+    (with-temp-buffer
+      (let ((status (call-process prog nil t nil "--text" "--" word)))
+        (let ((out (buffer-string)))
+          (unless (eq status 0)
+            (user-error "tld-lookup failed (%s): %s" status (string-trim out)))
+          out)))))
+
+(defun +osx-dictionary-view-text (word text)
+  "Show TEXT in `*osx-dictionary*' as WORD.
+
+Replaces `osx-dictionary--search' for this call only, so the stock
+Oxford CLI is never invoked."
+  (require 'cl-lib)
+  (require 'osx-dictionary)
+  (cl-letf (((symbol-function 'osx-dictionary--search)
+             (lambda (_word) text)))
+    (osx-dictionary--view-result word)))
+
+(defun +osx-dictionary-search-pointer ()
+  "Look up the word at point in The Little Dict; show it in `*osx-dictionary*'."
+  (interactive)
+  (let ((word (if (use-region-p)
+                  (buffer-substring-no-properties (region-beginning) (region-end))
+                (or (thing-at-point 'word t)
+                    (user-error "Nothing to look up")))))
+    (+osx-dictionary-view-text word (+tld-lookup-text word))))
+
+(defun +osx-dictionary-search-input ()
+  "Prompt for a word, look it up in The Little Dict, show it in `*osx-dictionary*'."
+  (interactive)
+  (let* ((default (if (use-region-p)
+                      (buffer-substring-no-properties (region-beginning) (region-end))
+                    (thing-at-point 'word t)))
+         (word (read-string (if default (format "Word (%s): " default) "Word: ")
+                            nil nil default)))
+    (when (string-blank-p word)
+      (user-error "Nothing to look up"))
+    (+osx-dictionary-view-text word (+tld-lookup-text word))))
+
 (use-package osx-dictionary
   :straight t
   ;; `C-c d i' now belongs to `consult-imenu' (upstream), so search-input
-  ;; moved to `C-c d s'.
-  :bind (("C-c d s" . osx-dictionary-search-input)
-         ("C-c d d" . osx-dictionary-search-pointer)))
+  ;; moved to `C-c d s'.  macOS steals Control-Command-D (Look Up) before
+  ;; Emacs sees it, so the second binding is `C-c d l', not `C-s-d'.
+  ;; Do not bind `s-d' (stock isearch-repeat-backward).
+  :bind (("C-c d s" . +osx-dictionary-search-input)
+         ("C-c d d" . +osx-dictionary-search-pointer)
+         ("C-c d l" . +osx-dictionary-search-pointer)))
+
+;; Drop the dead Control-Command-D binding (macOS Look Up eats the event).
+(when (featurep 'ns)
+  (unbind-key "C-s-d"))
 
 ;; [emt] CJK word motion via macOS NLP tokenizer (needs a native .dylib).
 ;; Do NOT enable on after-init: emt-mode -> emt-ensure may call yes-or-no-p

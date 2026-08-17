@@ -103,6 +103,16 @@
   (+mode-line-update-envrc buffer))
 (add-hook! envrc-mode-hook #'+mode-line-update-envrc)
 
+(defsubst +mode-line-imenu-crumbs ()
+  "Imenu crumbs for the mode-line, skipped in agent-shell buffers.
+
+Streaming ACP output makes `breadcrumb-imenu-crumbs' rescan a huge
+buffer on every redisplay and can signal `args-out-of-range' on
+empty crumbs (B1, 2026-08-14)."
+  (unless (derived-mode-p 'agent-shell-mode
+                          'agent-shell-viewport-view-mode
+                          'agent-shell-viewport-edit-mode)
+    (breadcrumb-imenu-crumbs)))
 
 (defsubst +mode-line-normal ()
   "Formatting active-long mode-line."
@@ -122,7 +132,7 @@
       ,(or +mode-line-project-crumb
            '(:propertize "%b" face +mode-line-meta-face))
       (:propertize ":%l " face font-lock-comment-face)
-      (:eval (breadcrumb-imenu-crumbs))
+      (:eval (+mode-line-imenu-crumbs))
       (:propertize +mode-line-remote-host-name
                    face +mode-line-host-name-active-face)
       (:eval +mode-line-encoding))

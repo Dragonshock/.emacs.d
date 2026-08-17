@@ -6,11 +6,22 @@
 ;;   :hook ((org-mode . org-fragtog-mode)))
 
 ;; [org]
+(defconst +org-directory
+  (expand-file-name "~/Documents/org/")
+  "Root of personal Org files.")
+
+(defconst +org-agenda-directory
+  (expand-file-name "agenda/" +org-directory)
+  "Directory scanned by `org-agenda' and used by `org-capture'.")
+
 (use-package org
   :straight (:type built-in)
   :init
   ;; Load optional Org modules only when explicitly enabled.
   (setq org-modules nil)
+  ;; Upstream: C-c a / C-c n c.  Leave C-c c for citre (init-prog.el).
+  :bind (("C-c a" . org-agenda)
+         ("C-c n c" . org-capture))
   :custom-face (org-quote ((t (:inherit org-block-begin-line))))
   :hook ((org-mode . (lambda () (setq-local dabbrev-abbrev-skip-leading-regexp "[=*]")))  ;; Skipping leading char, so corfu can complete with dabbrev for formatted text
          (org-mode . (lambda ()
@@ -49,7 +60,17 @@
    org-ctrl-k-protect-subtree 'error
    org-fold-catch-invisible-edits 'show-and-error
 
-   org-imenu-depth 4)
+   org-imenu-depth 4
+
+   org-directory +org-directory
+   org-agenda-files (list +org-agenda-directory)
+   org-default-notes-file (expand-file-name "agenda.org" +org-agenda-directory)
+   org-capture-templates
+   '(("t" "Todo" entry
+      (file+headline org-default-notes-file "Inbox")
+      "* TODO %?\n%u\n")))
+
+  (make-directory +org-agenda-directory t)
 
   ;; Better Org Latex Preview
   (setq org-preview-latex-default-process 'dvisvgm
