@@ -48,7 +48,8 @@
           (string-match-p "gh\\.pat\\'" base)
           (string-match-p "/\\.cli-proxy-api/" name)
           (string-match-p "/\\.ssh/" name)
-          (member base '("id_rsa" "id_ed25519" "passwd" "credentials"))))))
+          (member base '("id_rsa" "id_ed25519" "passwd" "credentials"
+                         "private.el" "secrets.el" "local.el"))))))
 
 (setq backup-enable-predicate
       (lambda (name)
@@ -154,7 +155,7 @@
  uniquify-buffer-name-style 'forward
 
  ;; Fix alignment problem
- truncate-string-ellipsis "⁝"
+ truncate-string-ellipsis "›"
 
  ;; Shell command
  shell-command-prompt-show-cwd t
@@ -431,6 +432,8 @@
 
 
 ;; [tramp] Edit file remotely
+;; MERGE LOCK vs roife: keep default `ssh'.  `rpc' (tramp-rpc below) is
+;; opt-in via /rpc:user@host: — do not follow upstream tramp-default-method rpc.
 (use-package tramp
   :config
   (setq tramp-default-method "ssh"

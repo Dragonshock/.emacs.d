@@ -11,6 +11,11 @@
   (expand-file-name "reddit-emacs.atom" +elfeed-local-dir)
   "Path of the private r/emacs Atom file produced by scripts/reddit-elfeed.py.")
 
+(defvar +reddit-private-rss-user nil
+  "Reddit username for the private r/emacs RSS URL.
+Set this in gitignored `private.el'.  When nil or empty,
+`scripts/reddit-elfeed.py' skips the private feed.")
+
 (defun +elfeed-file-feed (filename &rest tags)
   "Build an Elfeed feed entry for local FILENAME under `+elfeed-local-dir' with TAGS."
   (cons (concat "file://" (expand-file-name filename +elfeed-local-dir)) tags))
@@ -71,6 +76,9 @@ When RUN-HN is non-nil (or `+elfeed-hn-llm'), export ELFEED_HN_LLM=1."
                       nil))))
         (when token
           (setenv "REDDIT_PRIVATE_RSS_TOKEN" token))
+        (when (and (stringp +reddit-private-rss-user)
+                   (not (string-empty-p +reddit-private-rss-user)))
+          (setenv "REDDIT_PRIVATE_RSS_USER" +reddit-private-rss-user))
         (when (or run-hn +elfeed-hn-llm)
           (setenv "ELFEED_HN_LLM" "1"))
         (make-process :name "elfeed-local-feeds"

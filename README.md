@@ -8,6 +8,8 @@ Fork of [roife/.emacs.d](https://github.com/roife/.emacs.d) with local modules
 | Path | Role | Git |
 |------|------|-----|
 | `early-init.el` `init.el` `core/` `scripts/` `tempel-templates` | Config source | tracked |
+| `private.el.example` | Template for machine-local identity | tracked |
+| `private.el` | Name, email, Reddit user, magh clone path | ignored |
 | `straight/` | Package manager (optional `versions/default.el` pin) | ignored (versions may be tracked) |
 | `var/` | Runtime state, caches, DBs (no-littering) | ignored |
 | `etc/` | Machine-local package state (`custom.el`, …) | ignored |
@@ -40,9 +42,16 @@ exist but may be commented out in `init.el`.
 
 ## Credentials
 
+Copy `private.el.example` to `private.el` (gitignored; loaded from `init.el`)
+and set `user-full-name`, `user-mail-address`, optionally
+`+reddit-private-rss-user` and `+magh-git-repo`. Mail and Reddit private RSS
+do not work until that file exists.
+
 - `~/.authinfo`
   + Deepseek API (for `gptel`)
 - `~/.authinfo.gpg`
   + Gmail app password (for Gnus, mbsync, and SMTP, note: use imap.googlemail.com with TLS 1.2 for Gmail)
   + GitHub token (for `forge`)
-  + Emacs china token (for `gnus`)
+  + `reddit-private-rss` (Elfeed private r/emacs atom)
+
+Never commit `private.el`, `authinfo`, or `*.gpg`. `.gitignore` already excludes them.
