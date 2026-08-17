@@ -154,7 +154,7 @@
  uniquify-buffer-name-style 'forward
 
  ;; Fix alignment problem
- truncate-string-ellipsis "⁝"
+ truncate-string-ellipsis "›"
 
  ;; Shell command
  shell-command-prompt-show-cwd t
@@ -431,6 +431,8 @@
 
 
 ;; [tramp] Edit file remotely
+;; MERGE LOCK vs roife: keep default `ssh'.  `rpc' (tramp-rpc below) is
+;; opt-in via /rpc:user@host: — do not follow upstream tramp-default-method rpc.
 (use-package tramp
   :config
   (setq tramp-default-method "ssh"
