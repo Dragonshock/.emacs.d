@@ -24,9 +24,19 @@
 
 
 ;; [ezf] Use Emacs completion from terminal shells
+;; Consult's fd builder returns nil on a blank query (`when (or re opts)`),
+;; so zsh C-t / ezf Files opens with an empty candidate list.
+(defun +ezf-fd-builder-list-on-empty (orig directories-only)
+  "Around `ezf--fd-builder': treat blank input as \".\" so fd lists immediately."
+  (let ((inner (funcall orig directories-only)))
+    (lambda (input)
+      (funcall inner (if (string-blank-p input) "." input)))))
+
 (use-package ezf
   :straight (:type git :host github :repo "roife/ezf")
-  :demand t)
+  :demand t
+  :config
+  (advice-add #'ezf--fd-builder :around #'+ezf-fd-builder-list-on-empty))
 
 
 ;; [speedbar]
@@ -205,7 +215,15 @@ Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
   (setq browse-url-browser-function #'eww-browse-url))
 
 ;; [eww] Builtin browser
+;; TTY: skip SHR images so kitty-graphics does not freeze on GitHub-sized
+;; SVG pages.  GUI eww still shows images.  Toggle later with I.
+(defun +eww-inhibit-images-on-tty ()
+  "Set `shr-inhibit-images' on TTY frames only."
+  (unless (display-graphic-p)
+    (setq-local shr-inhibit-images t)))
+
 (use-package eww
+  :hook (eww-mode . +eww-inhibit-images-on-tty)
   :config
   (setq shr-max-image-proportion 0.5))
 

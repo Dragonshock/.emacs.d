@@ -155,18 +155,24 @@ does not clobber maximized/custom sizes.  FORCE non-nil re-applies."
 (setq custom-safe-themes t)
 
 
+;; Org #hashtag / @tag font-lock only (not the color theme).
 (use-package doom-themes
   :straight t
   :config
-  (setq doom-themes-enable-bold t
-        doom-themes-enable-italic t)
+  (require 'doom-themes-ext-org)
+  (doom-themes-org-config))
 
-  (doom-themes-org-config)
-  (setcdr (assoc 'gnus-group-news-low-empty doom-themes-base-faces)
-          '(:inherit 'gnus-group-mail-1-empty :weight 'normal)))
+;; Built-in Emacs 31; load the library first so defcustom does not clobber setq.
+(unless (featurep 'modus-themes)
+  (load (expand-file-name "themes/modus-themes" data-directory) nil 'nomessage))
+(setq modus-themes-italic-constructs t
+      modus-themes-bold-constructs nil
+      modus-themes-mixed-fonts nil
+      modus-themes-variable-pitch-ui nil
+      modus-themes-headings nil)
 
-(defvar +light-theme 'doom-gruvbox-light)
-(defvar +dark-theme 'doom-gruvbox)
+(defvar +light-theme 'modus-operandi)
+(defvar +dark-theme 'modus-vivendi)
 ;; Align with upstream roife: always re-detect dark/light and switch when the
 ;; picked theme differs.  First pass may run before xterm OSC 11; tty-setup-hook
 ;; re-runs after reportBackground so TUI can correct light → dark.

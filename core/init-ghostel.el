@@ -37,6 +37,8 @@
          ;; README mentions ghostel-backward-kill-word, but that command is
          ;; not in the package; semi-char already sends M-<backspace> to PTY.
          ("C-k"  . +ghostel-send-C-k-and-kill)
+         ;; Upstream: do not let semi-char swallow M-SPC (tab-bar echo).
+         ("M-SPC" . +tab-bar-echo)
          ;; Eshell-style history: M-p/n → C-p/n for the shell.
          ("M-p" . (lambda () (interactive) (ghostel-send-key "p" "ctrl")))
          ("M-n" . (lambda () (interactive) (ghostel-send-key "n" "ctrl")))

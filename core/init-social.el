@@ -264,8 +264,9 @@ In the input area, insert the typed character instead."
         telega-filter-custom-show-folders nil
 
         ;; images
-        ;; 上游关闭图片走纯文字风格；本地打开，照片/视频缩略图/网页
+        ;; 上游关闭图片走纯文字风格；本地 GUI 打开，照片/视频缩略图/网页
         ;; 预览图直接显示（emoji 仍用字体渲染，头像保持关闭）。
+        ;; TTY 不借 GUI 帧插图：见 +telega-x-frame-selected-only-a。
         telega-use-images t
         telega-emoji-use-images nil
         telega-symbols-emojify '()
@@ -327,6 +328,16 @@ Update straight recipe files or run make from straight/repos/telega.el"
                 ((symbol-function 'telega-chat-admin-get)
                  (lambda (&rest _) nil)))
         (funcall orig msg msg-chat msg-sender addon-inserter))))
+
+  ;; T1: `telega-ins--image' uses (display-graphic-p (telega-x-frame)).
+  ;; telega-x-frame walks all frames, so emacsclient -nw borrows the NS
+  ;; frame and inserts image display specs that TTY/Ghostty cannot size.
+  (defadvice! +telega-x-frame-selected-only-a (fn)
+    :around #'telega-x-frame
+    "On a TTY frame, do not reuse another graphical frame for images."
+    (if (display-graphic-p)
+        (funcall fn)
+      nil))
 
   ;; HACK: show stickers
   (defadvice! +telega-enable-image-for-stickers (orig-fn &rest args)

@@ -9,13 +9,23 @@
 # ]
 # ///
 
-"""Build a Chinese Hacker News Atom feed for Elfeed."""
+"""Build a Chinese Hacker News Atom feed for Elfeed.
+
+Fetch concurrency and LLM concurrency are separate. Article downloads use a
+short timeout and a 2 MiB cap; DeepSeek uses a longer timeout. A story that
+fails summarization still becomes a fallback entry so the feed is not empty.
+"""
+
+from __future__ import annotations
 
 import argparse
 import datetime as dt
 import html
+import http.client
 import json
 import os
+import tempfile
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -42,25 +52,40 @@ HN_SEARCH_URL = (
     "?tags=story&numericFilters=points%3E%3D150&hitsPerPage=20"
 )
 HN_COMMENTS_URL = "https://news.ycombinator.com/item?id={story_id}"
-USER_AGENT = "hn-elfeed/1.0 (personal Elfeed generator)"
+HN_HOSTS = {"news.ycombinator.com", "www.news.ycombinator.com"}
+SCRIPT_UA = "hn-elfeed/2.0 (personal Elfeed generator)"
+BROWSER_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36"
+)
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "var" / "rss"
 FEED_PATH = DATA_DIR / "hackernews.atom"
+CACHE_PATH = DATA_DIR / "hn-elfeed-cache.json"
 # Plaintext authinfo is last resort; prefer DEEPSEEK_API_KEY or AUTHINFO_PATH.
 AUTHINFO_PATH = Path(
     os.environ.get("AUTHINFO_PATH", str(Path.home() / ".authinfo"))
 )
 AUTHINFO_GPG_PATH = Path.home() / ".authinfo.gpg"
 
-HTTP_TIMEOUT = 25
+ARTICLE_TIMEOUT = 12
+ALGOLIA_TIMEOUT = 20
+LLM_TIMEOUT = 60
+MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+MAX_PDF_PAGES = 12
 MAX_ARTICLE_CHARS = 120_000
 MAX_COMMENT_CHARS = 60_000
-DEFAULT_JOBS = os.cpu_count() or 1
+MAX_CACHE_ENTRIES = 200
+DEFAULT_JOBS = 6
+DEFAULT_LLM_JOBS = 2
+RETRYABLE_HTTP = {408, 429, 500, 502, 503, 504}
 NO_ARTICLE = "原文正文无法自动提取，本条仅保留评论区讨论整理。"
 NO_EXTRACTION = "原文无法自动提取，正文摘要已省略。"
 
 UTC = dt.timezone.utc
 ATOM_NS = "http://www.w3.org/2005/Atom"
+_LOG_LOCK = threading.Lock()
 
 
 ARTICLE_SYSTEM_PROMPT = """你是一名 Hacker News 中文编辑。翻译标题，并把网页正文
@@ -123,10 +148,29 @@ class Candidate:
     comments_count: int
 
 
+@dataclass
+class Material:
+    candidate: Candidate
+    item: dict[str, Any]
+    article_text: str
+    comments_text: str
+
+
 def log(message: str) -> None:
-    print(
-        f"[{dt.datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S %z')}] {message}"
-    )
+    stamp = dt.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %z")
+    with _LOG_LOCK:
+        print(f"[{stamp}] {message}", flush=True)
+
+
+def now_utc() -> str:
+    return dt.datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def excerpt(text: str, limit: int) -> str:
+    compact = " ".join((text or "").split())
+    if len(compact) <= limit:
+        return compact
+    return compact[: max(0, limit - 1)] + "…"
 
 
 def _parse_authinfo_text(text: str, machine: str) -> str | None:
@@ -155,7 +199,7 @@ def authinfo_password(machine: str, path: Path | None = None) -> str:
     """Read password for MACHINE from Emacs authinfo.
 
     Prefer, in order:
-    1. ``DEEPSEEK_API_KEY`` (or generic ``API_KEY`` is not used — host-specific)
+    1. ``DEEPSEEK_API_KEY`` (handled by ``deepseek_api_key``)
     2. Explicit ``path`` / ``AUTHINFO_PATH`` plaintext
     3. ``~/.authinfo.gpg`` via ``gpg --decrypt`` when available
     4. ``~/.authinfo`` plaintext (last resort)
@@ -199,9 +243,8 @@ def authinfo_password(machine: str, path: Path | None = None) -> str:
             except (subprocess.CalledProcessError, OSError) as err:
                 log(f"authinfo.gpg decrypt failed: {err}")
 
-    # Prefer gpg over plaintext when both exist.
     for kind in ("gpg", "plain"):
-        for k, p, text in candidates:
+        for k, _path, text in candidates:
             if k != kind:
                 continue
             found = _parse_authinfo_text(text, machine)
@@ -222,31 +265,83 @@ def deepseek_api_key() -> str:
     return authinfo_password(DEEPSEEK_HOST)
 
 
-def request(
+def _retry_delay(error: BaseException, attempt: int) -> float:
+    if isinstance(error, urllib.error.HTTPError) and error.headers:
+        raw = error.headers.get("Retry-After")
+        if raw:
+            try:
+                return min(max(float(raw), 0.5), 20.0)
+            except ValueError:
+                pass
+    return min(2**attempt, 8)
+
+
+def _read_limited(response: Any, max_bytes: int) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    try:
+        while total < max_bytes:
+            chunk = response.read(min(65536, max_bytes - total))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+    except http.client.IncompleteRead as error:
+        partial = error.partial or b""
+        if partial:
+            chunks.append(partial)
+            total += len(partial)
+        if total < 1024:
+            raise
+    return b"".join(chunks)[:max_bytes]
+
+
+def http_request(
     url: str,
     *,
+    timeout: float,
     data: bytes | None = None,
     headers: dict[str, str] | None = None,
-    retries: int = 0,
+    retries: int = 2,
+    max_bytes: int = MAX_RESPONSE_BYTES,
+    user_agent: str = SCRIPT_UA,
 ) -> tuple[bytes, Any, str]:
-    req = urllib.request.Request(
-        url, data=data, headers={"User-Agent": USER_AGENT, **(headers or {})}
+    request = urllib.request.Request(
+        url,
+        data=data,
+        headers={"User-Agent": user_agent, **(headers or {})},
     )
+    last: BaseException | None = None
     for attempt in range(retries + 1):
         try:
-            with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as response:
-                return response.read(), response.headers, response.geturl()
-        except urllib.error.HTTPError:
-            raise
-        except urllib.error.URLError:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return (
+                    _read_limited(response, max_bytes),
+                    response.headers,
+                    response.geturl(),
+                )
+        except urllib.error.HTTPError as error:
+            last = error
+            if error.code not in RETRYABLE_HTTP or attempt == retries:
+                raise
+            delay = _retry_delay(error, attempt)
+        except (
+            TimeoutError,
+            http.client.IncompleteRead,
+            http.client.RemoteDisconnected,
+            urllib.error.URLError,
+            ConnectionError,
+        ) as error:
+            last = error
             if attempt == retries:
                 raise
-            time.sleep(2**attempt)
-    raise AssertionError
+            delay = _retry_delay(error, attempt)
+        time.sleep(delay)
+    raise AssertionError(last)
 
 
 def fetch_candidates() -> list[Candidate]:
-    body, _, _ = request(HN_SEARCH_URL, retries=2)
+    body, _, _ = http_request(HN_SEARCH_URL, timeout=ALGOLIA_TIMEOUT, retries=2)
     return [
         Candidate(
             int(item["objectID"]),
@@ -263,7 +358,11 @@ def fetch_candidates() -> list[Candidate]:
 
 
 def fetch_hn_item(story_id: int) -> dict[str, Any]:
-    body, _, _ = request(HN_ITEM_URL.format(story_id=story_id), retries=2)
+    body, _, _ = http_request(
+        HN_ITEM_URL.format(story_id=story_id),
+        timeout=ALGOLIA_TIMEOUT,
+        retries=2,
+    )
     return json.loads(body)
 
 
@@ -277,16 +376,20 @@ def html_fragment_to_text(fragment: str) -> str:
 def collect_comments(item: dict[str, Any]) -> str:
     blocks: list[str] = []
     used = 0
-    for index, child in enumerate(item["children"][:18], start=1):
+    children = item.get("children") or []
+    for index, child in enumerate(children[:18], start=1):
         rows = []
         stack = [(child, 0)]
         while stack and len(rows) < 24:
             current, depth = stack.pop()
-            text = html_fragment_to_text(current.get("text", ""))
+            text = html_fragment_to_text(current.get("text", "") or "")
             if text:
                 label = "主评论" if depth == 0 else f"回复层级 {depth}"
                 rows.append(f"[{label}] {text}")
-            stack.extend((reply, depth + 1) for reply in reversed(current["children"]))
+            stack.extend(
+                (reply, depth + 1)
+                for reply in reversed(current.get("children") or [])
+            )
         block = "\n".join(rows)[:4_000]
         heading = f"\n\n--- 讨论串 {index} ---\n"
         remaining = MAX_COMMENT_CHARS - used - len(heading)
@@ -297,43 +400,71 @@ def collect_comments(item: dict[str, Any]) -> str:
     return "".join(blocks).strip()
 
 
-def fetch_article_text(article_url: str, item: dict[str, Any]) -> str:
-    parsed = urllib.parse.urlsplit(article_url)
-    if parsed.hostname in {"news.ycombinator.com", "www.news.ycombinator.com"}:
-        return html_fragment_to_text(item.get("text", ""))
+def article_is_self(item: dict[str, Any], article_url: str) -> bool:
+    raw = (item.get("url") or article_url or "").strip()
+    if not raw:
+        return True
+    host = (urllib.parse.urlsplit(raw).hostname or "").lower()
+    return host in HN_HOSTS
 
+
+def extract_pdf(body: bytes) -> str:
+    pages = []
+    for page in PdfReader(BytesIO(body)).pages[:MAX_PDF_PAGES]:
+        pages.append(page.extract_text() or "")
+    return "\n\n".join(pages)
+
+
+def fetch_article_text(article_url: str, item: dict[str, Any]) -> str:
+    if article_is_self(item, article_url):
+        return html_fragment_to_text(item.get("text", "") or "")
+
+    target = item.get("url") or article_url
     try:
-        item_url = item.get("url", article_url)
-        for attempt in range(3):
-            try:
-                body, headers, final_url = request(item_url)
-                if headers.get_content_type() == "application/pdf" or final_url.split(
-                    "?", 1
-                )[0].endswith(".pdf"):
-                    text = "\n\n".join(
-                        page.extract_text() or ""
-                        for page in PdfReader(BytesIO(body)).pages
-                    )
-                else:
-                    text = trafilatura.extract(
-                        body,
-                        output_format="markdown",
-                        include_formatting=True,
-                        include_links=True,
-                        include_tables=True,
-                    )
-                if text := (text or "").strip():
-                    return text[:MAX_ARTICLE_CHARS]
-                raise ValueError("正文提取为空")
-            except urllib.error.HTTPError:
-                raise
-            except (urllib.error.URLError, ValueError):
-                if attempt == 2:
-                    raise
-                time.sleep(2**attempt)
+        body, headers, final_url = http_request(
+            target,
+            timeout=ARTICLE_TIMEOUT,
+            retries=2,
+            user_agent=BROWSER_UA,
+        )
+        is_pdf = headers.get_content_type() == "application/pdf" or final_url.split(
+            "?", 1
+        )[0].endswith(".pdf")
+        if is_pdf:
+            text = extract_pdf(body)
+        else:
+            text = trafilatura.extract(
+                body,
+                output_format="markdown",
+                include_formatting=True,
+                include_links=True,
+                include_tables=True,
+            )
+        if text := (text or "").strip():
+            return text[:MAX_ARTICLE_CHARS]
+        raise ValueError("正文提取为空")
     except Exception as error:
         log(f"跳过无法抓取的正文 {article_url}: {error}")
-        return html_fragment_to_text(item.get("text", ""))
+        return html_fragment_to_text(item.get("text", "") or "")
+
+
+def fetch_material(candidate: Candidate) -> Material:
+    try:
+        item = fetch_hn_item(candidate.story_id)
+    except Exception as error:
+        log(f"HN item 失败 {candidate.story_id}: {error}")
+        item = {
+            "points": candidate.points,
+            "text": "",
+            "children": [],
+            "url": candidate.article_url,
+        }
+    return Material(
+        candidate=candidate,
+        item=item,
+        article_text=fetch_article_text(candidate.article_url, item),
+        comments_text=collect_comments(item),
+    )
 
 
 def deepseek_json(
@@ -351,6 +482,7 @@ def deepseek_json(
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
     ]
+    last_error: BaseException | None = None
     for attempt in range(2):
         request_body = json.dumps(
             {
@@ -363,14 +495,30 @@ def deepseek_json(
             },
             ensure_ascii=False,
         ).encode()
-        body, _, _ = request(
-            DEEPSEEK_URL,
-            data=request_body,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-        )
+        try:
+            body, _, _ = http_request(
+                DEEPSEEK_URL,
+                data=request_body,
+                timeout=LLM_TIMEOUT,
+                retries=1,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+            )
+        except (
+            TimeoutError,
+            http.client.IncompleteRead,
+            urllib.error.URLError,
+            ConnectionError,
+        ) as error:
+            last_error = error
+            if attempt:
+                raise
+            log(f"DeepSeek 请求失败（{type(error).__name__}: {error}），重试")
+            time.sleep(2)
+            continue
+
         content = ""
         try:
             response = json.loads(body)
@@ -380,6 +528,7 @@ def deepseek_json(
                 raise TypeError("顶层必须是 JSON 对象")
             return result
         except (json.JSONDecodeError, KeyError, IndexError, TypeError) as error:
+            last_error = error
             if attempt:
                 raise RuntimeError(f"DeepSeek 连续返回无效 JSON：{error}") from error
             log(f"DeepSeek 返回无效 JSON（{error}），要求模型重新生成")
@@ -394,47 +543,163 @@ def deepseek_json(
                     ),
                 }
             )
-    raise AssertionError
+    raise AssertionError(last_error)
 
 
-def process_story(candidate: Candidate, api_key: str) -> dict[str, Any]:
-    log(f"处理 {candidate.story_id}: {candidate.original_title}")
-    item = fetch_hn_item(candidate.story_id)
-    article_text = fetch_article_text(candidate.article_url, item)
-    article = deepseek_json(
-        api_key,
-        ARTICLE_SYSTEM_PROMPT,
-        {
-            "hn_title": candidate.original_title,
-            "article_url": candidate.article_url,
-            "article_text": article_text,
-        },
-        max_tokens=5_000,
+def fallback_comments(comments_text: str) -> str:
+    if not comments_text:
+        return "评论区暂无可总结的有效内容。"
+    return "评论摘要失败。摘录：\n\n" + excerpt(comments_text, 600)
+
+
+def fallback_row(material: Material, error: BaseException) -> dict[str, Any]:
+    candidate = material.candidate
+    item = material.item
+    body = material.article_text or html_fragment_to_text(item.get("text", "") or "")
+    short = excerpt(body, 160)
+    if short:
+        short_summary = f"摘要失败。{short}"
+    else:
+        short_summary = "摘要失败。"
+    return asdict(candidate) | {
+        "translated_title": candidate.original_title,
+        "short_summary": short_summary,
+        "article_summary_md": body[:2_000] or NO_ARTICLE,
+        "comments_summary_md": fallback_comments(material.comments_text),
+        "points": item.get("points", candidate.points),
+        "updated_at": now_utc(),
+        "llm_ok": False,
+        "fail_reason": f"{type(error).__name__}: {error}",
+    }
+
+
+def row_from_cache(cached: dict[str, Any], candidate: Candidate) -> dict[str, Any]:
+    return asdict(candidate) | {
+        "translated_title": cached.get("translated_title") or candidate.original_title,
+        "short_summary": cached.get("short_summary") or NO_EXTRACTION,
+        "article_summary_md": cached.get("article_summary_md") or NO_ARTICLE,
+        "comments_summary_md": cached.get("comments_summary_md")
+        or "评论区暂无可总结的有效内容。",
+        "updated_at": cached.get("updated_at") or now_utc(),
+        "llm_ok": True,
+        "from_cache": True,
+    }
+
+
+def load_cache() -> dict[str, dict[str, Any]]:
+    if not CACHE_PATH.is_file():
+        return {}
+    try:
+        data = json.loads(CACHE_PATH.read_text(encoding="utf-8"))
+        stories = data.get("stories", data)
+        if not isinstance(stories, dict):
+            return {}
+        return {
+            str(key): value
+            for key, value in stories.items()
+            if isinstance(value, dict) and value.get("llm_ok")
+        }
+    except (OSError, json.JSONDecodeError) as error:
+        log(f"缓存无法读取，忽略: {error}")
+        return {}
+
+
+def save_cache(stories: dict[str, dict[str, Any]]) -> None:
+    items = sorted(
+        stories.values(),
+        key=lambda row: str(row.get("cached_at") or ""),
+        reverse=True,
+    )[:MAX_CACHE_ENTRIES]
+    payload = {
+        "version": 1,
+        "stories": {str(row["story_id"]): row for row in items if "story_id" in row},
+    }
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(
+        prefix=".hn-elfeed-cache-", suffix=".json", dir=DATA_DIR
     )
-    comments_text = collect_comments(item)
-    if comments_text:
-        comments = deepseek_json(
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+        os.replace(tmp, CACHE_PATH)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def cache_entry(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "story_id": row["story_id"],
+        "original_title": row.get("original_title", ""),
+        "translated_title": row["translated_title"],
+        "short_summary": row["short_summary"],
+        "article_summary_md": row["article_summary_md"],
+        "comments_summary_md": row["comments_summary_md"],
+        "updated_at": row["updated_at"],
+        "cached_at": now_utc(),
+        "llm_ok": True,
+    }
+
+
+def summarize(material: Material, api_key: str) -> dict[str, Any]:
+    candidate = material.candidate
+    log(f"处理 {candidate.story_id}: {candidate.original_title}")
+    try:
+        article = deepseek_json(
             api_key,
-            COMMENTS_SYSTEM_PROMPT,
+            ARTICLE_SYSTEM_PROMPT,
             {
                 "hn_title": candidate.original_title,
-                "comments_url": candidate.comments_url,
-                "hn_comments": comments_text,
+                "article_url": candidate.article_url,
+                "article_text": material.article_text,
             },
-            max_tokens=2_200,
+            max_tokens=5_000,
         )
-        comments_summary = comments["comments_summary"].strip()
-    else:
-        comments_summary = "评论区暂无可总结的有效内容。"
+        translated = (article.get("translated_title") or "").strip() or candidate.original_title
+        short = (article.get("short_summary") or "").strip() or NO_EXTRACTION
+        article_md = (article.get("article_summary") or "").strip() or NO_ARTICLE
+    except Exception as error:
+        log(
+            f"摘要失败 {candidate.story_id}: {type(error).__name__}: {error}，写入兜底条目"
+        )
+        return fallback_row(material, error)
 
-    log(f"完成 {candidate.story_id}: {article['translated_title']}")
+    if material.comments_text:
+        try:
+            comments = deepseek_json(
+                api_key,
+                COMMENTS_SYSTEM_PROMPT,
+                {
+                    "hn_title": candidate.original_title,
+                    "comments_url": candidate.comments_url,
+                    "hn_comments": material.comments_text,
+                },
+                max_tokens=2_200,
+            )
+            comments_md = (comments.get("comments_summary") or "").strip()
+            if not comments_md:
+                comments_md = fallback_comments(material.comments_text)
+        except Exception as error:
+            log(
+                f"评论摘要失败 {candidate.story_id}: {type(error).__name__}: {error}"
+            )
+            comments_md = fallback_comments(material.comments_text)
+    else:
+        comments_md = "评论区暂无可总结的有效内容。"
+
+    log(f"完成 {candidate.story_id}: {translated}")
     return asdict(candidate) | {
-        "translated_title": article["translated_title"].strip(),
-        "short_summary": article["short_summary"].strip() or NO_EXTRACTION,
-        "article_summary_md": article["article_summary"].strip() or NO_ARTICLE,
-        "comments_summary_md": comments_summary,
-        "points": item["points"],
-        "updated_at": dt.datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "translated_title": translated,
+        "short_summary": short,
+        "article_summary_md": article_md,
+        "comments_summary_md": comments_md,
+        "points": material.item.get("points", candidate.points),
+        "updated_at": now_utc(),
+        "llm_ok": True,
     }
 
 
@@ -454,7 +719,7 @@ def entry_html(row: dict[str, Any]) -> str:
 
 def write_feed(rows: list[dict[str, Any]]) -> None:
     rows.sort(key=lambda row: row["published_at"], reverse=True)
-    generated_at = dt.datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    generated_at = now_utc()
     feed = ET.Element("feed", xmlns=ATOM_NS)
     ET.SubElement(feed, "id").text = "urn:hn-elfeed:zh-hot"
     ET.SubElement(feed, "title").text = "Hacker News 中文热门"
@@ -485,45 +750,133 @@ def write_feed(rows: list[dict[str, Any]]) -> None:
         ET.SubElement(entry, "content", type="html").text = entry_html(row)
     ET.indent(feed, space="  ")
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    ET.ElementTree(feed).write(FEED_PATH, encoding="utf-8", xml_declaration=True)
+    fd, tmp = tempfile.mkstemp(prefix=".hackernews-", suffix=".atom", dir=DATA_DIR)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            ET.ElementTree(feed).write(
+                handle, encoding="utf-8", xml_declaration=True
+            )
+        os.replace(tmp, FEED_PATH)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
-def command_update(limit: int | None, jobs: int) -> int:
+def command_update(limit: int | None, jobs: int, llm_jobs: int) -> int:
     candidates = sorted(fetch_candidates(), key=lambda item: item.points, reverse=True)
     if limit is not None:
-        candidates = candidates[:limit]
+        candidates = candidates[: max(0, limit)]
     if not candidates:
         write_feed([])
         return 0
 
-    worker_count = min(jobs, len(candidates))
-    log(f"开始并行处理 {len(candidates)} 篇，并发数 {worker_count}")
-    api_key = deepseek_api_key()
-    stories = []
-    failures = 0
-    with ThreadPoolExecutor(
-        max_workers=worker_count, thread_name_prefix="hn-elfeed"
-    ) as executor:
-        futures = {
-            executor.submit(process_story, candidate, api_key): candidate
-            for candidate in candidates
-        }
-        for future in as_completed(futures):
-            candidate = futures[future]
-            try:
-                stories.append(future.result())
-            except Exception as error:
-                failures += 1
-                log(
-                    f"失败 {candidate.story_id}: {candidate.original_title}: "
-                    f"{type(error).__name__}: {error}"
-                )
-    if not stories:
-        log(f"更新失败：{failures} 篇均未完成，保留原 Atom")
+    jobs = max(1, jobs)
+    llm_jobs = max(1, llm_jobs)
+    cache = load_cache()
+    hits: list[Candidate] = []
+    misses: list[Candidate] = []
+    for candidate in candidates:
+        cached = cache.get(str(candidate.story_id))
+        if cached and cached.get("llm_ok"):
+            hits.append(candidate)
+        else:
+            misses.append(candidate)
+
+    log(
+        f"开始处理 {len(candidates)} 篇"
+        f"（缓存 {len(hits)}，新抓 {len(misses)}，"
+        f"抓取并发 {min(jobs, max(len(misses), 1))}，"
+        f"LLM 并发 {min(llm_jobs, max(len(misses), 1))}）"
+    )
+
+    rows: list[dict[str, Any]] = []
+    for candidate in hits:
+        cached = cache[str(candidate.story_id)]
+        log(
+            f"缓存 {candidate.story_id}: "
+            f"{cached.get('translated_title') or candidate.original_title}"
+        )
+        rows.append(row_from_cache(cached, candidate))
+
+    materials: list[Material] = []
+    if misses:
+        fetch_workers = min(jobs, len(misses))
+        with ThreadPoolExecutor(
+            max_workers=fetch_workers, thread_name_prefix="hn-fetch"
+        ) as executor:
+            futures = {
+                executor.submit(fetch_material, candidate): candidate
+                for candidate in misses
+            }
+            for future in as_completed(futures):
+                candidate = futures[future]
+                try:
+                    materials.append(future.result())
+                except Exception as error:
+                    log(
+                        f"抓取失败 {candidate.story_id}: {candidate.original_title}: "
+                        f"{type(error).__name__}: {error}"
+                    )
+                    materials.append(
+                        Material(
+                            candidate=candidate,
+                            item={
+                                "points": candidate.points,
+                                "text": "",
+                                "children": [],
+                                "url": candidate.article_url,
+                            },
+                            article_text="",
+                            comments_text="",
+                        )
+                    )
+
+    if materials:
+        api_key = deepseek_api_key()
+        llm_workers = min(llm_jobs, len(materials))
+        with ThreadPoolExecutor(
+            max_workers=llm_workers, thread_name_prefix="hn-llm"
+        ) as executor:
+            futures = {
+                executor.submit(summarize, material, api_key): material
+                for material in materials
+            }
+            for future in as_completed(futures):
+                material = futures[future]
+                try:
+                    rows.append(future.result())
+                except Exception as error:
+                    log(
+                        f"失败 {material.candidate.story_id}: "
+                        f"{material.candidate.original_title}: "
+                        f"{type(error).__name__}: {error}，写入兜底条目"
+                    )
+                    rows.append(fallback_row(material, error))
+
+    if not rows:
+        log("更新失败：0 篇产出，保留原 Atom")
         return 1
-    write_feed(stories)
-    log(f"更新结束：Atom 共 {len(stories)} 篇，失败 {failures} 篇：{FEED_PATH}")
-    return int(bool(failures))
+
+    write_feed(rows)
+    for row in rows:
+        if row.get("llm_ok") and not row.get("from_cache"):
+            cache[str(row["story_id"])] = cache_entry(row)
+    try:
+        save_cache(cache)
+    except OSError as error:
+        log(f"缓存写入失败: {error}")
+
+    n_cache = sum(1 for row in rows if row.get("from_cache"))
+    n_llm = sum(1 for row in rows if row.get("llm_ok") and not row.get("from_cache"))
+    n_fallback = sum(1 for row in rows if not row.get("llm_ok"))
+    log(
+        f"更新结束：Atom 共 {len(rows)} 篇"
+        f"（LLM {n_llm}，缓存 {n_cache}，兜底 {n_fallback}）：{FEED_PATH}"
+    )
+    return 0
 
 
 def command_dry_run() -> int:
@@ -550,7 +903,14 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=DEFAULT_JOBS,
         metavar="N",
-        help=f"并行处理数（默认 CPU 核数 {DEFAULT_JOBS}）",
+        help=f"抓取正文并行数（默认 {DEFAULT_JOBS}）",
+    )
+    update.add_argument(
+        "--llm-jobs",
+        type=int,
+        default=DEFAULT_LLM_JOBS,
+        metavar="N",
+        help=f"DeepSeek 并行数（默认 {DEFAULT_LLM_JOBS}）",
     )
     subparsers.add_parser("dry-run", help="只检查候选，不调用 AI 或生成文件")
     return parser
@@ -559,7 +919,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "update":
-        return command_update(args.limit, args.jobs)
+        return command_update(args.limit, args.jobs, args.llm_jobs)
     return command_dry_run()
 
 

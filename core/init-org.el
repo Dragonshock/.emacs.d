@@ -161,10 +161,11 @@
   ;; org-modern table display props conflict with valign overlays.
   (org-modern-table nil))
 
-(use-package org-modern-indent
-  :straight (org-modern-indent :type git :host github :repo "jdtsmith/org-modern-indent")
-  :config
-  (add-hook! org-mode-hook :depth 90 #'org-modern-indent-mode))
+;; Align upstream 3608874: org-modern-indent off (indent/valign clash).
+;; (use-package org-modern-indent
+;;   :straight (org-modern-indent :type git :host github :repo "jdtsmith/org-modern-indent")
+;;   :config
+;;   (add-hook! org-mode-hook :depth 90 #'org-modern-indent-mode))
 
 
 ;; [ox]

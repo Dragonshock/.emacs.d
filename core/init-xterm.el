@@ -12,8 +12,18 @@
                         'truncation
                         (make-glyph-code ?… 'shadow))
 
-;; Disable auto-composition in terminal.
-(setq-default auto-composition-mode "xterm-256color")
+;; T2: do not setq-default auto-composition-mode to a non-nil string
+;; ("xterm-256color" is truthy — composition stayed on).  Disable only
+;; on TTY frames; GUI keeps the stock default (t).
+(defun +xterm-disable-auto-composition (&optional frame)
+  "Turn off `auto-composition-mode' on FRAME when it is a TTY."
+  (let ((frame (or frame (selected-frame))))
+    (when (and (frame-live-p frame)
+               (not (display-graphic-p frame)))
+      (with-selected-frame frame
+        (auto-composition-mode -1)))))
+(add-hook 'tty-setup-hook #'+xterm-disable-auto-composition)
+(add-hook 'after-change-major-mode-hook #'+xterm-disable-auto-composition)
 
 
 ;; [Kitty Graphics Protocol] Implements support for Kitty's "graphics protocol",
@@ -40,8 +50,10 @@
 ;; [xterm]
 (use-package term/xterm
   :straight nil
-  ;; Emacs 31 enables `xterm-mouse-mode' on compatible terminals by default.
-  ;; A bare mode symbol on `tty-setup' would toggle it off after enable.
+  ;; G2: Ghostty is not in Emacs 31's xterm-mouse allowlist (kitty/foot/
+  ;; iTerm2 / alacritty / contour).  Upstream roife enables this on
+  ;; tty-setup; a Lisp call with no arg enables (does not toggle).
+  :hook (tty-setup . xterm-mouse-mode)
   :init
   (setq xterm-extra-capabilities '(modifyOtherKeys reportBackground
                                                    getSelection setSelection)
