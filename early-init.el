@@ -39,8 +39,11 @@
       warning-suppress-types '((defvaralias) (lexical-binding))
       warning-inhibit-types '((files missing-lexbind-cookie)))
 
-;; In noninteractive sessions, prioritize .el file. It saves IO time
-(setq load-prefer-newer noninteractive)
+;; Prefer newer .el over stale .elc in GUI too.  Interactive used to
+;; keep load-prefer-newer nil, so Dock Emacs loaded outdated core/*.elc
+;; and straight/build/*.elc (Emacs 31 then reports parse EOF as
+;; #<killed buffer>, bug#80063).
+(setq load-prefer-newer t)
 
 ;; Inhibit resizing frame
 (setq frame-inhibit-implied-resize t)

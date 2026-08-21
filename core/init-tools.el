@@ -24,19 +24,102 @@
 
 
 ;; [ezf] Use Emacs completion from terminal shells
-;; Consult's fd builder returns nil on a blank query (`when (or re opts)`),
-;; so zsh C-t / ezf Files opens with an empty candidate list.
-(defun +ezf-fd-builder-list-on-empty (orig directories-only)
-  "Around `ezf--fd-builder': treat blank input as \".\" so fd lists immediately."
-  (let ((inner (funcall orig directories-only)))
-    (lambda (input)
-      (funcall inner (if (string-blank-p input) "." input)))))
+;; Consult's fd builder returns nil on a blank query (`when (or re opts)`).
+;; Path tokens (~/, src/foo) were passed through as regexes and matched nothing.
+(defun +ezf--fd-path-token-p (input)
+  "Return non-nil when INPUT looks like a path prefix, not a cwd fuzzy query."
+  (or (string-match-p "\\`\\(~\\|/\\|\\./\\|\\.\\./\\)" input)
+      (string-search "/" input)))
+
+(defun +ezf--fd-query-parts (input)
+  "Return (DIR . PATTERN) for fd from Consult INPUT.
+DIR is the absolute search root. PATTERN is never blank (Consult skips \"\")."
+  (let ((cwd (file-name-as-directory (expand-file-name default-directory))))
+    (cond
+     ((string-blank-p input)
+      (cons cwd "."))
+     ((not (+ezf--fd-path-token-p input))
+      (cons cwd input))
+     (t
+      (let ((expanded
+             (ignore-errors
+               (expand-file-name (substitute-in-file-name input) cwd))))
+        (cond
+         ((null expanded)
+          (cons cwd "."))
+         ((file-directory-p expanded)
+          (cons (file-name-as-directory expanded) "."))
+         (t
+          (let ((dir (file-name-directory expanded))
+                (base (file-name-nondirectory expanded)))
+            (if (and dir (file-directory-p dir))
+                (cons dir (if (string-blank-p base) "." base))
+              (cons cwd input))))))))))
+
+(defun +ezf--fd-format-candidate (candidate)
+  "Turn an absolute fd line into a path that can replace the shell token."
+  (let* ((abs (expand-file-name (string-remove-prefix "./" candidate)))
+         (rel (file-relative-name abs default-directory)))
+    (if (string-prefix-p ".." rel)
+        (abbreviate-file-name abs)
+      rel)))
+
+(defun +ezf-fd-builder-list-on-empty (_orig directories-only)
+  "Around `ezf--fd-builder': list on empty input; path prefixes search that directory."
+  (lambda (input)
+    (pcase-let* ((`(,dir . ,pattern) (+ezf--fd-query-parts input))
+                 (path-prefix (+ezf--fd-path-token-p input))
+                 (consult-fd-args
+                  (append '("fd" "--full-path" "--absolute-path" "--color=never"
+                            "--hidden" "--follow" "--exclude=.git")
+                          (when path-prefix '("--max-depth=1"))
+                          (when directories-only '("--type=directory"))))
+                 (inner (consult--fd-make-builder (list dir))))
+      (funcall inner pattern))))
+
+(defun +ezf-fd-dispatch-source-format (orig directories-only context)
+  "Around `ezf--fd-dispatch-source': insert cwd-relative or ~/ paths."
+  (let ((source (funcall orig directories-only context)))
+    (plist-put (copy-sequence source)
+               :async
+               (consult--process-collection
+                (ezf--fd-builder directories-only)
+                :min-input 0
+                :transform (consult--async-map #'+ezf--fd-format-candidate)
+                :highlight t))))
+
+(defun +ezf-tab-insert ()
+  "Insert the current Vertico candidate; stay in ezf. Directories get a trailing slash."
+  (interactive)
+  (vertico-insert)
+  (let ((text (minibuffer-contents)))
+    (when (and (not (string-suffix-p "/" text))
+               (file-directory-p
+                (expand-file-name (substitute-in-file-name text)
+                                  default-directory)))
+      (insert "/"))))
+
+(defun +ezf-bind-tab-locally ()
+  "In the ezf minibuffer, Tab completes the highlight instead of minibuffer-complete."
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map (current-local-map))
+    (keymap-set map "TAB" #'+ezf-tab-insert)
+    (keymap-set map "<tab>" #'+ezf-tab-insert)
+    (use-local-map map)))
+
+(defun +ezf-client-local-tab (orig request-file result-file)
+  "Around `ezf-client': bind Tab only for this minibuffer."
+  (minibuffer-with-setup-hook
+      (:append #'+ezf-bind-tab-locally)
+    (funcall orig request-file result-file)))
 
 (use-package ezf
   :straight (:type git :host github :repo "roife/ezf")
   :demand t
   :config
-  (advice-add #'ezf--fd-builder :around #'+ezf-fd-builder-list-on-empty))
+  (advice-add #'ezf--fd-builder :around #'+ezf-fd-builder-list-on-empty)
+  (advice-add #'ezf--fd-dispatch-source :around #'+ezf-fd-dispatch-source-format)
+  (advice-add #'ezf-client :around #'+ezf-client-local-tab))
 
 
 ;; [speedbar]

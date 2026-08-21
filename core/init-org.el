@@ -83,8 +83,10 @@
   ;; CJK-friendly emphasis boundaries for font-lock only.
   ;; `org-emphasis-regexp-components' does not change the Org parser/export
   ;; markup rules, so skip org-element-update-syntax / org-element--set-regexps.
-  (setq org-emphasis-regexp-components '("-[:space:]('\"{[:nonascii:][:alpha:]"
-                                         "-[:space:].,:!?;'\")}\\[[:nonascii:][:alpha:]"
+  ;; Keep ASCII letters out of the border classes so paths like
+  ;; `=/usr/bin/foo=' are not fontified as verbatim (upstream 8f668f5).
+  (setq org-emphasis-regexp-components '("-[:space:]('\"{[:nonascii:]"
+                                         "-[:space:].,:!?;'\")}\\[[:nonascii:]"
                                          "[:space:]"
                                          "."
                                          1))
