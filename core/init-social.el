@@ -50,13 +50,17 @@ Prefer the straight git repo; fall back to `telega--lib-directory'."
       (message "telega filter: %s" (if archive-p telega-filter-default 'archive))))
 
   (defun +telega-chatbuf-quit-or-self-insert (n)
-    "Leave the chatbuf for the telega root buffer.
-In the input area, insert the typed character instead."
+    "Quit the chat window; in the input area, insert the typed character.
+With more than one window, `quit-window' deletes the chat window and
+leaves the telega root.  If this is the only window, bury the chat
+instead of replacing it with root."
     (interactive "p")
     (if (and (bound-and-true-p telega-chatbuf--input-marker)
              (>= (point) telega-chatbuf--input-marker))
         (self-insert-command n)
-      (telega)))
+      (if (one-window-p)
+          (bury-buffer)
+        (quit-window))))
 
   (defvar +telega-unread-summary-prompt
     "你是 Telegram 未读摘要编辑，不是复述员。读者没看过这些消息，\
@@ -287,6 +291,11 @@ In the input area, insert the typed character instead."
                                    (time . "%H:%M") (date-time . "%y/%m/%d. %H:%M") (date-long . "%y/%m/%d")
                                    (date-break-bar . "%m/%d"))
         telega-chat-group-messages-timespan 600
+        ;; RET from root: reuse an existing chat window, otherwise split.
+        ;; Stock is display-buffer-same-window, which replaces the root.
+        telega-chat--display-buffer-action
+        '((display-buffer-reuse-window display-buffer-pop-up-window)
+          (inhibit-same-window . t))
         telega-completions-capf-functions '(telega-capf-username
                                             telega-capf-hashtag
                                             telega-capf-markdown-precode

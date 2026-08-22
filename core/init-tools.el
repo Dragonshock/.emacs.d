@@ -305,10 +305,16 @@ Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
   (unless (display-graphic-p)
     (setq-local shr-inhibit-images t)))
 
-(use-package eww
-  :hook (eww-mode . +eww-inhibit-images-on-tty)
+;; Elfeed-show and eww both render HTML via SHR.  Default shr-text
+;; inherits variable-pitch-text (Sarasa UI SC at 1.1×).  Use the
+;; default face (TX-02) instead.
+(use-package shr
   :config
-  (setq shr-max-image-proportion 0.5))
+  (setq shr-use-fonts nil
+        shr-max-image-proportion 0.5))
+
+(use-package eww
+  :hook (eww-mode . +eww-inhibit-images-on-tty))
 
 (use-package xwidget
   :config
