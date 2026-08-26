@@ -2,6 +2,141 @@
 
 ;; [compile]
 (use-package compile
+  :preface
+  (eval-when-compile
+    (require 'cl-lib)
+    (require 'compile))
+
+  (defvar +compilation-flymake-diagnostics nil
+    "Flymake diagnostics parsed from the latest compilation buffer.")
+
+  (defun +compilation-flymake--file (location)
+    "Return the file named by compilation LOCATION."
+    (let* ((file-struct (compilation--loc->file-struct location))
+           (file-spec (compilation--file-struct->file-spec file-struct))
+           (file (car file-spec)))
+      (if (bufferp file)
+          (buffer-file-name file)
+        (compilation--expand-fn
+         (or (cadr file-spec) default-directory)
+         (format (or (car (compilation--file-struct->formats file-struct))
+                     "%s")
+                 file)))))
+
+  (defun +compilation-flymake--message-start (message position)
+    "Return the beginning of parsed MESSAGE around POSITION.
+Compilation text properties may cover only a hyperlink inside the full
+parser match, so recover the complete match from MESSAGE's parser rule."
+    (let* ((rule (compilation--message->rule message))
+           (item (and rule
+                      (cdr (assq rule compilation-error-regexp-alist-alist))))
+           (regexp (car-safe item)))
+      (or (and (stringp regexp)
+               (save-excursion
+                 (goto-char position)
+                 (end-of-line)
+                 (when (and (re-search-backward regexp nil t)
+                            (<= (match-beginning 0) position)
+                            (<= position (match-end 0)))
+                   (match-beginning 0))))
+          (save-excursion
+            (goto-char position)
+            (line-beginning-position)))))
+
+  (defun +compilation-flymake--collect ()
+    "Convert the current compilation buffer's parsed message cache."
+    (save-excursion
+      (let ((entries
+             (progn
+               (goto-char (point-min))
+               (cl-loop
+                with seen = (make-hash-table :test #'eq)
+                for match = (text-property-search-forward
+                             'compilation-message nil nil t)
+                while match
+                for message = (prop-match-value match)
+                for location = (compilation--message->loc message)
+                for type = (compilation--message->type message)
+                for position = (+compilation-flymake--message-start
+                                message (prop-match-beginning match))
+                ;; Informational locations usually provide context for the
+                ;; preceding warning or error, rather than a separate
+                ;; diagnostic.  Keep them in that diagnostic's text range.
+                unless (or (zerop type) (gethash message seen))
+                collect (progn
+                          (puthash message t seen)
+                          (vector location type position))))))
+        (cl-loop
+         for tail on entries
+         for entry = (car tail)
+         for next = (cadr tail)
+         for location = (aref entry 0)
+         for type = (aref entry 1)
+         for position = (aref entry 2)
+         for end = (if next (aref next 2) (point-max))
+         collect
+         (flymake-make-diagnostic
+          (+compilation-flymake--file location)
+          (cons (or (compilation--loc->line location) 1)
+                (compilation--loc->col location))
+          nil
+          (if (= type 1) 'flymake-warning 'flymake-error)
+          (save-excursion
+            (goto-char position)
+            (string-trim
+             (buffer-substring-no-properties
+              (line-beginning-position) end)))
+          '+compilation-flymake)))))
+
+  (defun +compilation-flymake--publish-project-diagnostics ()
+    "Replace Compilation-owned project diagnostics."
+    (setq flymake-list-only-diagnostics
+          (cl-loop for (file . diagnostics) in flymake-list-only-diagnostics
+                   for others = (cl-remove '+compilation-flymake diagnostics
+                                           :key #'flymake-diagnostic-data)
+                   when others collect (cons file others)))
+    (dolist (diagnostic +compilation-flymake-diagnostics)
+      (push diagnostic
+            (alist-get (flymake-diagnostic-buffer diagnostic)
+                       flymake-list-only-diagnostics nil nil #'equal))))
+
+  (defun +compilation-flymake-backend (report-fn &rest _args)
+    "Report compilation diagnostics belonging to the current buffer.
+Diagnostics for all files are published separately for project listings."
+    (let (diagnostics)
+      (dolist (cached +compilation-flymake-diagnostics)
+        (when (and buffer-file-name
+                   (file-equal-p buffer-file-name
+                                 (flymake-diagnostic-buffer cached)))
+          (when-let* ((position (flymake-diagnostic-beg cached))
+                      (region (flymake-diag-region
+                               (current-buffer)
+                               (car position) (cdr position))))
+            (push (flymake-make-diagnostic
+                   (current-buffer) (car region) (cdr region)
+                   (flymake-diagnostic-type cached)
+                   (flymake-diagnostic-message cached))
+                  diagnostics))))
+      (funcall report-fn (nreverse diagnostics))))
+
+  (defun +compilation-flymake-finish-h (buffer _status)
+    "Publish the parsed messages from compilation BUFFER."
+    (require 'flymake)
+    (let ((old-files (mapcar #'flymake-diagnostic-buffer
+                             +compilation-flymake-diagnostics)))
+      (setq +compilation-flymake-diagnostics
+            (with-current-buffer buffer
+              (+compilation-flymake--collect)))
+      (+compilation-flymake--publish-project-diagnostics)
+      (dolist (file (delete-dups
+                     (append old-files
+                             (mapcar #'flymake-diagnostic-buffer
+                                     +compilation-flymake-diagnostics))))
+        (when-let* ((source (find-buffer-visiting file)))
+          (with-current-buffer source
+            (when flymake-mode
+              (flymake-start)))))))
+
   :config
   (setq compilation-always-kill t       ; kill compilation process before starting another
         compilation-ask-about-save nil  ; save all buffers on `compile'
@@ -23,6 +158,7 @@
 
   ;; Emacs 28+: stock filter (respects `ansi-color-for-compilation-mode').
   (add-hook 'compilation-filter-hook #'ansi-color-compilation-filter)
+  (add-hook 'compilation-finish-functions #'+compilation-flymake-finish-h)
   )
 
 
@@ -66,6 +202,10 @@
               ("M-/" . eglot-find-typeDefinition)
               ("M-?" . xref-find-references))
   :config
+  ;; Keep local Flymake backends (hl-todo, compilation); add Eglot's ourselves.
+  (add-to-list 'eglot-stay-out-of 'flymake-diagnostic-functions)
+  (add-hook 'flymake-diagnostic-functions #'eglot-flymake-backend)
+
   (setq eglot-events-buffer-config '(:size 0 :format full)
         eglot-autoshutdown t
         ;; eglot-report-progress 'messages
@@ -151,6 +291,9 @@
   ;; we call eldoc manually
   (add-hook! eglot-managed-mode-hook
     (defun +eglot-disable-eldoc-mode ()
+      ;; Drop treesit/CC Flymake backends so they do not compete with Eglot.
+      (dolist (backend '(rust-ts-flymake flymake-cc python-flymake))
+        (remove-hook 'flymake-diagnostic-functions backend t))
       (when (eglot-managed-p)
         (eldoc-mode -1))))
   )
@@ -231,9 +374,17 @@
               ("C-c c u" . citre-update-this-tags-file))
   :hook (find-file . +citre-auto-enable)
   :config
+  (require 'dumb-jump)
+  (citre-register-backend 'dumb-jump
+                          (citre-xref-backend-to-citre-backend
+                           'dumb-jump #'dumb-jump-xref-activate))
   (setq citre-default-create-tags-file-location 'global-cache
         citre-edit-ctags-options-manually t
-        citre-enable-capf-integration t)
+        citre-auto-enable-citre-mode-modes '(prog-mode)
+        citre-find-definition-backends '(eglot tags global dumb-jump)
+        citre-find-reference-backends '(eglot global dumb-jump))
+  (setq-default citre-enable-xref-integration nil
+                citre-enable-capf-integration t)
 
   (with-eval-after-load 'cc-mode (require 'citre-lang-c))
   (with-eval-after-load 'dired (require 'citre-lang-fileref))
@@ -295,8 +446,27 @@
 (use-package flymake
   :straight (:type built-in)
   :preface
+  (defun +flymake-show-buffer-diagnostics-single-a (args)
+    "Pass at most one diagnostic to `flymake-show-buffer-diagnostics'.
+Emacs 31's interactive form returns every diagnostic at point as a
+separate argument, although the command accepts only one."
+    (if (cdr args) (list (car args)) args))
+
+  (defun +flymake-add-shared-backends-h ()
+    "Add buffer-local shared Flymake backends (hl-todo, compilation)."
+    (dolist (backend '(hl-todo-flymake +compilation-flymake-backend))
+      (add-hook 'flymake-diagnostic-functions backend nil t)))
+
   (defun +flymake-mode-unless-eglot-auto-starts ()
-    "Enable Flymake unless Eglot will enable it after connecting."
+    "Enable Flymake unless Eglot will enable it after connecting.
+Shared backends are still registered so Eglot-managed buffers keep them.
+On Eglot auto-start modes, drop native treesit/CC backends first so an
+asynchronous checker cannot report after Eglot has taken over
+(notably `rust-ts-flymake'; upstream 874f89e)."
+    (when (memq major-mode +eglot-auto-start-modes)
+      (dolist (backend '(rust-ts-flymake flymake-cc python-flymake))
+        (remove-hook 'flymake-diagnostic-functions backend t)))
+    (+flymake-add-shared-backends-h)
     (unless (memq major-mode +eglot-auto-start-modes)
       (flymake-mode 1)))
 
@@ -304,10 +474,13 @@
   :bind (("C-c f ]" . flymake-goto-next-error)
          ("C-c f [" . flymake-goto-prev-error)
          ("C-c f b" . flymake-show-buffer-diagnostics)
+         ("C-c f p" . flymake-show-project-diagnostics)
          :map flymake-mode-map
          ("<left-fringe> <mouse-1>" . nil)
          ("<right-fringe> <mouse-1>" . nil))
   :config
+  (advice-add 'flymake-show-buffer-diagnostics :filter-args
+              #'+flymake-show-buffer-diagnostics-single-a)
   (setq flymake-show-diagnostics-at-end-of-line 'short))
 
 ;; Langs
@@ -479,7 +652,9 @@
         indent-bars-width-frac 0.1
         indent-bars-color '(highlight :face-bg t :blend 0.2)
         indent-bars-highlight-current-depth nil
-        indent-bars-pattern "."))
+        indent-bars-pattern ".")
+
+  (add-hook! enable-theme-functions #'indent-bars-reset))
 
 
 ;; [direnv] Buffer-local project environments

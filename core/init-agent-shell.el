@@ -7,8 +7,10 @@
 ;; dev-docs/notes/agent-shell-ux-align-recommendations-2026-08-02.md).
 ;; V4 (tool-use expand-by-default) reverted 2026-08-14: expanded tool
 ;; bodies + markdown tables fed a jit-lock 0-delay timer storm.
-;; Table alignment (2026-08-14): C1 pins U+2500–257F to TX-02 in
-;; init-ui; C3 remaps table faces off italic/bold (this file).
+;; Table faces: package defaults (header bold, border comment, zebra
+;; lazy-highlight).  Local C3 remaps and markdown `:align-to PIXEL'
+;; were reverted 2026-08-25 (Invalid face 728 redisplay hang).
+;; C1 still pins U+2500–257F to TX-02 in init-ui.el.
 ;;
 ;; Grok uses the OFFICIAL agent-shell-xai.el (upstream PR #720) — process
 ;; contract, welcome screen and auth all come from the package:
@@ -458,13 +460,6 @@ default `:none'."
   :bind (("C-c C-g" . agent-shell)
          ;; V3: multi-line compose (works with or without prefer-viewport).
          ("C-c C-;" . agent-shell-prompt-compose))
-  ;; C3: table faces must not inherit italic comment / bold — those
-  ;; change glyph width and misalign │.  Zebra keeps lazy-highlight
-  ;; background only; slant/weight stay default-metric.
-  :custom-face
-  (agent-shell-markdown-table-border ((t (:inherit default :slant normal :weight normal))))
-  (agent-shell-markdown-table-header ((t (:inherit default :slant normal :weight normal))))
-  (agent-shell-markdown-table-zebra ((t (:inherit lazy-highlight :slant normal :weight normal))))
   :config
   (+agent-shell-ensure-path)
   ;; Official Grok Build support (agent-shell-xai.el, upstream PR #720).

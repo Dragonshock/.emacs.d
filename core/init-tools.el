@@ -281,12 +281,46 @@ Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
 
 
 ;; [emacs-reader] read docs in emacs (moved here from init-pdf.el, upstream layout)
+;; 2026-08-22: native DocState leak.  `reader-dyn--load-doc' mallocs with a
+;; NULL user-ptr finalizer; `reader-refresh-doc-buffer' never calls
+;; `set-visited-file-modtime' or `reader-dyn--close-doc'.  A rewritten PDF
+;; stays stale forever; +auto-revert-mode + window churn re-loads it until
+;; jetsam (pid 55552, 71GB).  Upstream kill-buffer-hook is also added
+;; buffer-local at load time, not on reader-mode buffers.
 (use-package reader
   :straight '(reader :type git :host codeberg :repo "MonadicSheep/emacs-reader"
                      :files ("*.el" "render-core.dylib")
                      ;; NOTE: Makefile shells out to `emacs' for checkdoc;
                      ;; init-straight.el ensures emacs is on PATH.
-                     :pre-build ("make" "all")))
+                     :pre-build ("make" "all"))
+  :config
+  (defun +reader-close-native-doc ()
+    "Free the MuPDF DocState for this buffer.  Must run while the overlay exists."
+    (when (and (derived-mode-p 'reader-mode)
+               (fboundp 'reader-dyn--close-doc)
+               (bound-and-true-p reader-current-doc-state-ptr)
+               (reader-current-doc-overlay))
+      (reader-dyn--close-doc)))
+
+  (defadvice! +reader-refresh-close-before-reload-a (orig &rest args)
+    :around #'reader-refresh-doc-buffer
+    ;; close-doc no-ops if the overlay is already gone; call it before
+    ;; upstream `remove-overlays'.
+    (+reader-close-native-doc)
+    (prog1 (apply orig args)
+      (when buffer-file-name
+        (set-visited-file-modtime)
+        (set-buffer-modified-p nil))))
+
+  (defun +reader-mode-setup ()
+    "Stop polling auto-revert; free native memory when the buffer dies."
+    (auto-revert-mode -1)
+    (add-hook 'kill-buffer-hook #'+reader-close-native-doc nil t))
+  (add-hook 'reader-mode-hook #'+reader-mode-setup)
+
+  (with-eval-after-load 'zoom
+    (when (boundp 'zoom-ignored-major-modes)
+      (add-to-list 'zoom-ignored-major-modes 'reader-mode))))
 
 
 ;; [browse-url] Pass a URL to browser

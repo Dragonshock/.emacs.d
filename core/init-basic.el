@@ -346,6 +346,20 @@
       (apply save args))))
 
 
+;; Snapshot *Messages* under var/.  Force-quit leaves no *Messages* buffer,
+;; which is why the 2026-08-22 71GB OOM had to be reconstructed from
+;; recentf/save-place and JetsamEvent.
+(defun +messages-snapshot ()
+  "Write `*Messages*' to `var/messages'."
+  (when-let* ((buf (get-buffer "*Messages*"))
+              (file (no-littering-expand-var-file-name "messages")))
+    (with-current-buffer buf
+      (let ((inhibit-message t))
+        (write-region (point-min) (point-max) file nil 'silent)))))
+(add-hook 'kill-emacs-hook #'+messages-snapshot)
+(run-with-idle-timer 300 t #'+messages-snapshot)
+
+
 ;; [so-long] Workaround for long one-line file
 (use-package so-long
   :hook ((after-init . global-so-long-mode))

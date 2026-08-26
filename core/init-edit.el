@@ -36,6 +36,10 @@
   (defun +auto-revert-buffer-h (&rest _)
     "Auto revert current buffer when it is stale."
     (unless (or (active-minibuffer-window)
+                ;; reader-mode: custom revert + native DocState.  This hook
+                ;; let-binds `auto-revert-mode' to t, so disabling the minor
+                ;; mode on the PDF buffer is not enough (2026-08-22 OOM).
+                (derived-mode-p 'reader-mode)
                 (and (not auto-revert-remote-files)
                      buffer-file-name
                      (file-remote-p buffer-file-name)))
@@ -267,11 +271,10 @@ Global `window-selection-change-functions' also receives a frame."
       (puni-backward-delete-char)))
   )
 
-;; [dtrt-indent] Detect indentation size
+;; [dtrt-indent] Detect indentation size (prog-mode only; upstream 16db7a7).
 (use-package dtrt-indent
   :straight t
-  ;; Always-defer: :config alone never runs until package loads.
-  :hook (after-init . dtrt-indent-global-mode))
+  :hook (prog-mode . dtrt-indent-mode))
 
 
 ;; [dogears] Jump to the last edit location

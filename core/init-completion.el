@@ -50,7 +50,7 @@
                                         (window-height . 0.5)))
   (defadvice! +vertico-buffer-disbale-mode-line ()
     :before #'vertico-buffer--setup
-    (setq-local mode-line-format nil)))
+    (mode-line-invisible-mode)))
 
 
 ;;; Matching styles
@@ -181,7 +181,7 @@
          ("M-g i" . consult-imenu)
          ("M-g I" . consult-imenu-multi)
          ;; ── M-s (search-map) ──
-         ("M-s d" . consult-find)          ; dakra uses consult-find; keep fd
+         ("M-s d" . consult-fd)          ; dakra uses consult-find; keep fd
          ("M-s D" . consult-locate)
          ("M-s g" . consult-grep)
          ("M-s G" . consult-git-grep)
@@ -236,10 +236,10 @@
           :state    #'consult--file-preview
           :async (lambda (sink)
                    (let* ((consult-fd-args '("fd" "--full-path" "--color=never" "--hidden" "--follow"
-                                            "--exclude=.git" "--max-results=100"))
-                         (builder (consult--fd-make-builder
-                                   (list (or (consult--project-root)
-                                             (expand-file-name default-directory))))))
+                                             "--exclude=.git" "--max-results=100"))
+                          (builder (consult--fd-make-builder
+                                    (list (or (consult--project-root)
+                                              (expand-file-name default-directory))))))
                      (funcall
                       (consult--process-collection builder
                         :transform (consult--async-map #'abbreviate-file-name)

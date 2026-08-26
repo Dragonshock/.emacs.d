@@ -78,7 +78,6 @@
   (hl-todo ((t (:inherit default :height 0.9 :width condensed :weight bold :inverse-video t))))
   :hook ((prog-mode conf-mode yaml-mode yaml-ts-mode toml-ts-mode) . hl-todo-mode)
   :config
-  (add-hook! flymake-diagnostic-functions #'hl-todo-flymake)
   (setq hl-todo-require-punctuation t
         hl-todo-highlight-punctuation ":")
 
@@ -149,6 +148,14 @@
     "Recenter and pulse the current line."
     (recenter)
     (+pulse-momentary-line))
+
+  ;; Pulse only in current window (upstream 58b8567).
+  (defadvice! +pulse-window-local-a (fn &rest args)
+    :around #'pulse-momentary-highlight-region
+    (let ((window (selected-window)))
+      (prog1 (apply fn args)
+        (when (overlayp pulse-momentary-overlay)
+          (overlay-put pulse-momentary-overlay 'window window)))))
   )
 
 

@@ -198,7 +198,7 @@ ENTRY may be a regexp string, major-mode symbol, or predicate."
   :hook (window-setup . zoom-mode)
   :config
   (setq zoom-minibuffer-preserve-layout nil
-        zoom-ignored-major-modes '(ediff-mode vundo-mode minibuffer-mode speedbar-mode))
+        zoom-ignored-major-modes '(ediff-mode vundo-mode minibuffer-mode speedbar-mode reader-mode))
 
   (add-hook! vundo-mode-hook
     (defun +zoom-fix-window-size-h ()

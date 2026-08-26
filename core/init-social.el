@@ -41,6 +41,40 @@ Prefer the straight git repo; fall back to `telega--lib-directory'."
              (file-exists-p (expand-file-name "Makefile" telega--lib-directory))
              telega--lib-directory)))
 
+  (defvar +telega-socks-proxy
+    (pcase system-type
+      ('darwin '(:server "127.0.0.1" :port 6153
+                 :type (:@type "proxyTypeSocks5")))
+      ('gnu/linux '(:server "127.0.0.1" :port 7891
+                    :type (:@type "proxyTypeSocks5")))
+      (_ nil))
+    "Local SOCKS5 for TDLib (`telega--addProxy'), or nil for the system network.
+Darwin uses Surge's default SOCKS port; GNU/Linux uses Clash 7891.
+TUN/fake-ip (198.18.0.0/15) intercepts DC sockets and breaks MTProto;
+localhost SOCKS usually bypasses the TUN.")
+
+  (defun +telega-add-local-proxy-h ()
+    "Enable `+telega-socks-proxy' before TDLib authorization."
+    (when +telega-socks-proxy
+      (telega--addProxy +telega-socks-proxy
+                        :enable-p 'enable
+                        :comment "local socks5")))
+
+  (defun +telega-apply-count-faces (&rest _)
+    "Unmuted unread = modus blue-warmer + bold; muted unread = fg-dim.
+Modus maps `telega-unmuted-count' to `number' (fg-main), same as titles."
+    (when (fboundp 'modus-themes-get-color-value)
+      (let ((blue (modus-themes-get-color-value 'blue-warmer t))
+            (dim (modus-themes-get-color-value 'fg-dim t)))
+        (unless (eq blue 'unspecified)
+          (set-face-attribute 'telega-unmuted-count nil
+                              :foreground blue :weight 'bold
+                              :inherit 'unspecified))
+        (unless (eq dim 'unspecified)
+          (set-face-attribute 'telega-muted-count nil
+                              :foreground dim :weight 'normal
+                              :inherit 'unspecified)))))
+
   (defun +telega-toggle-archive ()
     "Toggle telega root buffer between the main and archive filters."
     (interactive)
@@ -319,13 +353,11 @@ Update straight recipe files or run make from straight/repos/telega.el"
 
   ;; `telega-proxies' is obsolete since telega 0.8.621; proxies are now added
   ;; from `telega-before-auth-hook' via `telega--addProxy'.
-  (when (eq system-type 'gnu/linux)
-    (add-hook 'telega-before-auth-hook
-              (lambda ()
-                (telega--addProxy
-                    '(:server "127.0.0.1" :port 7891
-                              :type (:@type "proxyTypeSocks5"))
-                  :enable-p 'enable :comment "local socks5"))))
+  (when +telega-socks-proxy
+    (add-hook 'telega-before-auth-hook #'+telega-add-local-proxy-h))
+
+  (add-hook 'modus-themes-after-load-theme-hook #'+telega-apply-count-faces)
+  (+telega-apply-count-faces)
 
   ;; Do not redef telega-completions--bot-commands: package already uses
   ;; mapcan (telega-completions.el).  Local copy was checkout-drift; MERGE

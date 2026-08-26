@@ -122,7 +122,7 @@ does not clobber maximized/custom sizes.  FORCE non-nil re-applies."
       (set-face-font 'variable-pitch "Sarasa UI SC")
 
       (dolist (charset '(han cjk-misc))
-        (set-fontset-font t charset (font-spec :family "LXGW WenKai Mono"))) ; Sarasa Mono SC
+        (set-fontset-font t charset (font-spec :family "LXGW Neo ZhiSong Screen Full"))) ; Sarasa Mono SC, LXGW WenKai Mono
 
       ;; Box Drawing (U+2500–257F): pin TX-02 so agent-shell table
       ;; borders (│ ─ ┼ ├ ┤) do not fall back to a different-width font.
@@ -171,7 +171,7 @@ does not clobber maximized/custom sizes.  FORCE non-nil re-applies."
       modus-themes-variable-pitch-ui nil
       modus-themes-headings nil)
 
-(defvar +light-theme 'modus-operandi)
+(defvar +light-theme 'modus-operandi-tinted)
 (defvar +dark-theme 'modus-vivendi)
 ;; Align with upstream roife: always re-detect dark/light and switch when the
 ;; picked theme differs.  First pass may run before xterm OSC 11; tty-setup-hook
