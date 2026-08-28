@@ -60,6 +60,17 @@
                         :inherit (intern (format "org-level-%d" (1+ i)))
                         :weight 'unspecified)))
 
+;; Re-front `.md'/`.markdown' after forge/magit load markdown-mode autoloads.
+;; Do not remap `markdown-mode': separedit requires the exact mode.
+(add-hook! emacs-startup-hook
+  (defun +markdown-ts-refront-auto-mode-alist ()
+    "Put `markdown-ts-mode' first for `.md' and `.markdown' files."
+    (dolist (elt '(("\\.md\\'" . markdown-ts-mode)
+                   ("\\.markdown\\'" . markdown-ts-mode)))
+      (setq auto-mode-alist (cons elt (delete elt auto-mode-alist))))))
+(with-eval-after-load 'markdown-mode-autoloads
+  (+markdown-ts-refront-auto-mode-alist))
+
 
 ;; [md-babel] Execute Markdown fenced blocks through Org Babel
 (use-package md-babel
@@ -110,3 +121,9 @@
          (latex-mode . turn-on-reftex))
   :config
   (setq reftex-plug-into-AUCTeX t))
+
+
+(use-package mermaid-mode
+  :straight t
+  :config
+  (setq mermaid-output-format ".svg"))

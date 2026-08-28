@@ -181,10 +181,11 @@ ENTRY may be a regexp string, major-mode symbol, or predicate."
 
   (defun +popper-smart-popup (buffer &optional alist)
     "Display BUFFER as a half-height popup; select unless no-select listed."
-    (let ((window (display-buffer-in-direction
-                   buffer
-                   (append alist '((direction . below)
-                                   (window-height . 0.5))))))
+    (let ((window (or (display-buffer-reuse-window buffer alist)
+                      (display-buffer-in-direction
+                       buffer
+                       (append alist '((direction . below)
+                                       (window-height . 0.5)))))))
       (unless (+popper-match-reference-p buffer +popper-reference-buffer-no-select)
         (select-window window))
       window))

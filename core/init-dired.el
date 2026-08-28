@@ -90,7 +90,6 @@
     :config
     (setq dired-subtree-line-prefix "  |  "))
 
-  ;; TODO: remove it
   (use-package f :straight t :demand t)
 
   (use-package dired-collapse

@@ -288,19 +288,24 @@ Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
 ;; jetsam (pid 55552, 71GB).  Upstream kill-buffer-hook is also added
 ;; buffer-local at load time, not on reader-mode buffers.
 (use-package reader
-  :straight '(reader :type git :host codeberg :repo "MonadicSheep/emacs-reader"
-                     :files ("*.el" "render-core.dylib")
+  :straight `(reader :type git :host codeberg :repo "MonadicSheep/emacs-reader"
+                     :files (:defaults ,(concat "render-core" module-file-suffix))
                      ;; NOTE: Makefile shells out to `emacs' for checkdoc;
                      ;; init-straight.el ensures emacs is on PATH.
                      :pre-build ("make" "all"))
   :config
   (defun +reader-close-native-doc ()
-    "Free the MuPDF DocState for this buffer.  Must run while the overlay exists."
+    "Free the MuPDF DocState for this buffer.  Must run while overlays exist.
+`reader-dyn--close-doc' no-ops unless the selected window has an overlay,
+so iterate this buffer's windows instead of gating on `selected-window'."
     (when (and (derived-mode-p 'reader-mode)
                (fboundp 'reader-dyn--close-doc)
-               (bound-and-true-p reader-current-doc-state-ptr)
-               (reader-current-doc-overlay))
-      (reader-dyn--close-doc)))
+               (bound-and-true-p reader-current-doc-state-ptr))
+      (dolist (window (get-buffer-window-list nil nil t))
+        (when (and (bound-and-true-p reader-current-doc-state-ptr)
+                   (reader-current-doc-overlay window))
+          (with-selected-window window
+            (reader-dyn--close-doc))))))
 
   (defadvice! +reader-refresh-close-before-reload-a (orig &rest args)
     :around #'reader-refresh-doc-buffer

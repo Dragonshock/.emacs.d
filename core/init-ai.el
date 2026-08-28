@@ -102,6 +102,31 @@ When OVERLAYS is nil, export all pending rewrites in the current buffer."
 (use-package gptel-quick
   :straight (gptel-quick :type git :host github :repo "karthink/gptel-quick")
   :after (gptel embark)
+  :bind (("C-c g d" . +gptel-quick-dict))
+  :preface
+  (defun +gptel-quick-dict ()
+    "Explain the word at point in dictionary style."
+    (interactive)
+    (let ((word (or (thing-at-point 'word t)
+                    (user-error "No word at point")))
+          (gptel-quick-system-message
+           (lambda (&rest _)
+             "Given a word, explain it in the style of a concise English dictionary entry,
+and add accurate Chinese translations for each sense. Preserve the compact dictionary
+format in plain text rather than giving a long explanatory article or markdown document.
+No need for chinese in sentences.
+
+Use this format:
+*word* syllable division | pronunciation | part of speech (inflections)
+
+1. English definition **中文**
+     *Example sentence.*
+ | Sub-sense or extended meaning **中文**
+     *Example sentence.*
+• ...
+2. English definition **中文**
+     *Example sentence.*")))
+      (gptel-quick word)))
   :config
   (setq gptel-quick-backend (gptel-make-deepseek "DeepSeek-quick"
                               :stream t
@@ -111,6 +136,7 @@ When OVERLAYS is nil, export all pending rewrites in the current buffer."
         gptel-quick-word-count 500
         gptel-quick-system-message (lambda (&rest _) "一句话解释："))
   (keymap-set embark-general-map "?" #'gptel-quick)
+  (keymap-set embark-general-map "D" #'+gptel-quick-dict)
   )
 
 (use-package codex-ide

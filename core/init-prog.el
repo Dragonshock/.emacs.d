@@ -202,9 +202,8 @@ Diagnostics for all files are published separately for project listings."
               ("M-/" . eglot-find-typeDefinition)
               ("M-?" . xref-find-references))
   :config
-  ;; Keep local Flymake backends (hl-todo, compilation); add Eglot's ourselves.
+  ;; Keep local Flymake backends (hl-todo, compilation); add Eglot's per buffer.
   (add-to-list 'eglot-stay-out-of 'flymake-diagnostic-functions)
-  (add-hook 'flymake-diagnostic-functions #'eglot-flymake-backend)
 
   (setq eglot-events-buffer-config '(:size 0 :format full)
         eglot-autoshutdown t
@@ -217,15 +216,14 @@ Diagnostics for all files are published separately for project listings."
             'markdown-ts-view-mode
           'gfm-view-mode))
 
-  ;; Do not setq-local eldoc strategy here: :config only affects the then-current
-  ;; buffer, eglot-managed-mode sets its own strategy, and this config disables
-  ;; eldoc-mode under eglot (manual C-h h).
+  ;; Eldoc strategy / disable is set in `+eglot-managed-mode-h' (buffer-local).
   ;; Flat plist (not alist of sections); RA uses :features "all", not "full"/:allFeatures.
   ;; Client ECC belongs in CONTACT :initializationOptions, not workspace/configuration.
   (setq-default eglot-workspace-configuration
                 ;; Prefer pylsp section name (pyls is the deprecated Palantir server).
                 ;; Flat plist per eglot docstring (alist is less reliable).
-                '(:pylsp (:plugins (:jedi_completion (:fuzzy t)))
+                ;; Backquote: Java runtime paths come from the environment.
+                `(:pylsp (:plugins (:jedi_completion (:fuzzy t)))
                          :rust-analyzer (:cargo (:allTargets t :features "all")
                                                 :checkOnSave :json-false
                                                 :completion (:termSearch (:enable t)
@@ -248,11 +246,11 @@ Diagnostics for all files are published separately for project listings."
                          ;; typescript preferences belong in CONTACT :initializationOptions
                          ;; (workspace/configuration does not feed tsserver preferences).
                          :java (:configuration
-                                (:runtimes [(:name "JavaSE-17"
-                                                   :path "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home/")
-                                            (:name "JavaSE-21"
-                                                   :path "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/"
-                                                   :default t)])
+                                (:runtimes [(:name "JavaSE-21"
+                                                   :path ,(getenv "JAVA21_HOME")
+                                                   :default t)
+                                            (:name "JavaSE-26"
+                                                   :path ,(getenv "JAVA26_HOME"))])
                                 :import (:gradle (:enabled t
                                                            :wrapper (:enabled t)))
                                 :autobuild (:enabled :json-false))))
@@ -268,7 +266,7 @@ Diagnostics for all files are published separately for project listings."
                     :initializationOptions
                     (:preferences (:importModuleSpecifierPreference "non-relative")))))
 
-  (defun jdtls-command-contact (&optional interactive)
+  (defun jdtls-command-contact (&optional _interactive)
     "Eglot CONTACT for jdtls; ECC goes in :initializationOptions (not workspace config)."
     (let* ((jdtls-java-home (getenv "JDTLS_JAVA_HOME"))
            (project-root (project-root (project-current t)))
@@ -288,14 +286,21 @@ Diagnostics for all files are published separately for project listings."
   (add-to-list 'eglot-server-programs
                `((java-mode java-ts-mode) . ,#'jdtls-command-contact))
 
-  ;; we call eldoc manually
   (add-hook! eglot-managed-mode-hook
-    (defun +eglot-disable-eldoc-mode ()
+    (defun +eglot-managed-mode-h ()
+      "Install or remove Flymake/Eldoc integrations as Eglot starts or stops."
       ;; Drop treesit/CC Flymake backends so they do not compete with Eglot.
       (dolist (backend '(rust-ts-flymake flymake-cc python-flymake))
         (remove-hook 'flymake-diagnostic-functions backend t))
-      (when (eglot-managed-p)
-        (eldoc-mode -1))))
+      (if (eglot-managed-p)
+          (progn
+            (add-hook 'flymake-diagnostic-functions #'eglot-flymake-backend nil t)
+            (setq-local eldoc-documentation-strategy
+                        'eldoc-documentation-compose-eagerly)
+            (eldoc-mode -1))
+        (remove-hook 'flymake-diagnostic-functions #'eglot-flymake-backend t)
+        (when flymake-mode
+          (flymake-start)))))
   )
 
 
@@ -361,18 +366,13 @@ Diagnostics for all files are published separately for project listings."
 (use-package citre
   :straight t
   :commands (citre-update-this-tags-file)
-  :preface
-  (defun +citre-auto-enable ()
-    (when (and buffer-file-name (derived-mode-p 'prog-mode))
-      (require 'citre)
-      (citre-auto-enable-citre-mode)))
   :bind (:map prog-mode-map
               ("C-c c j" . +citre-jump)
               ("C-c c k" . +citre-jump-back)
               ("C-c c p" . citre-peek)
               ("C-c c a" . citre-ace-peek)
               ("C-c c u" . citre-update-this-tags-file))
-  :hook (find-file . +citre-auto-enable)
+  :hook ((prog-mode . citre-auto-enable-citre-mode))
   :config
   (require 'dumb-jump)
   (citre-register-backend 'dumb-jump
@@ -403,19 +403,6 @@ Diagnostics for all files are published separately for project listings."
     (condition-case _
         (citre-jump-back)
       (error (call-interactively #'xref-go-back))))
-
-  ;; Use Citre xref backend as a [fallback]
-  (defadvice! +citre--xref-fallback-a (fn &rest args)
-    :around #'xref--create-fetcher
-    (let ((fetcher (apply fn args))
-          (citre-fetcher
-           (let ((xref-backend-functions '(citre-xref-backend t)))
-             (ignore xref-backend-functions)
-             (apply fn args))))
-      (lambda ()
-        (or (with-demoted-errors "%s, fallback to citre"
-              (funcall fetcher))
-            (funcall citre-fetcher)))))
   )
 
 
@@ -527,8 +514,11 @@ asynchronous checker cannot report after Eglot has taken over
 (use-package rust-mode
   :straight t
   :init
-  (setq rust-mode-treesitter-derive t
-        rust-format-goto-problem nil))
+  (setq rust-format-goto-problem nil)
+  :config
+  (with-eval-after-load 'dtrt-indent
+    (setf (alist-get 'rust-mode dtrt-indent-hook-mapping-list)
+          '(c/c++/java rust-ts-indent-offset))))
 
 
 (use-package fish-mode

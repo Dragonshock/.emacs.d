@@ -163,12 +163,12 @@
 
 ;; [magh.el] Magit-style GitHub frontend powered by the `gh' CLI.
 ;; Upstream github.com/roife/magh.el was DELETED (404). Source of truth is the
-;; local backup clone ~/code/gh.el → straight/repos/magh.el (origin → that path).
+;; local backup clone ~/src/github.com/roife/gh.el → straight/repos/magh.el (origin → that path).
 ;; MERGE LOCK: do not point recipe at roife/magh.el. Prefer publishing a private
 ;; remote later and switching :repo to HTTPS/SSH so rebuilds work off this machine.
 ;; Package-Requires Emacs 31.1+ (header); runs on 31.0.91 builds with care.
 (use-package magh
-  :straight (:type git :repo "/Users/dragon/code/gh.el" :local-repo "magh.el")
+  :straight (:type git :repo "/Users/dragon/src/github.com/roife/gh.el" :local-repo "magh.el")
   :bind (("C-, g g" . magh)
          ("C-, g G" . magh-dispatch)
          ("C-, g d" . magh-repo-status)
@@ -203,7 +203,7 @@
 
 ;; [magh-magit] Lightweight asynchronous magh.el summaries in Magit status
 (use-package magh-magit
-  :straight (:type git :repo "/Users/dragon/code/gh.el" :local-repo "magh.el")
+  :straight (:type git :repo "/Users/dragon/src/github.com/roife/gh.el" :local-repo "magh.el")
   :after magit
   :demand t
   :config
@@ -219,7 +219,7 @@
 
 ;; Structured actions for magh.el candidates in Embark.
 (use-package magh-embark
-  :straight (:type git :repo "/Users/dragon/code/gh.el" :local-repo "magh.el")
+  :straight (:type git :repo "/Users/dragon/src/github.com/roife/gh.el" :local-repo "magh.el")
   :after embark
   :demand t
   :config
@@ -228,7 +228,7 @@
 
 ;; Keep magh.el's native Issue/PR viewer, with an explicit Forge -> magh.el bridge.
 (use-package magh-forge
-  :straight (:type git :repo "/Users/dragon/code/gh.el" :local-repo "magh.el")
+  :straight (:type git :repo "/Users/dragon/src/github.com/roife/gh.el" :local-repo "magh.el")
   :after forge
   :commands (magh-forge-open-current-topic-in-magh)
   :bind (:map forge-topic-mode-map

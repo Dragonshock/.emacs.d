@@ -170,8 +170,6 @@
          ("M-#"   . consult-register-load)
          ("M-'"   . consult-register-store)
          ("C-M-#" . consult-register)
-         ;; ── misc ──
-         ("<help> a" . consult-apropos)
          ;; ── M-g (goto-map); goto-line already via remap ──
          ("M-g e" . consult-compile-error)
          ("M-g o" . consult-outline)
@@ -188,7 +186,6 @@
          ("M-s r" . consult-ripgrep)
          ("M-s l" . consult-line)
          ("M-s L" . consult-line-multi)
-         ("M-s m" . consult-multi-occur)
          ("M-s k" . consult-keep-lines)
          ("M-s u" . consult-focus-lines)
          ("M-s i" . consult-imenu)

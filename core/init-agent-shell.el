@@ -121,11 +121,11 @@ command is still `grok agent stdio' on the VPS."
              (cwd (directory-file-name
                    (file-local-name (expand-file-name default-directory))))
              (remote-sh
-              (format "cd %s && exec grok agent --always-approve stdio"
+              (format "cd %s && exec grok agent stdio"
                       (shell-quote-argument cwd))))
         (list "ssh" "-T" "-o" "BatchMode=yes" "-o" "RequestTTY=no"
               target remote-sh))
-    (list +agent-shell-grok-bin "agent" "--always-approve" "stdio")))
+    (list +agent-shell-grok-bin "agent" "stdio")))
 
 (defun +agent-shell-xai-make-client-around (orig &rest args)
   "Bind `agent-shell-xai-acp-command' to the cwd-appropriate grok."
@@ -471,12 +471,10 @@ default `:none'."
   ;; inherited environment — the official client passes this list verbatim,
   ;; and `grok' needs HOME/PATH from the login environment (~/.grok/auth.json).
   (setq agent-shell-xai-acp-command
-        (list +agent-shell-grok-bin "agent" "--always-approve" "stdio")
+        (list +agent-shell-grok-bin "agent" "stdio")
         agent-shell-xai-default-model-id "grok-4.6"
         agent-shell-xai-environment
-        (agent-shell-make-environment-variables :inherit-env t)
-        agent-shell-permission-responder-function
-        #'agent-shell-permission-allow-always)
+        (agent-shell-make-environment-variables :inherit-env t))
 
   ;; Pi: ACP adapter + pin pi binary for the adapter (daemon-safe).
   (setq agent-shell-pi-acp-command (list +agent-shell-pi-acp-bin)

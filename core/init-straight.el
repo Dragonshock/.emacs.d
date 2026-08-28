@@ -35,13 +35,17 @@
       (eval-print-last-sexp)))
   (load bootstrap-file nil 'nomessage))
 
-;; Emacs 31 ships project/xref at the same major version as GNU ELPA.
-;; Dependents (consult-dir, breadcrumb, geiser, …) must not clone ELPA
-;; copies or we hit: Feature 'project' loaded from A is now provided by B.
+;; Emacs 31 ships project/xref/tramp/org at the same major version as GNU ELPA.
+;; Dependents (consult-dir, breadcrumb, geiser, tramp-rpc, md-babel, org-appear, …)
+;; must not clone ELPA copies or we hit: Feature 'project' loaded from A is now
+;; provided by B — and for org, a git 10.0-pre clone fighting dump Org 9.8.7.
 ;; Must be set before any package that declares a dependency on them.
+;; `use-package org :straight (:type built-in)` in init-org.el is too late:
+;; init-writing (md-babel) loads first and would register the org-elpa git recipe.
 (setq straight-built-in-pseudo-packages
-      (append '(project xref)
+      (append '(project xref tramp org)
               straight-built-in-pseudo-packages))
+(straight-use-package '(org :type built-in))
 
 ;; [use-package] config
 (setq use-package-always-demand (daemonp)

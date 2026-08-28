@@ -82,7 +82,6 @@
  ;; Will improve long line display performance
  bidi-inhibit-bpa t
  bidi-paragraph-direction 'left-to-right
- bidi-display-reordering nil
 
  ;; Leave long-line-threshold / large-hscroll-threshold / syntax-wholeline-max
  ;; at stock defaults (DOC: do not lower except for debugging; stock ~50000 /
@@ -518,7 +517,8 @@
   :init
   (setq exec-path-from-shell-arguments '("-l")
         exec-path-from-shell-variables
-        (let ((vars '("HOMEBREW" "JAVA_HOME" "JDTLS_JAVA_HOME" "MANPATH")))
+        (let ((vars '("HOMEBREW" "JAVA_HOME" "JAVA21_HOME" "JAVA26_HOME"
+                      "JDTLS_JAVA_HOME" "MANPATH")))
           (if (bound-and-true-p ns-emacs-plus-injected-path)
               vars
             (cons "PATH" vars))))

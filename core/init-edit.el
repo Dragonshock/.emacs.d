@@ -229,6 +229,10 @@ Global `window-selection-change-functions' also receives a frame."
   (add-hook! telega-root-mode-hook #'beginend-telega-root-mode))
 
 
+;; [next-line] C-n at EOB inserts a newline
+(setq next-line-add-newlines t)
+
+
 ;; Alternatives to [hungry-delete]
 (setq backward-delete-char-untabify-method 'hungry)
 

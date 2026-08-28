@@ -114,12 +114,10 @@
 
    ;; Source blocks
    org-src-preserve-indentation t
-   org-src-tab-acts-natively t
    org-src-window-setup 'other-window
 
    ;; Store ID-based attachments centrally and inherit them in subtrees.
    org-attach-id-dir (expand-file-name ".attach/" org-directory)
-   org-attach-store-link-p 'attached
    org-attach-use-inheritance t
    org-archive-subtree-save-file-p t
    org-num-face '(:inherit org-special-keyword :underline nil :weight bold)
@@ -172,7 +170,7 @@
       '(warning org-link)))
   (org-link-set-parameters "file" :face #'+org-file-link-face)
 
-  (add-to-list 'org-src-lang-modes '("md" . markdown))
+  (add-to-list 'org-src-lang-modes '("md" . markdown-ts-mode))
   (define-key org-src-mode-map (kbd "C-c C-c") #'org-edit-src-exit)
 
   ;; Block delimiter faces inherit from `org-meta-line'.
@@ -226,7 +224,10 @@ Temporarily prepend `save-buffer' to `org-after-refile-insert-hook' only while
   :straight t
   :after org
   :init
-  (setf (alist-get 'mermaid org-babel-load-languages) t))
+  (setf (alist-get 'mermaid org-babel-load-languages) t)
+  :config
+  (setq ob-mermaid-default-config-file
+        (no-littering-expand-etc-file-name "mermaid/config.json")))
 
 
 ;; [org-entities]

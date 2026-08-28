@@ -20,23 +20,14 @@
 (defun restart-eglot-and-switch-logs ()
   "Reconnect Eglot in this buffer and display its events buffer."
   (interactive)
-  (when-let* ((project-name (when (project-current)
-                              (file-name-nondirectory
-                               (directory-file-name
-                                (project-root (project-current))))))
-              (log-buffer-name (format "*EGLOT (%s/(rust-ts-mode rust-mode)) events*"
-                                       project-name)))
-    (let ((eglot-log-window (catch 'found
-                              (dolist (win (window-list))
-                                (when (string-equal (buffer-name (window-buffer win))
-                                                    log-buffer-name)
-                                  (throw 'found win))))))
-      (unless eglot-log-window
-        (setq eglot-log-window (split-window-right)))
-      (call-interactively #'eglot)
-      (let ((current-window (selected-window)))
-        (select-window eglot-log-window)
-        (when (get-buffer log-buffer-name)
-          (kill-buffer log-buffer-name))
-        (switch-to-buffer log-buffer-name)
-        (select-window current-window)))))
+  (require 'eglot)
+  ;; `eglot-events-buffer' uses `jsonrpc-events-buffer', not the
+  ;; post-initialize renamed name.  Do not hook
+  ;; `eglot-server-initialized-hook': it runs before initialize, and a
+  ;; `let'-bound lambda capturing itself is evaluated outside the
+  ;; binding (void-variable).
+  (if-let* ((server (eglot-current-server)))
+      (eglot-reconnect server)
+    (call-interactively #'eglot))
+  (when-let* ((server (eglot-current-server)))
+    (eglot-events-buffer server)))
