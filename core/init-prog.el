@@ -3,10 +3,6 @@
 ;; [compile]
 (use-package compile
   :preface
-  (eval-when-compile
-    (require 'cl-lib)
-    (require 'compile))
-
   (defvar +compilation-flymake-diagnostics nil
     "Flymake diagnostics parsed from the latest compilation buffer.")
 
@@ -156,8 +152,13 @@ Diagnostics for all files are published separately for project listings."
           (with-silent-modifications
             (comint-truncate-buffer))))))
 
-  ;; Emacs 28+: stock filter (respects `ansi-color-for-compilation-mode').
-  (add-hook 'compilation-filter-hook #'ansi-color-compilation-filter)
+  (add-hook! compilation-filter-hook
+    (defun +compilation--colorize-h ()
+      "Apply ANSI color codes to the compilation buffer."
+      (require 'ansi-color)
+      (let ((inhibit-read-only t))
+        (ansi-color-apply-on-region compilation-filter-start (point)))))
+
   (add-hook 'compilation-finish-functions #'+compilation-flymake-finish-h)
   )
 
@@ -189,7 +190,7 @@ Diagnostics for all files are published separately for project listings."
   :preface
   (defconst +eglot-auto-start-modes
     '(c-mode c++-mode rust-mode python-mode java-mode
-             c-ts-mode c++-ts-mode rust-ts-mode python-ts-mode java-ts-mode)
+             c-ts-mode c++-ts-mode rust-ts-mode python-ts-mode)
     "Major modes where Eglot should start automatically.")
   :init
   (dolist (mode +eglot-auto-start-modes)
@@ -200,101 +201,63 @@ Diagnostics for all files are published separately for project listings."
               ("M-/" . eglot-find-typeDefinition)
               ("M-?" . xref-find-references))
   :config
-  ;; Keep local Flymake backends (hl-todo, compilation); add Eglot's per buffer.
-  (add-to-list 'eglot-stay-out-of 'flymake-diagnostic-functions)
-
   (setq eglot-events-buffer-config '(:size 0 :format full)
         eglot-autoshutdown t
-        ;; eglot-report-progress 'messages
+        eglot-documentation-renderer 'markdown-ts-view-mode
         eglot-code-action-indications nil)
-  ;; Renderer needs a bound major mode; markdown-ts-view-mode is not autoloaded.
-  (require 'markdown-ts-mode nil t)
-  (setq eglot-documentation-renderer
-        (if (fboundp 'markdown-ts-view-mode)
-            'markdown-ts-view-mode
-          'gfm-view-mode))
 
-  ;; Eldoc strategy / disable is set in `+eglot-managed-mode-h' (buffer-local).
-  ;; Flat plist (not alist of sections); RA uses :features "all", not "full"/:allFeatures.
-  ;; Client ECC belongs in CONTACT :initializationOptions, not workspace/configuration.
+  ;; LSP server settings
   (setq-default eglot-workspace-configuration
-                ;; Prefer pylsp section name (pyls is the deprecated Palantir server).
-                ;; Flat plist per eglot docstring (alist is less reliable).
-                ;; Backquote: Java runtime paths come from the environment.
-                `(:pylsp (:plugins (:jedi_completion (:fuzzy t)))
-                         :rust-analyzer (:cargo (:allTargets t :features "all")
-                                                :checkOnSave :json-false
-                                                :completion (:termSearch (:enable t)
-                                                                         :fullFunctionSignatures (:enable t))
-                                                :hover (:memoryLayout (:size "both")
-                                                                      :show (:traitAssocItems 5)
-                                                                      :documentation (:keywords (:enable :json-false)))
-                                                :inlayHints (:lifetimeElisionHints (:enable "skip_trivial" :useParameterNames t)
-                                                                                   :closureReturnTypeHints (:enable "always")
-                                                                                   :discriminantHints (:enable t)
-                                                                                   :genericParameterHints (:lifetime (:enable t)))
-                                                :semanticHighlighting (:operator (:specialization (:enable t))
-                                                                                 :punctuation (:enable t :specialization (:enable t)))
-                                                :workspace (:symbol (:search (:kind "all_symbols"
-                                                                                    :scope "workspace_and_dependencies")))
-                                                :references (:excludeImports t
-                                                                             :excludeTests t)
-                                                :lru (:capacity 1024)
-                                                :diagnostics (:enable :json-false))
-                         ;; typescript preferences belong in CONTACT :initializationOptions
-                         ;; (workspace/configuration does not feed tsserver preferences).
-                         :java (:configuration
-                                (:runtimes [(:name "JavaSE-21"
-                                                   :path ,(getenv "JAVA21_HOME")
-                                                   :default t)
-                                            (:name "JavaSE-26"
-                                                   :path ,(getenv "JAVA26_HOME"))])
-                                :import (:gradle (:enabled t
-                                                           :wrapper (:enabled t)))
-                                :autobuild (:enabled :json-false))))
+                `((:pyls . (:plugins (:jedi_completion (:fuzzy t))))
+                  (:rust-analyzer . (:cargo (:allFeatures t :allTargets t :features "full")
+                                            :checkOnSave :json-false
+                                            :completion (:termSearch (:enable t)
+                                                                     :fullFunctionSignatures (:enable t))
+                                            :hover (:memoryLayout (:size "both")
+                                                                  :show (:traitAssocItems 5)
+                                                                  :documentation (:keywords (:enable :json-false)))
+                                            :inlayHints (:lifetimeElisionHints (:enable "skip_trivial" :useParameterNames t)
+                                                                               :closureReturnTypeHints (:enable "always")
+                                                                               :discriminantHints (:enable t)
+                                                                               :genericParameterHints (:lifetime (:enable t)))
+                                            :semanticHighlighting (:operator (:specialization (:enable t))
+                                                                             :punctuation (:enable t :specialization (:enable t)))
+                                            :workspace (:symbol (:search (:kind "all_symbols"
+                                                                                :scope "workspace_and_dependencies")))
+                                            :references (:excludeImports t
+                                                                         :excludeTests t)
+                                            :lru (:capacity 1024)
+                                            :diagnostics (:enable :json-false)))
+                  (:typescript . (:preferences (:importModuleSpecifierPreference "non-relative")))
+                  (:java . (:configuration
+                            (:runtimes [(:name "JavaSE-21" :path ,(getenv "JAVA21_HOME") :default t)
+                                        (:name "JavaSE-26" :path ,(getenv "JAVA26_HOME"))])
+                            :import (:gradle (:enabled t
+                                                       :wrapper (:enabled t)))
+                            :autobuild (:enabled :json-false)
+                            :extendedClientCapabilities (:classFileContentsSupport t)))))
 
-  ;; typescript-language-server: import preference via initialize options only.
-  (add-to-list 'eglot-server-programs
-               `(((js-mode :language-id "javascript")
-                  (js-ts-mode :language-id "javascript")
-                  (tsx-ts-mode :language-id "typescriptreact")
-                  (typescript-ts-mode :language-id "typescript")
-                  (typescript-mode :language-id "typescript"))
-                 . ("typescript-language-server" "--stdio"
-                    :initializationOptions
-                    (:preferences (:importModuleSpecifierPreference "non-relative")))))
-
-  (defun jdtls-command-contact (&optional _interactive)
-    "Eglot CONTACT for jdtls; ECC goes in :initializationOptions (not workspace config)."
+  ;; Java integration
+  (defun +jdtls-command-contact (&optional _interactive)
     (let* ((jdtls-java-home (getenv "JDTLS_JAVA_HOME"))
            (project-root (project-root (project-current t)))
            (data-dir
             (file-name-concat
              (no-littering-expand-var-file-name "lsp-cache/")
-             (md5 (expand-file-name project-root))))
-           (init-opts
-            '(:extendedClientCapabilities (:classFileContentsSupport t))))
-      ;; Only inject JAVA_HOME when set; bare "JAVA_HOME=" clears the child env.
-      (if (and jdtls-java-home (not (string-empty-p jdtls-java-home)))
-          `("env" ,(concat "JAVA_HOME=" jdtls-java-home)
-            "jdtls" "--jvm-arg=-Xmx16G" "-data" ,data-dir
-            :initializationOptions ,init-opts)
-        `("jdtls" "--jvm-arg=-Xmx16G" "-data" ,data-dir
-          :initializationOptions ,init-opts))))
-  (add-to-list 'eglot-server-programs
-               `((java-mode java-ts-mode) . ,#'jdtls-command-contact))
+             (md5 (expand-file-name project-root)))))
+      `("env" ,(concat "JAVA_HOME=" jdtls-java-home)
+        "jdtls" "--jvm-arg=-Xmx16G" "-data" ,data-dir)))
+  (push '(java-mode . +jdtls-command-contact) eglot-server-programs)
 
+  (add-to-list 'eglot-stay-out-of 'flymake-diagnostic-functions)
   (add-hook! eglot-managed-mode-hook
     (defun +eglot-managed-mode-h ()
-      "Install or remove Flymake/Eldoc integrations as Eglot starts or stops."
-      ;; Drop treesit/CC Flymake backends so they do not compete with Eglot.
-      (dolist (backend '(rust-ts-flymake flymake-cc python-flymake))
-        (remove-hook 'flymake-diagnostic-functions backend t))
+      "Install or remove integrations as Eglot starts or stops managing."
       (if (eglot-managed-p)
           (progn
-            (add-hook 'flymake-diagnostic-functions #'eglot-flymake-backend nil t)
-            (setq-local eldoc-documentation-strategy
-                        'eldoc-documentation-compose-eagerly)
+            (add-hook! flymake-diagnostic-functions :local #'eglot-flymake-backend)
+            ;; We call Eldoc manually while Eglot is active.
+            (setq-local eldoc-documentation-strategy 'eldoc-documentation-compose-eagerly)
             (eldoc-mode -1))
         (remove-hook 'flymake-diagnostic-functions #'eglot-flymake-backend t)
         (when flymake-mode
@@ -309,19 +272,15 @@ Diagnostics for all files are published separately for project listings."
   (eglot-tempel-mode 1))
 
 
-;; eglot-booster: upstream archived; Emacs 30/31 JSON is fast enough without it.
-
-
 ;; [Eldoc]
 (use-package eldoc
   :bind (("C-h h" . eldoc))
   :config
-  (setq eldoc-echo-area-prefer-doc-buffer t
+  (setq eldoc-echo-area-display-truncation-message t
+        eldoc-echo-area-prefer-doc-buffer t
         eldoc-echo-area-use-multiline-p nil
-        eglot-extend-to-xref t)
-  ;; Has a :set function that wires `eldoc-show-help-at-pt' into
-  ;; `eldoc-documentation-functions'; plain setq is a silent no-op.
-  (setopt eldoc-help-at-pt t))
+        eglot-extend-to-xref t
+        eldoc-help-at-pt t))
 
 
 ;; [help]
@@ -342,8 +301,8 @@ Diagnostics for all files are published separately for project listings."
   :straight t
   :commands webpaste-paste-buffer-or-region
   :config
-  ;; webpaste-add-to-killring package default is already t.
   (setq webpaste-paste-confirmation t
+        webpaste-add-to-killring t
         webpaste-provider-priority '("paste.rs")))
 
 
@@ -353,8 +312,8 @@ Diagnostics for all files are published separately for project listings."
   :init
   (add-hook! xref-backend-functions #'dumb-jump-xref-activate)
   :config
-  ;; `dumb-jump-selector' only affects legacy dumb-jump-go*; we use xref only.
   (setq dumb-jump-prefer-searcher 'rg
+        dumb-jump-selector 'completing-read
         dumb-jump-aggressive t
         dumb-jump-default-project nil)
   )
@@ -364,18 +323,15 @@ Diagnostics for all files are published separately for project listings."
 (use-package citre
   :straight t
   :commands (citre-update-this-tags-file)
+  :preface
   :bind (:map prog-mode-map
-              ("C-c c j" . +citre-jump)
-              ("C-c c k" . +citre-jump-back)
-              ("C-c c p" . citre-peek)
-              ("C-c c a" . citre-ace-peek)
-              ("C-c c u" . citre-update-this-tags-file))
+              ("C-c r c" . citre-update-this-tags-file))
   :hook ((prog-mode . citre-auto-enable-citre-mode))
   :config
-  (require 'dumb-jump)
   (citre-register-backend 'dumb-jump
                           (citre-xref-backend-to-citre-backend
                            'dumb-jump #'dumb-jump-xref-activate))
+
   (setq citre-default-create-tags-file-location 'global-cache
         citre-edit-ctags-options-manually t
         citre-auto-enable-citre-mode-modes '(prog-mode)
@@ -387,20 +343,6 @@ Diagnostics for all files are published separately for project listings."
   (with-eval-after-load 'cc-mode (require 'citre-lang-c))
   (with-eval-after-load 'dired (require 'citre-lang-fileref))
   (with-eval-after-load 'verilog-mode (require 'citre-lang-verilog))
-
-  (defun +citre-jump ()
-    "Jump to the definition of the symbol at point. Fallback to `xref-find-definitions'."
-    (interactive)
-    (condition-case _
-        (citre-jump)
-      (error (call-interactively #'xref-find-definitions))))
-
-  (defun +citre-jump-back ()
-    "Go back to the position before last `citre-jump'. Fallback to `xref-go-back'."
-    (interactive)
-    (condition-case _
-        (citre-jump-back)
-      (error (call-interactively #'xref-go-back))))
   )
 
 
@@ -436,24 +378,6 @@ Emacs 31's interactive form returns every diagnostic at point as a
 separate argument, although the command accepts only one."
     (if (cdr args) (list (car args)) args))
 
-  (defun +flymake-add-shared-backends-h ()
-    "Add buffer-local shared Flymake backends (hl-todo, compilation)."
-    (dolist (backend '(hl-todo-flymake +compilation-flymake-backend))
-      (add-hook 'flymake-diagnostic-functions backend nil t)))
-
-  (defun +flymake-mode-unless-eglot-auto-starts ()
-    "Enable Flymake unless Eglot will enable it after connecting.
-Shared backends are still registered so Eglot-managed buffers keep them.
-On Eglot auto-start modes, drop native treesit/CC backends first so an
-asynchronous checker cannot report after Eglot has taken over
-(notably `rust-ts-flymake'; upstream 874f89e)."
-    (when (memq major-mode +eglot-auto-start-modes)
-      (dolist (backend '(rust-ts-flymake flymake-cc python-flymake))
-        (remove-hook 'flymake-diagnostic-functions backend t)))
-    (+flymake-add-shared-backends-h)
-    (unless (memq major-mode +eglot-auto-start-modes)
-      (flymake-mode 1)))
-
   (defun +flymake-mode-h ()
     "Enable Flymake with local shared backends."
     ;; Eglot will supply diagnostics for these modes.  Remove their native
@@ -484,13 +408,6 @@ asynchronous checker cannot report after Eglot has taken over
   (setq c-basic-offset 4)
   (c-set-offset 'case-label '+))
 
-;; treesit C/C++ ignore `c-basic-offset'; use `c-ts-indent-offset' (default 2).
-(use-package c-ts-mode
-  :straight (:type built-in)
-  :when (treesit-available-p)
-  :config
-  (setopt c-ts-indent-offset 4))
-
 
 (use-package csv-mode
   :straight t)
@@ -518,11 +435,11 @@ asynchronous checker cannot report after Eglot has taken over
   (setq css-indent-offset 2))
 
 
-;; Classic rust-mode kept as dependency/fallback; .rs remaps to rust-ts-mode.
 (use-package rust-mode
   :straight t
   :init
-  (setq rust-format-goto-problem nil)
+  (setq rust-mode-treesitter-derive t
+        rust-format-goto-problem nil)
   :config
   (with-eval-after-load 'dtrt-indent
     (setf (alist-get 'rust-mode dtrt-indent-hook-mapping-list)
@@ -563,13 +480,14 @@ asynchronous checker cannot report after Eglot has taken over
         verilog-tab-to-comment t))
 
 
-;; [yaml] third-party fallback; treesit remaps to yaml-ts-mode when available.
+;; [yaml]
 (use-package yaml-mode
   :straight t)
 
 
-;; [toml] Use built-in conf-toml-mode / toml-ts-mode (treesit remaps).
-;; Do not install third-party toml-mode — it steals auto-mode from treesit.
+;; [toml]
+(use-package toml-mode
+  :straight t)
 
 
 ;; [graphviz-dot]
@@ -602,49 +520,16 @@ asynchronous checker cannot report after Eglot has taken over
    web-mode-markup-indent-offset 2
    web-mode-css-indent-offset 2
    web-mode-code-indent-offset 2
-   web-mode-enable-html-entities-fontification t)
-  ;; web-mode defaults six enable-* options with STANDARD (display-graphic-p).
-  ;; Daemon + use-package-always-demand loads the package with no GUI frame, so
-  ;; those STANDARD forms become nil and stick. Force GUI-friendly defaults
-  ;; here (and refresh when a graphic client frame appears).
-  (defun +web-mode-force-graphic-defaults ()
-    "Set web-mode interactive defaults as if loaded under a graphic frame."
-    (setq web-mode-enable-css-colorization t
-          web-mode-enable-auto-indentation t
-          web-mode-enable-auto-closing t
-          web-mode-enable-auto-pairing t
-          web-mode-enable-auto-opening t
-          web-mode-enable-auto-quoting t))
-  (+web-mode-force-graphic-defaults)
-  (add-hook 'server-after-make-frame-hook
-            (lambda ()
-              (when (display-graphic-p)
-                (+web-mode-force-graphic-defaults)))))
+   web-mode-enable-html-entities-fontification t
+   web-mode-auto-close-style 1))
 
 
 ;; [treesit]
 (use-package treesit
   :when (treesit-available-p)
   :init
-  ;; `treesit-enabled-modes' MUST be set with `setopt': its :set function is
-  ;; what installs the 26 entries of `treesit-major-mode-remap-alist' into
-  ;; `major-mode-remap-alist'.  Plain `setq' silently does nothing.
-  ;;
-  ;; `require' remains load-bearing during early init while early-init's
-  ;; temporary setopt advice inhibits custom-load-symbol (removed at
-  ;; emacs-startup-hook).
-  (require 'treesit)
-  (setopt treesit-enabled-modes t
-          ;; Also has a :set (`treesit--font-lock-level-setter'); setq is not enough.
-          treesit-font-lock-level 4)
-  (setq treesit-auto-install-grammar 'always))
-
-
-;; Emacs 31: copy jq-style path of the JSON node at point.
-(use-package json-ts-mode
-  :when (treesit-available-p)
-  :bind (:map json-ts-mode-map
-              ("C-c C-j" . json-ts-jq-path-at-point)))
+  (setq treesit-enabled-modes t
+        treesit-auto-install-grammar 'always))
 
 
 ;; [indent-bars] Show indent guides
@@ -660,6 +545,7 @@ asynchronous checker cannot report after Eglot has taken over
         indent-bars-depth-update-delay 0.15
         indent-bars-width-frac 0.1
         indent-bars-color '(highlight :face-bg t :blend 0.2)
+        indent-bars-zigzag nil
         indent-bars-highlight-current-depth nil
         indent-bars-pattern ".")
 
@@ -685,51 +571,3 @@ asynchronous checker cannot report after Eglot has taken over
   (logview-additional-submodes
    '(("Pipeline" . ((format . "[TIMESTAMP] [LEVEL] [NAME] MESSAGE")
                     (levels . "Pipeline levels"))))))
-
-
-;; [minuet-ai] AI-powered inline code completion
-;; Audit: do NOT global-hook minuet-auto-suggestion-mode on prog-mode —
-;; default context posts buffer slices to DeepSeek (privacy P0; roife same-bad).
-;; Opt-in: M-i minibuffer complete, or M-x minuet-auto-suggestion-mode.
-(use-package minuet
-  :straight (:host github :repo "milanglacier/minuet-ai.el")
-  :bind (("M-i" . #'minuet-complete-with-minibuffer)
-         :map minuet-active-mode-map
-         ("M-p" . #'minuet-previous-suggestion)
-         ("M-n" . #'minuet-next-suggestion)
-         ("C-e" . #'minuet-accept-suggestion)
-         ("C-g" . #'minuet-dismiss-suggestion))
-  :custom-face
-  (minuet-suggestion-face ((t (:inherit font-lock-comment-face :slant italic :weight normal :underline nil))))
-  :config
-  (setq minuet-provider 'openai-fim-compatible)
-
-  (plist-put minuet-openai-fim-compatible-options :end-point "https://api.deepseek.com/beta/completions")
-  (plist-put minuet-openai-fim-compatible-options :model "deepseek-v4-flash")
-  (plist-put minuet-openai-fim-compatible-options :name "Deepseek")
-  (plist-put minuet-openai-fim-compatible-options :api-key
-             (lambda ()
-               (require 'gptel)
-               (gptel-api-key-from-auth-source "api.deepseek.com" "apikey")))
-
-  (minuet-set-optional-options minuet-openai-fim-compatible-options :max_tokens 56)
-  (minuet-set-optional-options minuet-openai-fim-compatible-options :top_p 0.9)
-
-  ;; If auto mode is enabled manually, still never FIM on credential paths.
-  ;; block-predicates only gate minuet--maybe-show-suggestion (auto path).
-  (add-to-list 'minuet-auto-suggestion-block-predicates
-               (lambda ()
-                 (and buffer-file-name
-                      (fboundp '+secret-file-p)
-                      (+secret-file-p buffer-file-name))))
-
-  ;; Manual paths (M-i / minuet-show-suggestion) ignore block-predicates —
-  ;; refuse secret files so buffer context is never POSTed to the provider.
-  (defun +minuet-refuse-secret-context (&rest _)
-    "Abort minuet when the current buffer is a secret file."
-    (when (and buffer-file-name
-               (fboundp '+secret-file-p)
-               (+secret-file-p buffer-file-name))
-      (user-error "minuet: refused on secret file")))
-  (advice-add 'minuet-complete-with-minibuffer :before #'+minuet-refuse-secret-context)
-  (advice-add 'minuet-show-suggestion :before #'+minuet-refuse-secret-context))

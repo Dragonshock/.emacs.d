@@ -2,44 +2,14 @@
 
 ;; [eshell] Emacs command shell
 (use-package esh-mode
-  :defines (eshell-prompt-function eshell-history-ring eshell-mode-map)
-  :functions (eshell/alias eshell-get-history)
+  :defines eshell-prompt-function
+  :functions eshell/alias
   :hook ((eshell-mode . compilation-shell-minor-mode))
   :bind (("C-`" . +eshell-toggle)
-         ("C-·" . +eshell-toggle))
+         ("C-·" . +eshell-toggle)
+         :map eshell-mode-map
+         ("M-s" . consult-history))
   :config
-  ;; Emacs 31 binds M-r on `eshell-hist-mode-map' (minor); major-map binding is shadowed.
-  (with-eval-after-load 'em-hist
-    (keymap-set eshell-hist-mode-map "M-r" #'consult-history))
-
-  ;; Readline/zsh M-. is yank-last-arg.  Global M-. stays xref; only Eshell.
-  (defvar-local +eshell-insert-previous-argument--ring-index 0)
-  (defvar-local +eshell-insert-previous-argument--start nil)
-  (defun +eshell-insert-previous-argument (&optional arg)
-    "Insert an argument from a previous Eshell command (readline `M-.').
-Without prefix, insert the last argument.  Prefix N inserts the Nth
-argument (0 is the command name).  Repeat to walk earlier history."
-    (interactive "P")
-    (unless (and (ring-p eshell-history-ring)
-                 (not (ring-empty-p eshell-history-ring)))
-      (user-error "No Eshell history"))
-    (require 'comint)
-    (let ((index (and arg (prefix-numeric-value arg))))
-      (cond
-       ((eq last-command this-command)
-        (delete-region +eshell-insert-previous-argument--start (point)))
-       (t
-        (setq +eshell-insert-previous-argument--ring-index 0)))
-      (let ((word (comint-arguments
-                   (eshell-get-history +eshell-insert-previous-argument--ring-index)
-                   index index)))
-        (unless (or (bobp) (bolp) (memq (char-before) '(?\s ?\t)))
-          (insert " "))
-        (setq +eshell-insert-previous-argument--start (point-marker))
-        (insert word)
-        (setq +eshell-insert-previous-argument--ring-index
-              (1+ +eshell-insert-previous-argument--ring-index)))))
-  (keymap-set eshell-mode-map "M-." #'+eshell-insert-previous-argument)
   (setq
    ;; banner
    eshell-banner-message ""
@@ -71,26 +41,11 @@ argument (0 is the command name).  Repeat to walk earlier history."
    )
 
 
-  (defun +ghostel-toggle-project ()
-    "Toggle the current project's Ghostel terminal window.
-Uses stock `ghostel-project' buffer identity (no Ghostel-popup rename)."
-    (require 'ghostel)
-    (let* ((root (project-root (project-current t)))
-           (identity (ghostel--project-buffer-name root))
-           (buf (ghostel--find-buffer-by-identity identity))
-           (win (and buf (get-buffer-window buf))))
-      (cond
-       ((and win (eq (selected-window) win))
-        (ignore-errors (delete-window win)))
-       (win (select-window win))
-       (t (ghostel-project)))))
-
   (defun +eshell-toggle (&optional arg)
-    "Toggle a persistent Eshell popup, or with ARG a project Ghostel terminal.
-If the target window is visible but unselected, select it.
-If it is focused, delete the window.
-Plain call: Eshell popup for the current project/directory.
-Prefix ARG: `ghostel-project' (stock buffer name / display, dakra-aligned)."
+    "Toggle a persistent Eshell popup window for the current project or directory.
+If the popup is visible but unselected, select it.
+If the popup is focused, kill it.
+If no project is found, create a temporary Eshell instance in the current directory."
     (interactive "P")
     (require 'eshell)
     (require 'project)  ;; Ensure we load project.el
@@ -127,19 +82,18 @@ Prefix ARG: `ghostel-project' (stock buffer name / display, dakra-aligned)."
                     (delete-window (get-buffer-window popup-buffer-name)))))))))))
 
   (defun +eshell/define-alias ()
-    "Define alias for eshell.
-Eshell looks up `eshell/NAME' (slash), not `eshell-NAME' (hyphen)."
-    ;; Lisp-backed commands (eshell-find-alias-function → eshell/NAME)
-    (defalias 'eshell/f #'find-file)
-    (defalias 'eshell/fo #'find-file-other-window)
-    (defalias 'eshell/d #'dired)
-    (defalias 'eshell/q #'eshell/exit)
-    (defalias 'eshell/vim #'find-file)
-    (defalias 'eshell/vi #'find-file)
-    ;; String aliases
+    "Define alias for eshell"
+    ;; Aliases
+    (defalias 'eshell-f 'find-file)
+    (defalias 'eshell-fo 'find-file-other-window)
+    (defalias 'eshell-d 'dired)
     (eshell/alias "l" "ls -lah $*")
     (eshell/alias "ll" "ls -laG $*")
+    (defalias 'eshell-q 'eshell/exit)
     (eshell/alias "rg" "rg --color=always $*")
+    ;; Vim
+    (defalias 'eshell-vim 'find-file)
+    (defalias 'eshell-vi 'find-file)
     ;; Git
     (eshell/alias "git" "git $*")
     (eshell/alias "gst" "git status $*")
@@ -217,37 +171,23 @@ Eshell looks up `eshell/NAME' (slash), not `eshell-NAME' (hyphen)."
         (eshell/cd dir))))
 
 
-  ;; view file — quit-restore is Emacs 31's 4-list
-  ;; (TYPE QUAD SELWIN BUFFER).  Reuse + different buffer → TYPE `other';
-  ;; QUAD size is height if vertically combined else width (window.el).
-  ;; Exit action mirrors stock `view-file': only kill if we opened a new
-  ;; buffer, and then only if unmodified (never raw `kill-buffer' on a
-  ;; file-visiting buffer — that can discard unsaved edits on View-quit).
+  ;; view file
   (defun +eshell-view-file (file)
     "View FILE.  A version of `view-file' which properly rets the eshell prompt."
     (interactive "fView file: ")
     (unless (file-exists-p file) (error "%s does not exist" file))
-    (let ((had-a-buf (get-file-buffer file))
-          (buffer (find-file-noselect file)))
+    (let ((buffer (find-file-noselect file)))
       (if (eq (get (buffer-local-value 'major-mode buffer) 'mode-class)
               'special)
           (progn
             (switch-to-buffer buffer)
             (message "Not using View mode because the major mode is special"))
-        (let* ((return-buffer (window-buffer))
-               (return-start (window-start))
-               (return-point (+ (window-point)
-                                (length (funcall eshell-prompt-function))))
-               (return-size (if (window-combined-p)
-                                (window-total-height)
-                              (window-total-width))))
+        (let ((undo-window (list (window-buffer) (window-start)
+                                 (+ (window-point)
+                                    (length (funcall eshell-prompt-function))))))
           (switch-to-buffer buffer)
-          (view-mode-enter
-           (list 'other
-                 (list return-buffer return-start return-point return-size)
-                 (selected-window)
-                 buffer)
-           (and (not had-a-buf) #'kill-buffer-if-not-modified))))))
+          (view-mode-enter (cons (selected-window) (cons nil undo-window))
+                           'kill-buffer)))))
 
   ;; Sync buffer name
   (add-hook! (eshell-directory-change-hook eshell-mode-hook)
@@ -268,11 +208,9 @@ Eshell looks up `eshell/NAME' (slash), not `eshell-NAME' (hyphen)."
 
 
 ;; [eshell-z] `cd' to frequent directory in `eshell'
-;; Load on eshell-mode so frecent visits are recorded before the first `z'.
 (use-package eshell-z
   :straight t
   :after eshell
-  :hook (eshell-mode . (lambda () (require 'eshell-z)))
   :commands (eshell/z))
 
 
@@ -284,16 +222,10 @@ Eshell looks up `eshell/NAME' (slash), not `eshell-NAME' (hyphen)."
 (use-package esh-help
   :straight t
   :preface
-  (defun +esh-help-eldoc-backend (callback &rest _)
-    "Eldoc backend wrapping `esh-help-eldoc-command' (modern multi-backend API)."
-    (when-let* ((doc (esh-help-eldoc-command)))
-      (funcall callback doc)))
   (defun +eshell-setup-esh-help-eldoc ()
-    "Register `esh-help' on `eldoc-documentation-functions' in Eshell."
+    "Use `esh-help' as the Eldoc backend in Eshell."
     (require 'esh-help)
-    ;; Do not set obsolete `eldoc-documentation-function' to a string-returning
-    ;; command; that skips the composable `eldoc-documentation-functions' hook.
-    (add-hook 'eldoc-documentation-functions #'+esh-help-eldoc-backend nil t))
+    (setq-local eldoc-documentation-function #'esh-help-eldoc-command))
   :hook ((eshell-mode . +eshell-setup-esh-help-eldoc)
          (eshell-mode . eldoc-mode))
   :config
@@ -321,27 +253,20 @@ Eshell looks up `eshell/NAME' (slash), not `eshell-NAME' (hyphen)."
   (setq esh-tldr-use-tempel t))
 
 
-
-;; eshell-did-you-mean 0.2 is unmaintained and assumes (pcomplete-completions)
-;; is a plain string list, then mapcar's it for edit-distance.  Emacs 31 Eshell
-;; bare-command completion returns a programmed completion table (function /
-;; completion-table-dynamic via eshell--complete-commands-list).  Materialize
-;; with all-completions first.  MERGE LOCK: keep vs roife/upstream; stock 0.2
-;; breaks the eshell preoutput filter on Emacs 31.
 (use-package eshell-did-you-mean
   :straight t
   :after esh-mode
-  :init
+  :init (eshell-did-you-mean-setup)
+  ;; HACK: `pcomplete-completions' returns a function, but
+  ;;   `eshell-did-you-mean--get-all-commands' unconditionally expects it to
+  ;;   return a list of strings, causing wrong-type-arg errors in many cases.
+  ;;   `all-completions' handles all these cases.
   (defadvice! +eshell--fix-eshell-did-you-mean-a (&rest _)
     :override #'eshell-did-you-mean--get-all-commands
     (unless eshell-did-you-mean--all-commands
       (setq eshell-did-you-mean--all-commands
-            (all-completions "" (pcomplete-completions)))))
-  (eshell-did-you-mean-setup))
+            (all-completions "" (pcomplete-completions))))))
 
-
-;; Ghostel lives in `init-ghostel.el` (loaded earlier). Eshell prefix still
-;; calls `ghostel-project' (still defined by ghostel; project-scoped terminal).
 
 (use-package ghostel
   :straight t

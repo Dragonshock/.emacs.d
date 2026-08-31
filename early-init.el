@@ -17,20 +17,9 @@
 
 (add-hook 'emacs-startup-hook #'+restore-gc-threshold-h 100)
 
-;; Keep native compilation artifacts under no-littering's `var/' directory.
-;; (native-comp-jit-compilation defaults to t on Emacs 31; no need to setq.)
-(when (and (fboundp 'startup-redirect-eln-cache)
-           (fboundp 'native-comp-available-p)
-           (native-comp-available-p))
-  (startup-redirect-eln-cache
-   (convert-standard-filename
-    (expand-file-name "var/eln-cache/" user-emacs-directory))))
+(setq native-comp-jit-compilation t)
 
 ;; Keep early startup quiet unless we're debugging init.
-;; Match upstream (roife): only report native-comp warnings when debugging
-;; (`emacs --debug-init` sets init-file-debug). Default nil suppresses the
-;; common "function is not known to be defined" popups from third-party
-;; packages (emt / easy-kill / reader, etc.). Keep eln-cache redirect above.
 (setq ad-redefinition-action 'accept
       jka-compr-verbose init-file-debug
       native-comp-async-report-warnings-errors init-file-debug
@@ -39,20 +28,19 @@
       warning-suppress-types '((defvaralias) (lexical-binding))
       warning-inhibit-types '((files missing-lexbind-cookie)))
 
-;; Prefer newer .el over stale .elc in GUI too.  Interactive used to
-;; keep load-prefer-newer nil, so Dock Emacs loaded outdated core/*.elc
-;; and straight/build/*.elc (Emacs 31 then reports parse EOF as
-;; #<killed buffer>, bug#80063).
-(setq load-prefer-newer t)
+;; Increase process read size before any package can start subprocesses.
+(setq read-process-output-max (* 64 1024))
+
+;; In noninteractive sessions, prioritize .el file. It saves IO time
+(setq load-prefer-newer noninteractive)
 
 ;; Inhibit resizing frame
 (setq frame-inhibit-implied-resize t)
 
-;; Inhibit startup screen & message.
-;; Note: (setq inhibit-startup-echo-area-message t) is a no-op; Emacs only
-;; honors a login-name string via Customize or user-init-file. The advice
-;; below is what actually suppresses the echo-area message.
+;; Inhibit startup screen & message
 (setq inhibit-startup-screen t
+      inhibit-startup-echo-area-message t
+      inhibit-startup-message t
       inhibit-startup-buffer-menu t
       inhibit-x-resources t
       inhibit-default-init t
@@ -90,13 +78,9 @@
       tab-bar-mode t)
 
 ;; Avoid toolbar setup work during startup. It is unnecessary while the toolbar is
-;; disabled; remove the override after init so `tool-bar-mode' can rebuild the map.
+;; disabled, and can be reconstructed if `tool-bar-mode' is enabled later.
 (when (fboundp 'tool-bar-setup)
-  (advice-add #'tool-bar-setup :override #'ignore)
-  (add-hook 'emacs-startup-hook
-            (lambda ()
-              (advice-remove #'tool-bar-setup #'ignore))
-            100))
+  (advice-add #'tool-bar-setup :override #'ignore))
 
 ;; Case-insensitive pass over `auto-mode-alist' is time wasted.
 (setq auto-mode-case-fold nil)
@@ -107,29 +91,17 @@
 (unless (memq initial-window-system '(x pgtk))
   (setq command-line-x-option-alist nil))
 
-;; `setopt' can load custom dependencies early for type checks. Inhibit that
-;; only during init; remove the advice at startup so later setopt still runs
-;; custom-load-symbol / :set (treesit remaps, timers, etc.).
+;; `setopt' can load custom dependencies early for type checks. Keep it from
+;; doing so during init; type checks will still happen when variables are defined.
 (when (fboundp 'setopt--set)
   (define-advice setopt--set (:around (fn &rest args) inhibit-load-symbol -90)
     (let ((custom-load-recursion t))
-      (apply fn args)))
-  (add-hook 'emacs-startup-hook
-            (lambda ()
-              (advice-remove 'setopt--set #'setopt--set@inhibit-load-symbol))
-            100))
+      (apply fn args))))
 
-;; `file-name-handler-alist' is consulted on each call to `require', `load', or
-;; various file/io functions. Clear it for startup I/O (keep jka-compr so
-;; compressed Lisp can still load), then merge back anything registered during init.
+;; `file-name-handler-alist' is consulted on each call to `require', `load', or various file/io functions
 (unless (or (daemonp) noninteractive init-file-debug)
   (let ((old-value (default-toplevel-value 'file-name-handler-alist)))
     (put 'file-name-handler-alist 'initial-value (copy-sequence old-value))
-    ;; Actually disable handlers for the bulk of init (was a silent no-op before).
-    (set-default-toplevel-value
-     'file-name-handler-alist
-     (let ((jka (rassq 'jka-compr-handler old-value)))
-       (if jka (list jka) nil)))
     (define-advice command-line-1 (:around (fn args-left) restore-file-name-handlers)
       (let ((file-name-handler-alist
              (if args-left (copy-sequence old-value) file-name-handler-alist)))
@@ -144,18 +116,23 @@
                           old-value))))
               101)))
 
-;; Optimize load-suffixes for startup (prefer bytecode). Do not clear
-;; load-file-rep-suffixes: stock/jka-compr needs ("" ".gz") so load and
-;; locate-library can open compressed Lisp (foo.el.gz) after init.
-(setq load-suffixes '(".elc" ".el"))
+;; optimize `load-suffixes'
+(setq load-suffixes '(".elc" ".el")
+      load-file-rep-suffixes '(""))
 
 (defun +restore-load-suffixes-h ()
   "Restore dynamic module suffixes before loading the init file."
   (setq load-suffixes `(".elc" ".el"
-                        ,@(when module-file-suffix (list module-file-suffix)))))
+                        ,(cond ((eq system-type 'darwin) ".dylib")
+                               ((eq system-type 'gnu/linux) ".so")
+                               ((eq system-type 'windows-nt) ".dll")
+                               (t nil)))))
 
 (add-hook 'before-init-hook #'+restore-load-suffixes-h 100)
 
-;; Note: do not advice `load-file' for silence.  Emacs 31 loads site-start
-;; before early-init via (load site-run-file t t), and early-init/init also
-;; use `load' with nomessage — a late load-file override never covers them.
+;; Site files will use `load-file', which emit messages and triggers redisplay
+;; Make it silent and undo advice later
+(define-advice load-file (:override (file) silence)
+  (load file nil 'nomessage))
+(define-advice startup--load-user-init-file (:after (&rest _) undo-silence)
+  (advice-remove #'load-file #'load-file@silence))

@@ -18,16 +18,13 @@
         show-paren-when-point-in-periphery t
         show-paren-context-when-offscreen t
         blink-matching-paren-highlight-offscreen t
-        ;; Emacs 31: skip matching parens in comments/strings unless they mismatch.
-        show-paren-not-in-comments-or-strings 'on-mismatch)
-  ;; Must use setopt while show-paren-mode is on so the idle timer is recreated.
-  (setopt show-paren-delay 0.2)
+        show-paren-delay 0.2)
   )
 
 
 ;; [whitespace] Show visualize TAB, (HARD) SPC, newline
 (use-package whitespace
-  :hook ((prog-mode conf-mode yaml-mode yaml-ts-mode toml-ts-mode) . whitespace-mode)
+  :hook ((prog-mode conf-mode yaml-mode) . whitespace-mode)
   :init
   :config
   ;; only show bad whitespace
@@ -43,7 +40,7 @@
 ;; [rainbow-delimiters] Highlight brackets according to their depth
 (use-package rainbow-delimiters
   :straight t
-  :hook ((prog-mode conf-mode yaml-mode yaml-ts-mode toml-ts-mode) . rainbow-delimiters-mode)
+  :hook ((prog-mode conf-mode yaml-mode) . rainbow-delimiters-mode)
   :config
   (setq rainbow-delimiters-max-face-count 5))
 
@@ -66,7 +63,7 @@
   :functions (rainbow-turn-off rainbow-colorize-match rainbow-x-color-luminance)
   :bind (:map help-mode-map
               ("r" . rainbow-mode))
-  :hook ((html-mode css-mode css-ts-mode) . rainbow-mode)
+  :hook ((html-mode css-mode) . rainbow-mode)
   :config
   ;; removed HACK: Use overlay instead of text properties to override `hl-line' faces.
   ;; @see https://emacs.stackexchange.com/questions/36420
@@ -78,19 +75,16 @@
   :straight t
   :custom-face
   (hl-todo ((t (:inherit default :height 0.9 :width condensed :weight bold :inverse-video t))))
-  :hook ((prog-mode conf-mode yaml-mode yaml-ts-mode toml-ts-mode) . hl-todo-mode)
+  :hook (((prog-mode conf-mode yaml-mode) . hl-todo-mode))
   :config
   (setq hl-todo-require-punctuation t
         hl-todo-highlight-punctuation ":")
 
   (defun +hl-todo-add-keywords (keys color)
-    "Add KEYS→COLOR to `hl-todo-keyword-faces' via setopt so the custom :set runs."
-    (let ((faces (copy-tree hl-todo-keyword-faces)))
-      (dolist (keyword keys)
-        (if-let* ((item (assoc keyword faces)))
-            (setcdr item color)
-          (push (cons keyword color) faces)))
-      (setopt hl-todo-keyword-faces faces)))
+    (dolist (keyword keys)
+      (if-let* ((item (assoc keyword hl-todo-keyword-faces)))
+          (setf (cdr item) color)
+        (push `(,keyword . ,color) hl-todo-keyword-faces))))
 
   ;; HACK: `hl-todo' won't update face when changing theme, so we must add a hook for it
   (add-hook! enable-theme-functions :unless-daemonp-call-immediately
@@ -109,16 +103,12 @@
   )
 
 
-;; [beacon] Highlight line at cursor after switching window
-;; Do not customize pulse-highlight-face (doc forbids it). Do not set
-;; pulse-highlight-start-face background to `unspecified': pulse-reset-face
-;; uses face-background and then fades from nil → default = invisible flash.
-;; Stock faces already pick light/dark yellow backgrounds.
+;; [pulse] Highlight line at cursor after switching window
 (use-package pulse
-  ;; Stock `xref-after-jump-hook' is already (recenter xref-pulse-momentarily);
-  ;; do not also hook +recenter-and-pulse (double pulse aborts the first).
-  ;; imenu-after-jump defaults to nil — keep our recenter+pulse there.
-  :hook ((imenu-after-jump . +recenter-and-pulse)
+  :custom-face
+  (pulse-highlight-start-face ((t (:inherit region :background unspecified))))
+  (pulse-highlight-face ((t (:inherit region :background unspecified :extend t))))
+  :hook (((dumb-jump-after-jump imenu-after-jump) . +recenter-and-pulse)
          ((bookmark-after-jump magit-diff-visit-file next-error) . +recenter-and-pulse-line))
   :init
   (setq pulse-delay 0.2
@@ -151,7 +141,7 @@
     (recenter)
     (+pulse-momentary-line))
 
-  ;; Pulse only in current window (upstream 58b8567).
+  ;; Pulse only in current window
   (defadvice! +pulse-window-local-a (fn &rest args)
     :around #'pulse-momentary-highlight-region
     (let ((window (selected-window)))
@@ -177,11 +167,9 @@
          ("?" . symbol-overlay-map-help)
          ("c" . symbol-overlay-put)
          ("C" . symbol-overlay-remove-all))
-  :hook (((prog-mode yaml-mode yaml-ts-mode) . symbol-overlay-mode))
+  :hook (((prog-mode yaml-mode) . symbol-overlay-mode))
   :config
   (setq symbol-overlay-temp-highlight-on-region t)
-  ;; Public hook runs once per jump-call (not once per basic-jump in a loop).
-  (add-hook 'symbol-overlay-jump-hook #'+recenter-and-pulse-line)
   )
 
 

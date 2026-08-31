@@ -9,29 +9,6 @@
 
 (kill-ring-deindent-mode)
 
-;; Emacs 31: `C-x C-x' exchanges point and mark without activating the
-;; region (Mastering Emacs; stock default t highlights).  Independent of
-;; Transient Mark mode being on.
-(setq exchange-point-and-mark-highlight-region nil)
-
-;; After `M-x delete-pair', leave mark at the far delimiter so `C-x C-x'
-;; can act on the enclosed region.
-(setq delete-pair-push-mark t)
-
-;; Mickey's slick-cut: `C-w' / `s-x' kill the current line when there is
-;; no active region.  Do not remap `kill-ring-save' — `M-w' is `easy-kill'.
-;; `puni-mode-map' binds `C-w' to `puni-kill-region' (not `kill-region'),
-;; so structured kill in prog-mode is unchanged.
-(defun +kill-line-or-region (beg end &optional region)
-  "Kill the active region, or the current line if none is active."
-  (interactive
-   (if (use-region-p)
-       (list (region-beginning) (region-end) 'region)
-     (list (line-beginning-position)
-           (line-beginning-position 2))))
-  (kill-region beg end region))
-(define-key global-map [remap kill-region] #'+kill-line-or-region)
-
 
 ;; Make script file executable with `chmod +x' after save
 (add-hook! after-save-hook #'executable-make-buffer-file-executable-if-script-p)
@@ -40,10 +17,10 @@
 ;; [autorevert]
 (use-package autorevert
   :straight nil
-  ;; Global lazy mode: enable once after init (not on every find-file).
-  :hook (after-init . +auto-revert-mode)
+  :hook (find-file . +auto-revert-mode)
   :config
-  (setq auto-revert-use-notify nil
+  (setq auto-revert-verbose t
+        auto-revert-use-notify nil
         auto-revert-stop-on-user-input nil
         ;; Only prompts for confirmation when buffer is unsaved.
         revert-without-query (list "."))
@@ -59,10 +36,6 @@
   (defun +auto-revert-buffer-h (&rest _)
     "Auto revert current buffer when it is stale."
     (unless (or (active-minibuffer-window)
-                ;; reader-mode: custom revert + native DocState.  This hook
-                ;; let-binds `auto-revert-mode' to t, so disabling the minor
-                ;; mode on the PDF buffer is not enough (2026-08-22 OOM).
-                (derived-mode-p 'reader-mode)
                 (and (not auto-revert-remote-files)
                      buffer-file-name
                      (file-remote-p buffer-file-name)))
@@ -70,25 +43,15 @@
         (auto-revert-handler))))
 
   (defun +auto-revert-window-buffer-h (window &rest _)
-    "Auto revert WINDOW's buffer when it is stale.
-For buffer-local `window-buffer-change-functions' the arg is a window."
+    "Auto revert WINDOW's buffer when it is stale."
     (when (window-live-p window)
       (with-current-buffer (window-buffer window)
         (+auto-revert-buffer-h))))
 
-  (defun +auto-revert-on-window-buffer-change-h (frame &rest _)
-    "Global `window-buffer-change-functions' receives FRAME (Emacs 31 DOC).
-Roife/.emacs.d had the same bug: treating the arg as a window made this path a no-op."
-    (when (frame-live-p frame)
-      (dolist (window (window-list frame 'no-minibuf))
-        (+auto-revert-window-buffer-h window))))
-
   (defun +auto-revert-selected-window-h (&optional frame)
-    "Auto revert selected window on FRAME.
-Global `window-selection-change-functions' also receives a frame."
-    (let ((frame (or frame (selected-frame))))
-      (when (frame-live-p frame)
-        (+auto-revert-window-buffer-h (frame-selected-window frame)))))
+    "Auto revert the selected window's buffer in FRAME."
+    (+auto-revert-window-buffer-h
+     (frame-selected-window (or frame (selected-frame)))))
 
   (defun +auto-revert-visible-buffers-h (&rest _)
     "Auto revert visible stale buffers."
@@ -96,32 +59,17 @@ Global `window-selection-change-functions' also receives a frame."
       (with-current-buffer buffer
         (+auto-revert-buffer-h))))
 
-  (defun +auto-revert-on-focus-gained-h (&rest _)
-    "Auto revert visible buffers, but only when Emacs gains focus.
-`after-focus-change-function' fires for focus-out too, so filter on
-`frame-focus-state'."
-    (when (frame-focus-state)
-      (+auto-revert-visible-buffers-h)))
-
   (define-minor-mode +auto-revert-mode
     "A lazy alternative to `global-auto-revert-mode'."
     :global t
     (when global-auto-revert-mode
       (setq +auto-revert-mode nil))
     (let ((fn (if +auto-revert-mode #'add-hook #'remove-hook)))
-      ;; Global hook → FRAME handler (not window-live-p on a frame).
-      (funcall fn 'window-buffer-change-functions
-               #'+auto-revert-on-window-buffer-change-h)
-      (funcall fn 'window-selection-change-functions
-               #'+auto-revert-selected-window-h)
+      (funcall fn 'window-buffer-change-functions #'+auto-revert-window-buffer-h)
+      (funcall fn 'window-selection-change-functions #'+auto-revert-selected-window-h)
+      (funcall fn 'focus-in-hook #'+auto-revert-visible-buffers-h)
       (funcall fn 'after-save-hook #'+auto-revert-visible-buffers-h)
-      (funcall fn 'server-switch-hook #'+auto-revert-buffer-h))
-    ;; `focus-in-hook' is obsolete since Emacs 27.1.
-    (if +auto-revert-mode
-        (add-function :after after-focus-change-function
-                      #'+auto-revert-on-focus-gained-h)
-      (remove-function after-focus-change-function
-                       #'+auto-revert-on-focus-gained-h))))
+      (funcall fn 'server-switch-hook #'+auto-revert-buffer-h))))
 
 
 ;; [ws-butler] Remove trailing whitespace with lines touched
@@ -131,12 +79,8 @@ Global `window-selection-change-functions' also receives a frame."
 
 
 ;; [editorconfig] Respect project-local formatting rules
-;; Global minor mode: enable early so the first find-file still sees dir-locals.
 (use-package editorconfig
-  :init (editorconfig-mode 1)
-  :config
-  ;; Prefer ws-butler (touched lines only) over whole-buffer trailing trim.
-  (setq editorconfig-trim-whitespaces-mode 'ws-butler-mode))
+  :hook (find-file . editorconfig-mode))
 
 
 ;; [apheleia] Format buffers asynchronously without moving point
@@ -149,52 +93,57 @@ Global `window-selection-change-functions' also receives a frame."
   (setq apheleia-hide-log-buffers t))
 
 
-;; [jinx] Spell checker (needs Homebrew enchant + pkg-config to compile
-;; jinx-mod.dylib).  GUI Emacs often lacks /opt/homebrew on PATH, so
-;; ensure those paths before the module is built/loaded.
-(use-package jinx
-  :straight t
-  :hook ((text-mode . +jinx-mode-maybe)
-         (prog-mode . +jinx-mode-maybe))
-  :bind (:map jinx-mode-map
-              ("C-c f >" . jinx-next)
-              ("C-c f <" . jinx-previous)
-              ("C-c f ." . jinx-correct)
-              ("C-c f /" . jinx-correct-all))
-  :init
-  (defun +jinx-ensure-build-env ()
-    "Expose Homebrew tooling so jinx can compile/load jinx-mod.dylib."
-    (dolist (dir '("/opt/homebrew/bin" "/usr/local/bin"))
-      (when (file-directory-p dir)
-        (add-to-list 'exec-path dir)
-        (unless (string-match-p (regexp-quote dir) (or (getenv "PATH") ""))
-          (setenv "PATH" (concat dir path-separator (or (getenv "PATH") ""))))))
-    ;; #include <enchant.h> lives under include/enchant-2
-    (when (file-directory-p "/opt/homebrew/include/enchant-2")
-      (let ((inc "/opt/homebrew/include/enchant-2:/opt/homebrew/include"))
-        (setenv "CPATH" (concat inc path-separator (or (getenv "CPATH") "")))
-        (setenv "C_INCLUDE_PATH"
-                (concat inc path-separator (or (getenv "C_INCLUDE_PATH") "")))))
-    (when (file-directory-p "/opt/homebrew/lib")
-      (setenv "LIBRARY_PATH"
-              (concat "/opt/homebrew/lib" path-separator
-                      (or (getenv "LIBRARY_PATH") "")))))
-
-  (defun +jinx-mode-maybe ()
-    "Enable `jinx-mode', but never abort init if the native module fails."
-    (+jinx-ensure-build-env)
-    (condition-case err
-        (jinx-mode 1)
-      (error
-       (message "jinx: disabled (%s). Install: brew install enchant pkgconf"
-                (error-message-string err)))))
-  :custom
-  (jinx-languages "en")
+;; [ispell] Spell-checker backend
+(use-package ispell
+  :hook ((org-mode . +ispell-org-skip-regions-h)
+         ((markdown-mode markdown-ts-mode) . +ispell-markdown-skip-regions-h))
   :config
-  (+jinx-ensure-build-env)
-  ;; Skip CJK runs (upstream fix); English-only dict otherwise flags 中文.
-  (setq jinx-delay 0.5)
-  (add-to-list 'jinx-exclude-regexps '(t "\\cc")))
+  (defun +ispell-org-skip-regions-h ()
+    "Exclude Org blocks and inline markup from spell checking."
+    (make-local-variable 'ispell-skip-region-alist)
+    (dolist (pair '((org-property-drawer-re)
+                    ("~" "~") ("=" "=")
+                    ("^#\\+BEGIN_SRC" "^#\\+END_SRC")
+                    ("\\\\(" "\\\\)") ("\\[" "\\]")
+                    ("^\\\\begin{[^}]+}" "^\\\\end{[^}]+}")))
+      (add-to-list 'ispell-skip-region-alist pair)))
+
+  (defun +ispell-markdown-skip-regions-h ()
+    "Exclude Markdown code and inline markup from spell checking."
+    (make-local-variable 'ispell-skip-region-alist)
+    (dolist (pair '(("`" "`")
+                    ("^```" "^```")
+                    ("{{" "}}")
+                    ("\\\\(" "\\\\)") ("\\[" "\\]")
+                    ("^\\\\begin{[^}]+}" "^\\\\end{[^}]+}")))
+      (add-to-list 'ispell-skip-region-alist pair)))
+
+  (setq ispell-program-name "aspell"
+        ispell-extra-args nil
+        ispell-dictionary "en_US"
+        ispell-personal-dictionary (no-littering-expand-var-file-name "ispell/.pws")))
+
+
+;; [flyspell] Spell-checking overlays
+(use-package flyspell
+  :hook ((text-mode . flyspell-mode)
+         (prog-mode . flyspell-prog-mode))
+  :bind (:map flyspell-mode-map
+              ("C-c s ]" . flyspell-goto-next-error)
+              ("C-c s [" . +flyspell-goto-previous-error)
+              ("C-c s s" . flyspell-auto-correct-word)
+              ("C-;" . nil)
+              ("C-," . nil)
+              ("C-." . nil))
+  :config
+  (defun +flyspell-goto-previous-error ()
+    "Go to the previous Flyspell error."
+    (interactive)
+    (flyspell-goto-next-error t))
+
+  (setq flyspell-issue-message-flag nil
+        flyspell-issue-welcome-flag nil
+        flyspell-use-meta-tab nil))
 
 
 ;; [ediff] Diff & patch
@@ -217,15 +166,18 @@ Global `window-selection-change-functions' also receives a frame."
   (setq ediff-window-setup-function 'ediff-setup-windows-plain
         ediff-split-window-function 'split-window-horizontally
         ediff-merge-split-window-function 'split-window-horizontally
+        ediff-highlight-all-diffs t
         ;; turn off whitespace checking
         ediff-diff-options "-w")
   )
 
 
-;; [elec-pair] Automatic parenthesis pairing (buffer-local; not global mode)
+;; [elec-pair] Automatic parenthesis pairing
 (use-package elec-pair
-  :hook ((prog-mode conf-mode yaml-mode yaml-ts-mode toml-ts-mode org-mode markdown-ts-mode minibuffer-mode)
-         . electric-pair-local-mode))
+  :hook ((prog-mode conf-mode yaml-mode org-mode markdown-ts-mode minibuffer-mode) . electric-pair-mode)
+  :config
+  (setq electric-pair-inhibit-predicate 'electric-pair-default-inhibit)
+  )
 
 
 ;; [mwim] Better C-a C-e for programming
@@ -250,10 +202,6 @@ Global `window-selection-change-functions' also receives a frame."
 
   ;; Install explicitly in case `beginend-global-mode' is already enabled.
   (add-hook! telega-root-mode-hook #'beginend-telega-root-mode))
-
-
-;; [next-line] C-n at EOB inserts a newline
-(setq next-line-add-newlines t)
 
 
 ;; Alternatives to [hungry-delete]
@@ -288,7 +236,7 @@ Global `window-selection-change-functions' also receives a frame."
   :config
   (defun +puni-hungry-delete ()
     (interactive)
-    (if (looking-back "^[[:blank:]]+" (line-beginning-position))
+    (if (looking-back "^[[:blank:]]+")
         (let* ((puni-mode nil)
                (original-func (key-binding (kbd "DEL"))))
           ;; original-func is what `DEL' would be if puni-mode were disabled
@@ -298,11 +246,10 @@ Global `window-selection-change-functions' also receives a frame."
       (puni-backward-delete-char)))
   )
 
-;; [dtrt-indent] Detect indentation size (prog-mode only; upstream 16db7a7).
+;; [dtdr-indent] Detect indentation size
 (use-package dtrt-indent
   :straight t
   :hook (prog-mode . dtrt-indent-mode))
-
 
 ;; [dogears] Jump to the last edit location
 (use-package dogears
@@ -323,6 +270,7 @@ Global `window-selection-change-functions' also receives a frame."
                             other-window switch-to-buffer
                             aw-select
                             windmove-do-window-select
+                            pager-page-up
                             tab-bar-select-tab
                             pop-to-mark-command
                             pop-global-mark

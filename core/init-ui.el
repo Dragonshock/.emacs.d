@@ -5,12 +5,12 @@
  ;; Inhibits fontification while receiving input, which should help a little with scrolling performance.
  redisplay-skip-fontification-on-input t
 
- ;; [Selected-window] — must be default/global (plain setq is buffer-local here).
+ ;; [Selected-window]
+ highlight-nonselected-windows nil
+ cursor-in-non-selected-windows nil
+
  ;; Font compacting can be terribly expensive, but may increase memory use
  inhibit-compacting-font-caches t)
-;; highlight-nonselected-windows stock default is already nil — do not setq.
-
-(setq-default cursor-in-non-selected-windows nil)
 
 
 ;; [Cursor] disable blinking
@@ -18,8 +18,8 @@
 
 
 ;; [Fringes] Reduce the clutter in the fringes
-;; indicate-buffer-boundaries stock default is already nil.
-(setq-default indicate-empty-lines t)
+(setq indicate-buffer-boundaries nil
+      indicate-empty-lines nil)
 
 ;; Better fringe symbol
 (define-fringe-bitmap 'right-curly-arrow
@@ -68,10 +68,9 @@
 (setq use-file-dialog nil
       use-dialog-box nil)
 
-;; Emacs 31 context menu (right-click / `C-<down-mouse-3>').  Independent of
-;; `use-dialog-box'.  Ghostel binds its own mouse-3 on the terminal maps.
-(use-package mouse
-  :hook (after-init . context-menu-mode))
+
+;; Indicate eob lines
+(setq indicate-empty-lines t)
 
 
 ;; Disable menu/tool/scroll bars in daemon/client frames
@@ -92,8 +91,8 @@
 (use-package mb-depth
   :hook (after-init . minibuffer-depth-indicate-mode))
 ;; Keep the cursor out of the read-only portions of the minibuffer
-;; `intangible' is obsolete since Emacs 25; cursor-intangible-mode handles this.
 (setq minibuffer-prompt-properties '(read-only t
+                                               intangible t
                                                cursor-intangible t
                                                face minibuffer-prompt))
 (add-hook! minibuffer-setup-hook #'cursor-intangible-mode)
@@ -101,8 +100,7 @@
 (setq epg-pinentry-mode 'loopback)
 
 
-;; Font: Same width and height for emoji, chinese and english characters.
-;; Families match upstream roife (Sarasa Mono SC / Slab / UI).
+;; Font: Same width and height for emoji, chinese and english characters
 (defvar +font-size (if (eq system-type 'darwin) 16 26))
 
 (add-hook! server-after-make-frame-hook :unless-daemonp-call-immediately
@@ -117,21 +115,17 @@
       (dolist (charset '(han cjk-misc))
         (set-fontset-font t charset (font-spec :family "Sarasa Mono SC")))
 
-      ;; Emoji script (Emacs 28+ NEWS); 'prepend so color emoji wins composition.
-      ;; Do not bind color-emoji fonts to broad 'unicode — that can miss script
-      ;; 'emoji entries or pull non-emoji glyphs into the emoji font.
+      ;; font for emoji, set as unicode to cover more chars
       (if (eq system-type 'darwin)
-          (progn (set-fontset-font t 'emoji (font-spec :family "Apple Color Emoji") nil 'prepend)
+          (progn (set-fontset-font t 'unicode (font-spec :family "Apple Color Emoji") nil 'append)
                  (setq face-font-rescale-alist '(("Apple Color Emoji" . 0.79))))
-        (set-fontset-font t 'emoji (font-spec :family "Noto Color Emoji") nil 'prepend)))))
+        (set-fontset-font t 'unicode (font-spec :family "Noto Color Emoji") nil 'append)))))
 
 
-;; Smooth Scroll (less "jumpy" than defaults).
-;; `mouse-wheel-scroll-amount' has a custom :set that reinstalls bindings;
-;; plain setq leaves preloaded C-wheel text-scale. Harmless on TTY / daemon init.
-(setopt mouse-wheel-scroll-amount '(2 ((shift) . hscroll) ((control) . nil))
-        mouse-wheel-scroll-amount-horizontal 1
-        mouse-wheel-progressive-speed nil)
+;; Smooth Scroll (less "jumpy" than defaults)
+(setq mouse-wheel-scroll-amount '(2 ((shift) . hscroll) ((control) . nil))
+      mouse-wheel-scroll-amount-horizontal 1
+      mouse-wheel-progressive-speed nil)
 
 ;; Load theme
 ;; Don't prompt to confirm theme safety. This avoids problems with
@@ -139,12 +133,13 @@
 (setq custom-safe-themes t)
 
 
-;; Org #hashtag / @tag font-lock only (not the color theme).
 (use-package doom-themes
   :straight t
   :config
   (require 'doom-themes-ext-org)
-  (doom-themes-org-config))
+  (doom-themes-org-config)
+  (setcdr (assoc 'gnus-group-news-low-empty doom-themes-base-faces)
+          '(:inherit 'gnus-group-mail-1-empty :weight 'normal)))
 
 ;; Built-in Emacs 31; load the library first so defcustom does not clobber setq.
 (unless (featurep 'modus-themes)
@@ -220,8 +215,7 @@
   :straight (:type git :host github :repo "roife/scrollview.el" :branch "main")
   :hook ((after-init . global-scrollview-mode))
   :config
-  (setq scrollview-refresh-delay 0.1
-        scrollview-spell-checker 'jinx))
+  (setq scrollview-refresh-delay 0.1))
 
 (setq frame-title-format
       '((:eval (or buffer-file-truename "%b"))))

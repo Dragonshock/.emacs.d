@@ -1,7 +1,5 @@
 ;;; -*- lexical-binding: t; -*-
 
-(require 'cl-lib)
-
 (defun +liberime-prepend-env-path (name path)
   (when (file-directory-p path)
     (let ((value (getenv name)))
@@ -19,7 +17,7 @@
   :straight (liberime :type git :host github :repo "emacs-rime/liberime")
   :defer 1
   :init
-  (setq liberime-auto-build t
+  (setq liberime-load-on-require nil
         liberime-user-data-dir (if (eq system-type 'darwin)
                                    "~/Library/Rime/"
                                  "~/.local/share/fcitx5/rime")))
@@ -39,15 +37,8 @@
   (rimel-page-indicator-face ((t (:inherit font-lock-comment-face :height 0.85))))
   (rimel-highlight-face ((t (:inherit hl-line))))
   :init
-  (defun +rimel-set-candidate-display (&optional frame)
-    "Use posframe on GUI frames; echo-area prompt on TTY."
-    (setq rimel-show-candidate
-          (if (display-graphic-p (or frame (selected-frame)))
-              'posframe
-            'prompt)))
-  (add-hook 'server-after-make-frame-hook #'+rimel-set-candidate-display)
-  (+rimel-set-candidate-display)
   (setq default-input-method "rimel"
+        rimel-show-candidate 'posframe
         rimel-inline-preedit t
         rimel-candidate-show-preedit nil
         rimel-posframe-style 'horizontal
@@ -63,36 +54,24 @@
 
 (register-input-method "rimel" "Chinese" #'rimel-activate "中" "Rimel")
 
-(defun +rimel-ensure-chinese-h (&rest _)
-  "After activating rimel, enter Chinese and Chinese punctuation.
-User Rime defaults to ascii_mode (`rime_ice.custom.yaml` switches/@0/reset: 1)
-and may persist ascii_punct in user.yaml.  Toggle those options the same way
-Squirrel does (C-` / C-S-3)."
-  (when (and (fboundp 'liberime-get-status)
-             (fboundp 'liberime-workable-p)
-             (liberime-workable-p))
-    (let ((st (liberime-get-status)))
-      (when (alist-get 'is_ascii_mode st)
-        (liberime-process-keys (kbd "C-`")))
-      (when (alist-get 'is_ascii_punct (liberime-get-status))
-        (liberime-process-keys (kbd "C-S-3"))))))
-
-(advice-add 'rimel-activate :after #'+rimel-ensure-chinese-h)
-
 ;; [sis] automatically switch input source
 (use-package sis
   :straight t
-  ;; H2: do not enable sis-global-{inline,context,cursor-color}-mode.
-  ;; Those plus buffer-list-update-hook can stall the NS event loop.
-  ;; Keep rimel + C-\ only.
-  :config
-  ;; Use rimel as default. Must run after sis is loaded (`cl-defstruct'
-  ;; needs cl-lib; Emacs 31 will error on sis-back-detect otherwise).
+  :hook (;; When add space after chinese char, automatically switch to english mode
+         (liberime-after-start . sis-global-inline-mode)
+         ;; Enable the context-mode for all buffers
+         (liberime-after-start . sis-global-context-mode)
+         ;; Colored cursor
+         (liberime-after-start . sis-global-cursor-color-mode))
+  :init
+  ;; Use rimel as default
   (sis-ism-lazyman-config nil "rimel" 'native)
   (sis-get) ; HACK: set sis--ism
-  (defun +sis-refresh-cursor-color ()
-    (sis--get)
-    (sis--update-cursor-color))
+  :config
+  (add-hook! buffer-list-update-hook
+    (defun +sis-refresh-cursor-color ()
+      (sis--get)
+      (sis--update-cursor-color)))
 
   ;; HACK: Set cursor color automatically
   (add-hook! (enable-theme-functions server-after-make-frame-hook) :unless-daemonp-call-immediately
@@ -119,17 +98,11 @@ Squirrel does (C-` / C-S-3)."
       (apply fn args)))
 
   (defun +sis-context-switching-other (back-detect fore-detect)
-    "Prefer Chinese (other) in prose/chat buffers when surrounding text suggests it."
-    (when (or (and (derived-mode-p 'org-mode 'markdown-ts-mode 'text-mode)
-                   (sis--context-other-p back-detect fore-detect))
-              (and (derived-mode-p 'telega-chat-mode)
-                   (or (and (boundp 'telega-chatbuf--input-marker)
-                            telega-chatbuf--input-marker
-                            (= (point) telega-chatbuf--input-marker)
-                            (eolp))
-                       (sis--context-other-p back-detect fore-detect))))
-      'other))
-
+    (and meow-insert-mode
+         (or (and (derived-mode-p 'telega-chat-mode)
+                  (or (and (= (point) telega-chatbuf--input-marker) ; beginning of input
+                           (eolp)))))
+         'other))
   (add-to-list 'sis-context-detectors #'+sis-context-switching-other)
 
   ;; Inline-mode

@@ -32,7 +32,8 @@
           (eww-filter '(or (mode . eww-mode)
                            (mode . eww-bookmark-mode)
                            (mode . eww-history-mode)
-                           (mode . eww-buffers-mode)))
+                           (mode . eww-buffers-mode)
+                           (mode . eww-search-annotations-mode)))
           (elfeed-filter '(or (mode . elfeed-show-mode)
                               (mode . elfeed-search-mode)))
           (emms-filter

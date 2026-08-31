@@ -1,10 +1,20 @@
 ;;; -*- lexical-binding: t -*-
 
-;; Gnus is the *mail* client here.  News / blogs / HN live in Elfeed
-;; (`init-elfeed.el` + `scripts/update-elfeed-feeds`).  Do not re-add
-;; nnnrss/nnatom secondary methods when syncing roife/.emacs.d.
+(use-package nnnrss
+  :straight (:host github :repo "jjbarr/nnnrss")
+  :config
+  ;; nnnrss 0.4.1 references an unbound `id' when an item has no GUID.
+  (defun nnnrss--read-id (article)
+    (or (when-let* ((id (dom-child-by-tag article 'guid)))
+          (string-trim (dom-text id)))
+        (dom-attr article 'about)
+        (when-let* ((link (dom-child-by-tag article 'link)))
+          (string-trim (dom-text link)))
+        (when-let* ((title (dom-child-by-tag article 'title)))
+          (string-trim (dom-text title)))))
+  (puthash "include-yy's blog" "Include YY" nnfeed-group-names))
 
-;; [gnus] mail reader (nnmaildir) + composer (message/smtpmail)
+;; [gnus] a newsreader, mail reader, and news server client
 (use-package gnus
   :commands gnus
   :config
@@ -27,10 +37,11 @@
    ;; Automatically restore the local Gnus state journal after an unclean
    ;; exit instead of prompting about .newsrc-dribble.
    gnus-always-read-dribble-file t
-   ;; Discover local Maildir folders at startup and subscribe alphabetically.
+   ;; Discover local Maildir folders at startup and subscribe to them without
+   ;; prompting one by one.
    gnus-check-new-newsgroups 'ask-server
    gnus-subscribe-newsgroup-method 'gnus-subscribe-alphabetically
-   ;; A unified query lang (usable once a search engine is wired).
+   ;; A unified query lang
    gnus-search-use-parsed-queries t
 
    ;; article mode
@@ -41,101 +52,69 @@
    ;; Display more MIME stuff
    gnus-mime-display-multipart-related-as-mixed t
 
-   ;; Experienced-user UI; sending still asks via `message-confirm-send'.
+   ;; Use the experienced-user Gnus UI.  Sending still asks for confirmation
+   ;; through `message-confirm-send' below.
    gnus-novice-user nil
    gnus-expert-user t)
 
-  ;; NEWS 31: gnus-close-on-sleep hooks system-sleep-event-functions, but
-  ;; stock does not (require 'system-sleep).  loaddefs pre-defvars the hook
-  ;; with NOSET autoload, so add-hook alone never loads the library and
-  ;; system-sleep-enable (special-event-map) never runs — silent no-op on
-  ;; macOS sleep.  Both local and roife only set the flag.  Force load here.
-  (when gnus-close-on-sleep
-    (require 'system-sleep))
-
-  ;; Primary: nothing.  Secondary: local Gmail Maildir (isync Verbatim).
-  ;;
-  ;; isync layout is hierarchical, not flat:
-  ;;   ~/.local/share/mail/gmail/Inbox
-  ;;   ~/.local/share/mail/gmail/[Gmail]/{Sent Mail,All Mail,...}
-  ;; nnmaildir only lists *immediate* child maildirs of `directory', so
-  ;; Inbox and Gmail labels need two server roots (not "[Gmail].Sent Mail").
-  ;; RSS/Atom → Elfeed.  Do not re-add nnnrss/nnatom from roife.
   (setq gnus-select-method '(nnnil "")
         gnus-secondary-select-methods
-        '((nnmaildir "GMail"
+        `((nnmaildir "GMail"
                      (directory "~/.local/share/mail/gmail/"))
-          (nnmaildir "GMailLabels"
-                     (directory "~/.local/share/mail/gmail/[Gmail]/")))
-        ;; Gmail already keeps server-side Sent; no local monthly archive.
-        gnus-message-archive-group nil)
+          (nnnrss "karthinks.com/index.xml")
+          (nnnrss "egh0bww1.com/rss.xml")
+          (nnnrss "www.rahuljuliato.com/rss.xml")
+          (nnnrss "rust-analyzer.github.io/feed.xml")
+          (nnatom "emacsredux.com/atom.xml")
+          (nnatom "matklad.github.io/feed.xml")
+          (nnatom "blog.rust-lang.org/feed.xml")
+          (nndiscourse "emacs-china"
+                       (nndiscourse-base-url "https://emacs-china.org")
+                       (nndiscourse-auth-type user-api-key))
+          (nnhackernews ""))
 
-  (defun +gnus-ensure-gmail-folders ()
-    "Subscribe all isync Gmail folders; drop feed + wrong-name groups.
+        ;; Gmail already keeps a server-side Sent folder, so do not create an
+        ;; additional local monthly archive.
+        gnus-message-archive-group nil))
 
-isync Patterns (Verbatim) map to:
-  nnmaildir+GMail:Inbox
-  nnmaildir+GMailLabels:{All Mail,Sent Mail,Drafts,Trash,Spam}
-Topics (seeded in etc/gnus/newsrc.eld): mail / system / misc.
-Safe on every `gnus-started-hook'."
-    (dolist (spec '(("nnmaildir+GMail:Inbox" 3)
-                    ("nnmaildir+GMailLabels:All Mail" 4)
-                    ("nnmaildir+GMailLabels:Sent Mail" 4)
-                    ("nnmaildir+GMailLabels:Drafts" 5)
-                    ("nnmaildir+GMailLabels:Trash" 6)
-                    ("nnmaildir+GMailLabels:Spam" 6)))
-      (let ((group (car spec))
-            (level (cadr spec)))
-        (unless (gnus-group-entry group)
-          (ignore-errors (gnus-subscribe-newsgroup group)))
-        (when (gnus-group-entry group)
-          (gnus-group-change-level group level))))
-    ;; Drop legacy feed backends and the mistaken flat Gmail names.
-    (dolist (entry (copy-sequence gnus-newsrc-alist))
-      (let ((group (car entry)))
-        (when (and (stringp group)
-                   (or (string-match-p "\\`nn\\(atom\\|nrss\\|rss\\)" group)
-                       (string-match-p "\\`nnmaildir\\+GMail:\\[Gmail\\]" group)
-                       ;; Parent dir is not a maildir; ignore if ever subscribed.
-                       (string-equal group "nnmaildir+GMail:[Gmail]")))
-          (ignore-errors
-            (gnus-group-unsubscribe-group group nil t))))))
-
-  (add-hook 'gnus-started-hook #'+gnus-ensure-gmail-folders))
-
+;; Read web communities through Gnus-native backends.
+(use-package nnextension
+  :straight (:host github :repo "roife/nnextension"))
 
 ;; [gnus-group] group mode
 (use-package gnus-group
   :config
-  ;;               indentation ------------.
-  ;;       #      process mark ----------. |
-  ;;                     level --------. | |
-  ;;                subscribed ------. | | |
-  ;;       %          new mail ----. | | | |
-  ;;       *   marked articles --. | | | | |
-  ;;                             | | | | | |  Ticked    New     Unread  open-status Group
-  (setq gnus-group-line-format "%M%m%S%L%p%P %1(%7i%) %3(%7U%) %3(%7y%) %4(%B%-45G%)\n"
-        gnus-group-sort-function
-        '(gnus-group-sort-by-level gnus-group-sort-by-alphabet))
+  ;; Keep the useful state on the left and give the group name a stable
+  ;; starting column:
+  ;;
+  ;;   process  open  unread/total  group
+  ;;      #      *       12/340     INBOX
+  ;;
+  ;; For Discourse groups display the category description supplied by the
+  ;; backend (for example, "Emacs-general") instead of its stable category ID.
+  ;; Other backends retain the compact native `%c' name.
+  (setq gnus-group-line-format
+        (concat "%M%p%B %6,6y/%-6,6t  %P%("
+                "%~(form (if (and (string-prefix-p \"nndiscourse+\""
+                " gnus-tmp-group)"
+                " (not (string-empty-p gnus-tmp-newsgroup-description)))"
+                " (car (split-string gnus-tmp-newsgroup-description \" — \"))"
+                " (gnus-short-group-name gnus-tmp-group)))@%)%0,0D\n")
+        gnus-group-uncollapsed-levels 2
+        gnus-group-sort-function '(gnus-group-sort-by-level gnus-group-sort-by-alphabet)
+        gnus-permanently-visible-groups ".*")
 
   (defvar +gnus--refresh-process nil
-    "The process updating external sources before a Gnus refresh.")
+    "The mbsync process running before a Gnus refresh.")
 
   (defadvice! +gnus--sync-before-refresh (refresh &rest args)
     :around #'gnus-group-get-new-news
-    "Run isync (mbsync) before REFRESH with ARGS.
-
-Mail only: Hacker News and other feeds are updated by Elfeed
-(`scripts/update-elfeed-feeds`), not by this path."
+    "Synchronize mail before calling the Gnus REFRESH with ARGS."
     (if (and +gnus--refresh-process
              (process-live-p +gnus--refresh-process))
         (message "Mail synchronization is already running")
       (let ((group-buffer (current-buffer))
-            (output-buffer (get-buffer-create "*gnus-source-update*"))
-            (command
-             (list
-              (expand-file-name "scripts/update-gnus-sources"
-                                user-emacs-directory))))
+            (output-buffer (get-buffer-create "*gnus-source-update*")))
         (with-current-buffer output-buffer
           (erase-buffer))
         (setq +gnus--refresh-process
@@ -148,13 +127,11 @@ Mail only: Hacker News and other feeds are updated by Elfeed
                (lambda (process _event)
                  (when (memq (process-status process) '(exit signal))
                    (setq +gnus--refresh-process nil)
-                   (if (zerop (process-exit-status process))
+                   (if (and (eq (process-status process) 'exit)
+                            (zerop (process-exit-status process)))
                        (message "Mail synchronized")
-                     (message
-                      "Mail sync failed; see %s"
-                      (buffer-name (process-buffer process))))
-                   ;; Refresh even after a partial failure: existing local
-                   ;; Maildir remains usable.
+                     (message "Mail synchronization failed; see %s"
+                              (buffer-name (process-buffer process))))
                    (when (buffer-live-p group-buffer)
                      (with-current-buffer group-buffer
                        (apply refresh args)))))))
@@ -162,7 +139,16 @@ Mail only: Hacker News and other feeds are updated by Elfeed
 
 (use-package gnus-topic
   :after gnus-group
-  :hook (gnus-group-mode . gnus-topic-mode))
+  :hook (gnus-group-mode . gnus-topic-mode)
+  :bind (:map gnus-topic-mode-map
+              ("TAB" . gnus-topic-fold)
+              ("<tab>" . gnus-topic-fold))
+  :config
+  ;; Compact topic headings with an explicit collapsed marker and aggregate
+  ;; unread count.  Empty topics remain visible so the hierarchy is stable.
+  (setq gnus-topic-line-format "%i%(%n%)  %4A %v\n"
+        gnus-topic-display-empty-topics t
+        gnus-topic-indent-level 2))
 
 (use-package gnus-demon
   :after gnus
@@ -174,56 +160,68 @@ Mail only: Hacker News and other feeds are updated by Elfeed
 ;; [gnus-sum] summary mode
 (use-package gnus-sum
   :after gnus
+  :bind (:map gnus-summary-mode-map
+              ("RET" . gnus-summary-select-article-buffer)
+              ("<return>" . gnus-summary-select-article-buffer))
   :config
+  (defalias 'gnus-user-format-function-H #'nndiscourse-summary-liked-mark)
   (setq
-   ;; Pretty marks
+   ;; Keep the original symbols, but match Gnus's native component widths:
+   ;; roots are 2 columns, ancestor segments 2, and leaves 4.
    gnus-sum-thread-tree-root            "┌ "
    gnus-sum-thread-tree-false-root      "◌ "
    gnus-sum-thread-tree-single-indent   "◎ "
-   gnus-sum-thread-tree-vertical        "│"
+   gnus-sum-thread-tree-vertical        "│ "
    gnus-sum-thread-tree-indent          "  "
-   gnus-sum-thread-tree-leaf-with-other "├─►"
-   gnus-sum-thread-tree-single-leaf     "╰─►"
-   gnus-summary-line-format "%U%R %3d %[%-23,23f%] %B %s\n"
+   gnus-sum-thread-tree-leaf-with-other "├─► "
+   gnus-sum-thread-tree-single-leaf     "╰─► "
+   ;; Use Gnus's native summary renderer.  Keep all status columns before
+   ;; variable-width fields so its built-in mark-position tracking stays valid.
+   gnus-summary-line-format "%U%R%uH %3d %-23,23f %B%s\n"
    ;; Loose threads
-   gnus-simplify-subject-functions '(gnus-simplify-subject-re gnus-simplify-whitespace)
+   gnus-simplify-subject-functions
+   '(gnus-simplify-subject-re gnus-simplify-whitespace)
    gnus-summary-thread-gathering-function 'gnus-gather-threads-by-subject
    ;; Filling in threads
+   ;; Keep a little old context available for incomplete conversations.
    gnus-fetch-old-headers 2
    gnus-fetch-old-ephemeral-headers 2
    gnus-build-sparse-threads 'some
+   ;; More threading
+   gnus-show-threads t
    gnus-thread-indent-level 2
+   ;; Sorting
    gnus-thread-sort-functions 'gnus-thread-sort-by-most-recent-date
    gnus-subthread-sort-functions 'gnus-thread-sort-by-date
+   ;; Viewing
    gnus-view-pseudos 'automatic
    gnus-view-pseudo-asynchronously t
+   ;; No auto select
    gnus-auto-select-first nil
    gnus-auto-select-next nil
    gnus-paging-select-next nil))
 
-
-;; Identity / SMTP — independent of Gnus so `compose-mail' / `report-emacs-bug'
-;; work before the first `M-x gnus'.  Do not put these under `:after gnus'.
-;; Align with ~/.config/isyncrc (User) and authinfo smtp.gmail.com login.
-(setq user-full-name "LongZhen"
-      user-mail-address "longzhen9490@gmail.com"
-      send-mail-function #'smtpmail-send-it
-      smtpmail-smtp-server "smtp.gmail.com"
-      smtpmail-smtp-user user-mail-address
-      smtpmail-smtp-service 465
-      smtpmail-stream-type 'ssl
-      smtpmail-servers-requiring-authorization "\\`smtp\\.gmail\\.com\\'"
-      message-send-mail-function #'message-use-send-mail-function)
-
-;; [message] Composing mail (hooks / message-local options only)
+;; [message] Composing mail and news messages
 (use-package message
-  :defer t
+  :after gnus
   :hook (message-mode . auto-fill-mode)
   :config
-  (setq message-kill-buffer-on-exit t
+  (setq user-full-name "roifewu"
+        user-mail-address "roifewu@gmail.com"
+        message-kill-buffer-on-exit t
         message-confirm-send t
-        message-signature user-full-name
-        message-mail-alias-type 'ecomplete))
+        message-signature nil
+        message-mail-alias-type 'ecomplete
+
+        message-send-mail-function #'message-use-send-mail-function
+
+        ;; Use smtpmail to send mail through Gmail.
+        send-mail-function #'smtpmail-send-it
+        smtpmail-smtp-server "smtp.gmail.com"
+        smtpmail-smtp-user user-mail-address
+        smtpmail-smtp-service 587
+        smtpmail-stream-type 'starttls
+        smtpmail-servers-requiring-authorization "\\`smtp\\.gmail\\.com\\'"))
 
 
 ;; Attach marked files from Dired with `C-c RET C-a'.

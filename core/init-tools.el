@@ -8,7 +8,8 @@
   (setq
    ;; Record isearch in minibuffer history, so C-x ESC ESC can repeat it.
    isearch-resume-in-command-history t
-   ;; isearch-lax-whitespace stock default is already t (Emacs 25.1+).
+   ;; One space can represent a sequence of whitespaces
+   isearch-lax-whitespace t
    ;; direction change
    isearch-repeat-on-direction-change t
    ;; M-< and M-> move to the first/last occurrence of the current search string.
@@ -23,7 +24,7 @@
    regexp-search-ring-max 200))
 
 
-;; [ezf] Use Emacs completion from terminal shells (roife/ezf, no local advice)
+;; [ezf] Use Emacs completion from terminal shells
 (use-package ezf
   :straight (:type git :host github :repo "roife/ezf")
   :demand t)
@@ -80,9 +81,13 @@
 (use-package hideshow
   :preface
   (defun +hideshow-setup ()
-    "Set up hideshow block definitions for modes that need overrides.
-Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
+    "Set up hideshow block definitions for modes that need overrides."
     (pcase major-mode
+      ('ruby-mode
+       (setq-local hs-block-start-regexp "class\\|d\\(?:ef\\|o\\)\\|module\\|[[{]"
+                   hs-block-end-regexp "end\\|[]}]"
+                   hs-c-start-regexp "#\\|=begin"
+                   hs-forward-sexp-function #'ruby-forward-sexp))
       ('nxml-mode
        (setq-local hs-block-start-regexp "<!--\\|<[^/>]*[^/]>"
                    hs-block-end-regexp "-->\\|</[^/>]*[^/]>"
@@ -100,32 +105,22 @@ Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
                                (search-backward "\\begin{document}"
                                                 (line-beginning-position) t))
                        (LaTeX-find-matching-end)))))))
-  ;; toml-ts-mode derives from text-mode (not conf-mode); with
-  ;; treesit-enabled-modes remapping conf-toml → toml-ts, conf-mode-hook never
-  ;; runs for .toml — list toml-ts-mode explicitly (same pattern as yaml-ts).
-  ;; nxml/latex/LaTeX derive from text-mode (not prog/conf) — must list them on
-  ;; hs-minor-mode or setup-only hooks leave folding as a silent no-op.
-  :hook (((prog-mode conf-mode yaml-mode yaml-ts-mode toml-ts-mode
-                     nxml-mode latex-mode LaTeX-mode)
-          . hs-minor-mode)
-         ((nxml-mode latex-mode LaTeX-mode) . +hideshow-setup)
-         ;; Indentation-style hs is for classic yaml-mode; treesit yaml uses
-         ;; treesit-hs predicates from major-mode setup — keep yaml-ts off here.
+  :hook (((prog-mode conf-mode yaml-mode) . hs-minor-mode)
+         ((ruby-mode nxml-mode latex-mode LaTeX-mode) . +hideshow-setup)
          ((yaml-mode) . hs-indentation-mode))
   :bind (("C-c TAB" . hs-cycle)
          ("C-c `" . hs-toggle-all))
   :config
-  ;; Leave `hs-show-indicators' at default nil; do not set `hs-indicator-type'
-  ;; alone (it only applies when indicators are enabled).
-  (setq hs-display-lines-hidden t))
+  (setq hs-indicator-type nil
+        hs-display-lines-hidden t))
 
 
 ;; [vundo] Undo tree
 (use-package vundo
   :straight t
   :config
-  ;; vundo-roll-back-on-quit stock package default is already t.
-  (setq vundo-compact-display t))
+  (setq vundo-compact-display t
+        vundo-roll-back-on-quit t))
 
 
 ;; [undohist] Persist undo history
@@ -133,32 +128,14 @@ Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
   :straight t
   :hook (after-init . undo-fu-session-global-mode)
   :config
-  ;; Never snapshot secrets or ephemeral credentials (regexps match full path).
-  (setq undo-fu-session-incompatible-files
-        '("\\.gpg$"
-          "/COMMIT_EDITMSG\\'"
-          "/git-rebase-todo\\'"
-          "/\\.authinfo\\(\\.gpg\\)?\\'"
-          "/authinfo\\.gpg\\'"
-          "\\.netrc\\'"
-          "/cookies\\'"
-          "\\.pat\\'"
-          "/gh\\.pat\\'"
-          "/\\.cli-proxy-api/"
-          "/\\.ssh/"
-          "id_rsa"
-          "id_ed25519"
-          "/private/tmp/"
-          "^/tmp/"
-          "passwd"
-          "credentials"))
+  (setq undo-fu-session-incompatible-files '("\\.gpg$" "/COMMIT_EDITMSG\\'" "/git-rebase-todo\\'"))
 
   (when (executable-find "zstd")
     ;; There are other algorithms available, but zstd is the fastest
     (setq undo-fu-session-compression 'zst)))
 
 
-;; [undo-hl] Highlight undo changes (buffer-local; not global after-init)
+;; [undo-hl] Highlight undo changes
 (use-package undo-hl
   :straight (:host github :repo "casouri/undo-hl")
   :hook (((prog-mode text-mode conf-mode) . undo-hl-mode))
@@ -167,7 +144,7 @@ Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
 
 ;; [re-builder]
 (use-package re-builder
-  :straight nil
+  :ensure nil
   :commands re-builder
   :bind (:map reb-mode-map
               ("C-c C-k" . reb-quit)
@@ -183,17 +160,10 @@ Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
   :bind (:map prog-mode-map
               ("C-c '" . separedit))
   :config
-  ;; separedit only wires nested fenced-block edit for markdown-mode / gfm-mode.
-  (setq separedit-default-mode 'markdown-mode))
+  (setq separedit-default-mode 'markdown-ts-mode))
 
 
-;; [emacs-reader] read docs in emacs (moved here from init-pdf.el, upstream layout)
-;; 2026-08-22: native DocState leak.  `reader-dyn--load-doc' mallocs with a
-;; NULL user-ptr finalizer; `reader-refresh-doc-buffer' never calls
-;; `set-visited-file-modtime' or `reader-dyn--close-doc'.  A rewritten PDF
-;; stays stale forever; +auto-revert-mode + window churn re-loads it until
-;; jetsam (pid 55552, 71GB).  Upstream kill-buffer-hook is also added
-;; buffer-local at load time, not on reader-mode buffers.
+;; [emacs-reader] read docs in emacs
 (use-package reader
   :straight `(reader :type git :host codeberg :repo "MonadicSheep/emacs-reader"
                      :files (:defaults ,(concat "render-core" module-file-suffix))
@@ -206,23 +176,9 @@ Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
          ("C-, e" . browse-url-emacs)))
 
 ;; [eww] Builtin browser
-;; TTY: skip SHR images so kitty-graphics does not freeze on GitHub-sized
-;; SVG pages.  GUI eww still shows images.  Toggle later with I.
-(defun +eww-inhibit-images-on-tty ()
-  "Set `shr-inhibit-images' on TTY frames only."
-  (unless (display-graphic-p)
-    (setq-local shr-inhibit-images t)))
-
-;; Elfeed-show and eww both render HTML via SHR.  Default shr-text
-;; inherits variable-pitch-text (Sarasa UI SC at 1.1×).  Use the
-;; default face (TX-02) instead.
-(use-package shr
-  :config
-  (setq shr-use-fonts nil
-        shr-max-image-proportion 0.5))
-
 (use-package eww
-  :hook (eww-mode . +eww-inhibit-images-on-tty))
+  :config
+  (setq shr-max-image-proportion 0.5))
 
 (use-package xwidget
   :config

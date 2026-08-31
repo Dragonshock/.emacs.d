@@ -1,29 +1,16 @@
 ;;; -*- lexical-binding: t -*-
 
 ;; warp/truncation indicator in tty
-;; NS dumps may not pre-load disp-table; ensure a live char-table first.
-(require 'disp-table)
-(unless (char-table-p standard-display-table)
-  (setq standard-display-table (make-display-table)))
 (set-display-table-slot standard-display-table
                         'wrap
                         (make-glyph-code ?↩ 'shadow))
+
 (set-display-table-slot standard-display-table
                         'truncation
                         (make-glyph-code ?… 'shadow))
 
-;; T2: do not setq-default auto-composition-mode to a non-nil string
-;; ("xterm-256color" is truthy — composition stayed on).  Disable only
-;; on TTY frames; GUI keeps the stock default (t).
-(defun +xterm-disable-auto-composition (&optional frame)
-  "Turn off `auto-composition-mode' on FRAME when it is a TTY."
-  (let ((frame (or frame (selected-frame))))
-    (when (and (frame-live-p frame)
-               (not (display-graphic-p frame)))
-      (with-selected-frame frame
-        (auto-composition-mode -1)))))
-(add-hook 'tty-setup-hook #'+xterm-disable-auto-composition)
-(add-hook 'after-change-major-mode-hook #'+xterm-disable-auto-composition)
+;; Disable auto-composition in terminal.
+(setq-default auto-composition-mode "xterm-256color")
 
 
 ;; [Kitty Graphics Protocol] Implements support for Kitty's "graphics protocol",
@@ -39,20 +26,12 @@
 ;; which allows the terminal to send key events to Emacs.
 (use-package kkp
   :straight t
-  ;; KKP maps C-g to CSI-u; call-process (e.g. envrc--export) cannot be
-  ;; interrupted without restoring legacy keys around subprocesses.
-  ;; README + both local/roife default nil → footgun with envrc-global-mode.
-  :init
-  (setq kkp-restore-legacy-keys-around-subprocesses t)
   :hook (tty-setup . global-kkp-mode))
 
 
 ;; [xterm]
 (use-package term/xterm
   :straight nil
-  ;; G2: Ghostty is not in Emacs 31's xterm-mouse allowlist (kitty/foot/
-  ;; iTerm2 / alacritty / contour).  Upstream roife enables this on
-  ;; tty-setup; a Lisp call with no arg enables (does not toggle).
   :hook (tty-setup . xterm-mouse-mode)
   :init
   (setq xterm-extra-capabilities '(modifyOtherKeys reportBackground

@@ -6,36 +6,31 @@
               ("C-c C-p" . wdired-change-to-wdired-mode))
   :config
   (setq
-   ;; dired-recursive-deletes stock default is already 'top.
+   ;; Always delete and copy recursively
+   dired-recursive-deletes 'top
    dired-recursive-copies 'always
    ;; Move between two dired buffer quickly
    dired-dwim-target t
-   ;; dired-create-destination-dirs set once in dired-aux (with vc-rename).
+   ;; Ask whether destination dirs should get created when copying/removing files.
+   dired-create-destination-dirs 'ask
    ;; don't prompt to revert, just do it
-   ;; Predicate must accept DIRNAME; `dired-buffer-stale-p' is for Auto Revert.
-   dired-auto-revert-buffer #'dired-directory-changed-p
+   dired-auto-revert-buffer #'dired-buffer-stale-p
    ;; symlink
    dired-hide-details-hide-symlink-targets nil
    ;; free disk
    dired-free-space nil
    )
 
-  ;; Emacs 30.1+ stock `insert-directory-program' is computed via
-  ;; custom-initialize-delay *before* site-start.  On emacs-plus GUI
-  ;; launches, EMACS_PLUS_PATH is injected only in site-start, so the
-  ;; stock default often freezes as "ls" even when gls exists.  Re-bind
-  ;; here (user init runs after site-start).  Use an absolute path so
-  ;; later PATH changes cannot reintroduce BSD ls.
-  (cond
-   ((and (eq system-type 'darwin) (executable-find "gls"))
-    (setq insert-directory-program (executable-find "gls")
+  (when (eq system-type 'darwin)
+    (if (executable-find "gls")
+        (setq insert-directory-program "gls") ; Use GNU ls as `gls' from `coreutils' if available.
+      ;; Suppress the warning: `ls does not support --dired'.
+      (setq dired-use-ls-dired nil)))
+
+  (when (or (not (eq system-type 'darwin)) (executable-find "gls"))
+    (setq ls-lisp-use-insert-directory-program t ; Using `insert-directory-program'
+          ;; Show directory first
           dired-listing-switches "-alh --group-directories-first"))
-   ((eq system-type 'darwin)
-    ;; BSD ls only: no GNU long options, no --dired.
-    (setq dired-use-ls-dired nil
-          dired-listing-switches "-alh"))
-   (t
-    (setq dired-listing-switches "-alh --group-directories-first")))
   )
 
 ;; [dired-git-info] Show git info in dired
@@ -89,6 +84,7 @@
     :config
     (setq dired-subtree-line-prefix "  |  "))
 
+  ;; TODO: remove it
   (use-package f :straight t :demand t)
 
   (use-package dired-collapse

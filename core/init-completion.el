@@ -32,8 +32,8 @@
 (use-package vertico-quick
   :straight nil
   :after vertico
-  ;; Binding lives on vertico-map above (avoid C-, / C-, . double-bind).
-  )
+  :bind (:map vertico-map
+              ("C-," . vertico-quick-jump)))
 
 
 (use-package vertico-buffer
@@ -54,25 +54,16 @@
 (use-package orderless
   :straight t
   :init
-  ;; Component modifiers (affix both ends, matching orderless-affix-dispatch):
-  ;;   !foo / foo! excludes, =foo matches literally, ~foo uses flex,
+  ;; Component modifiers:
+  ;;   !foo excludes, =foo matches literally, ~foo uses flex,
   ;;   ^foo matches a literal prefix, ,foo uses initialism,
   ;;   %foo enables char-folding, @foo matches annotations.
   (defun +orderless-dispatch (pattern _index _total)
     (cond
-     ;; Ensure $ works with Consult: candidates may end with tofu chars for
-     ;; disambiguation. Consult uses [#x100000, #x10FFFD] (consult--tofu-*),
-     ;; not the old #x200000–#x300000 PUA range.
-     ((string-suffix-p "$" pattern)
-      (let ((tofu (if (boundp 'consult--tofu-regexp)
-                      (concat consult--tofu-regexp "*")
-                    "[\x100000-\x10FFFD]*")))
-        `(orderless-regexp . ,(concat (substring pattern 0 -1) tofu "$"))))
-     ;; Bare "!" alone would become empty orderless-not; keep no-op literal.
+     ;; Ensure $ works with Consult commands, which add disambiguation suffixes
+     ((string-suffix-p "$" pattern) `(orderless-regexp . ,(concat (substring pattern 0 -1) "[\x200000-\x300000]*$")))
      ((string= "!" pattern) `(orderless-literal . ""))
-     ;; Prefer `orderless-not' over legacy `orderless-without-literal' (README).
-     ((string-prefix-p "!" pattern) `(orderless-not . ,(substring pattern 1)))
-     ((string-suffix-p "!" pattern) `(orderless-not . ,(substring pattern 0 -1)))
+     ((string-prefix-p "!" pattern) `(orderless-without-literal . ,(substring pattern 1)))
      ((string-prefix-p "%" pattern) `(char-fold-to-regexp . ,(substring pattern 1)))
      ((string-suffix-p "%" pattern) `(char-fold-to-regexp . ,(substring pattern 0 -1)))
      ((string-prefix-p "^" pattern) `(orderless-literal-prefix . ,(substring pattern 1)))
@@ -90,13 +81,13 @@
         completion-category-defaults nil
         completion-ignore-case t
         read-buffer-completion-ignore-case t
-        ;; `read-file-name-completion-ignore-case' is set once in init-basic
-        ;; (darwin default is already t; keep the global explicit setq there).
-        ;; eglot registers category `eglot-capf' only (no bare `eglot').
-        completion-category-overrides '((file (styles partial-completion))
+        read-file-name-completion-ignore-case t
+        completion-category-overrides '((file (styles basic partial-completion))
+                                        (eglot (styles orderless))
                                         (eglot-capf (styles orderless)))
         orderless-style-dispatchers '(+orderless-dispatch)
-        ;; `completions-sort' only affects built-in *Completions*; Vertico ignores it.
+        orderless-component-separator #'orderless-escapable-split
+        completions-sort 'historical
         completion-pcm-leading-wildcard t))
 
 
@@ -109,22 +100,17 @@
 
 (use-package embark
   :straight t
-  :bind (("C-." . embark-act)           ; 对当前目标执行动作（同 emacsredux 作者键位）
-         ;; ("M-." . embark-dwim)          ; 对当前目标执行默认动作
-         ("C-h B" . embark-bindings)    ; 列出所有 embark 绑定
+  :bind (("C-;" . embark-act)
+         ("M-;" . embark-dwim)
+         ("C-h E" . embark-bindings)
          :map embark-file-map
-         ("s" . sudo-edit)              ; 对文件: sudo 编辑
-         ("g" . +embark-magit-status)   ; 对文件: 打开 magit-status
-         :map minibuffer-local-map
-         ("C-c C-c" . embark-export)    ; 导出候选项列表
-         ("C-c C-o" . embark-collect))  ; 收集候选项到独立 buffer
+         ("s" . sudo-edit)
+         ("g" . +embark-magit-status))
   :init
   (setq prefix-help-command 'embark-prefix-help-command)
   :config
-  ;; Embark buffer names are "*Embark Collect: …*" / "*Embark Live: …*"
-  ;; (old "*Embark Collect Live/Completions*" names are obsolete).
   (add-to-list 'display-buffer-alist
-               '("\\`\\*Embark \\(Collect\\|Live\\)\\b"
+               '("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
                  nil
                  (window-parameters (mode-line-format . none))))
 
@@ -141,14 +127,12 @@
 
 (use-package consult
   :straight t
-  ;; Remaps kept as-is (dakra-equivalent entry points).  Extra binds follow
-  ;; dakra/dmacs + consult README.  C-c h left to hs (init-tools); history via
-  ;; M-r in minibuffer and the C-c / M-s keys below where free.
-  :bind (;; ── existing remaps (do not remove) ──
-         ([remap bookmark-jump]                 . consult-bookmark)           ; C-x r b
+  :bind (([remap bookmark-jump]                 . consult-bookmark)
          ([remap list-registers]                . consult-register)
-         ([remap goto-line]                     . consult-goto-line)          ; M-g g / M-g M-g
+         ([remap goto-line]                     . consult-goto-line)
          ([remap imenu]                         . consult-imenu)
+         ("C-c d i"                             . consult-imenu)
+         ("C-c d I"                             . consult-imenu-multi)
          ([remap locate]                        . consult-locate)
          ([remap load-theme]                    . consult-theme)
          ([remap man]                           . consult-man)
@@ -195,19 +179,21 @@
          ("M-s l" . consult-line)
          ("M-s L" . consult-line-multi)
          :map minibuffer-mode-map
-         ("M-r" . consult-history))
-  ;; Register/xref UI must be wired before first use; :config is too late under
-  ;; always-defer (stock register-preview / xref UI until consult loads).
-  :init
-  (setq register-preview-delay 0.5
-        register-preview-function #'consult-register-format
-        xref-show-xrefs-function #'consult-xref
-        xref-show-definitions-function #'consult-xref)
-  (advice-add #'register-preview :override #'consult-register-window)
+         ("C-r"                                 . consult-history))
   :config
   (setq consult-narrow-key "<"
         consult-async-min-input 1
         consult-async-refresh-delay 0.05)
+
+  ;; [consult-register] Configure the register formatting.
+  (setq register-preview-delay 0.5
+        register-preview-function #'consult-register-format)
+  ;; This adds thin lines, sorting and hides the mode line of the window.
+  (advice-add #'register-preview :override #'consult-register-window)
+
+  ;; [consult-xref] Use Consult to select xref locations with preview
+  (setq xref-show-xrefs-function #'consult-xref
+        xref-show-definitions-function #'consult-xref)
 
   ;; better preview
   (consult-customize
@@ -255,27 +241,20 @@
 (use-package consult-dir
   :straight t
   :bind (([remap list-directory] . consult-dir)
-         ;; Vertico uses vertico-map (parent minibuffer-local-map), not
-         ;; minibuffer-local-completion-map — binds there are dead under Vertico.
-         :map vertico-map
+         :map minibuffer-local-completion-map
          ("C-x C-d" . consult-dir)
          ("C-x C-j" . consult-dir-jump-file))
   :config
-  ;; `consult-dir--source-tramp-local' is already in the default sources list.
-  (add-to-list 'consult-dir-sources 'consult-dir--source-tramp-ssh t))
+  (add-to-list 'consult-dir-sources 'consult-dir--source-tramp-ssh t)
+  (add-to-list 'consult-dir-sources 'consult-dir--source-tramp-local t))
 
 
 ;;; In-buffer completion
 
 (use-package corfu
   :straight (:files (:defaults "extensions/*.el"))
-  :hook (((prog-mode conf-mode yaml-mode yaml-ts-mode toml-ts-mode text-mode codex-ide-session-mode)
-          . +corfu-enable)
-         ;; Shells are not prog-mode; set auto nil *before* enabling Corfu.
-         ((shell-mode eshell-mode) . +corfu-enable-no-auto)
-         ;; Elisp: prog-mode-hook runs while major-mode is still prog-mode, so
-         ;; disable auto only on the child mode hook, then restart Corfu.
-         ((emacs-lisp-mode lisp-interaction-mode) . +corfu-disable-auto)
+  :hook (((prog-mode conf-mode yaml-mode shell-mode eshell-mode text-mode codex-ide-session-mode) . corfu-mode)
+         ((eshell-mode shell-mode) . (lambda () (setq-local corfu-auto nil)))
          (minibuffer-setup . +corfu-enable-in-minibuffer))
   :bind (:map corfu-map
               ("TAB" . corfu-complete)
@@ -283,33 +262,13 @@
               ("S-TAB" . +corfu-move-to-minibuffer)
               ("S-<tab>" . +corfu-move-to-minibuffer)
               ("RET" . nil))
-  :init
-  ;; Emacs 30+: text-mode reads this when the major mode body runs and installs
-  ;; a buffer-local Ispell Capf. Must be set before any text/org/md buffer is
-  ;; created — corfu :config is too late when the package is deferred.
-  (setq text-mode-ispell-word-completion nil)
-
-  (defun +corfu-enable ()
-    "Enable Corfu (auto Capf on by default)."
-    (corfu-mode 1))
-  (defun +corfu-enable-no-auto ()
-    "Enable Corfu with auto Capf off (shells)."
-    (setq-local corfu-auto nil)
-    (corfu-mode 1))
-  (defun +corfu-disable-auto ()
-    "Turn off auto Capf after Corfu is already on (Elisp security)."
-    (setq-local corfu-auto nil)
-    (when corfu-mode
-      (corfu-mode -1)
-      (corfu-mode 1)))
   :config
   (setq corfu-cycle t
         corfu-auto t
         corfu-auto-prefix 2
         corfu-preselect 'first
         corfu-preview-current nil
-        ;; 0.1 was too aggressive with cape-dabbrev; 0.2 is the usual floor.
-        corfu-auto-delay 0.2)
+        corfu-auto-delay 0.1)
 
   (defun +corfu-move-to-minibuffer ()
     "Use Consult's minibuffer UI for the current completion-in-region table."
@@ -330,7 +289,9 @@
   :straight nil
   :after corfu
   :config
-  (corfu-history-mode 1))
+  (corfu-history-mode 1)
+  (with-eval-after-load 'savehist
+    (cl-pushnew 'corfu-history savehist-additional-variables)))
 
 (use-package corfu-popupinfo
   :straight nil
@@ -350,7 +311,7 @@
   :straight t
   :hook (((TeX-mode LaTeX-mode org-mode markdown-ts-mode) . +completion-add-tex-capfs))
   :init
-  ;; cape 2.7+ defaults `cape-dabbrev-buffer-function' to `cape-same-mode-buffers'.
+  (setq cape-dabbrev-buffer-function #'buffer-list)
 
   (defun +completion-add-capfs (&rest capfs)
     "Append CAPFS to the buffer-local `completion-at-point-functions'."

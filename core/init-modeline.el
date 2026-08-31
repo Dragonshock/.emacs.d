@@ -104,16 +104,6 @@
   (+mode-line-update-envrc buffer))
 (add-hook! envrc-mode-hook #'+mode-line-update-envrc)
 
-(defsubst +mode-line-imenu-crumbs ()
-  "Imenu crumbs for the mode-line, skipped in agent-shell buffers.
-
-Streaming ACP output makes `breadcrumb-imenu-crumbs' rescan a huge
-buffer on every redisplay and can signal `args-out-of-range' on
-empty crumbs (B1, 2026-08-14)."
-  (unless (derived-mode-p 'agent-shell-mode
-                          'agent-shell-viewport-view-mode
-                          'agent-shell-viewport-edit-mode)
-    (breadcrumb-imenu-crumbs)))
 
 (defsubst +mode-line-normal ()
   "Formatting active-long mode-line."
@@ -135,8 +125,8 @@ empty crumbs (B1, 2026-08-14)."
       (:propertize ":%l" face font-lock-comment-face)
       (:propertize +mode-line-remote-host-name
                    face +mode-line-host-name-active-face)
-      " "
-      (:eval (+mode-line-imenu-crumbs))
+      "  "
+      (:eval (breadcrumb-imenu-crumbs))
       (:eval +mode-line-encoding))
     ))
 
@@ -205,7 +195,6 @@ empty crumbs (B1, 2026-08-14)."
 
   (defvar +tab-bar-gnus-indicator-cache nil)
   (defvar +tab-bar-telega-indicator-cache nil)
-  (defvar +tab-bar-elfeed-indicator-cache nil)
   (defvar +tab-bar-emms-indicator-cache nil)
 
   (with-eval-after-load 'gnus
@@ -248,26 +237,6 @@ empty crumbs (B1, 2026-08-14)."
                 telega-kill-hook
                 telega-online-status-hook)
       #'+tab-bar-telega-indicator-update))
-
-  (with-eval-after-load 'elfeed
-    (add-hook! (elfeed-db-update-hook elfeed-tag-hook elfeed-untag-hook)
-      ;; elfeed-tag-hook / elfeed-untag-hook pass 2 args (entries, tags);
-      ;; elfeed-db-update-hook passes none. Accept any args like gnus/telega.
-      (defun +tab-bar-elfeed-indicator-update (&rest _)
-        "Update the cached Elfeed unread count in the tab bar."
-        (when (and (featurep 'elfeed)
-                   (hash-table-p elfeed-db-entries))
-          (setq +tab-bar-elfeed-indicator-cache
-                (cl-loop for entry being the hash-values
-                         of elfeed-db-entries
-                         count (elfeed-tagged-p 'unread entry) into count
-                         finally return
-                         (and (> count 0)
-                              `((tab-bar-elfeed
-                                 menu-item ,(propertize (format " R %d " count)
-                                                        'face 'font-lock-keyword-face)
-                                 elfeed))))))
-        (force-mode-line-update t))))
 
   (with-eval-after-load 'emms
     (defun +tab-bar-emms-indicator-update (&rest _)
