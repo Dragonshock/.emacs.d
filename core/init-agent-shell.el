@@ -10,13 +10,15 @@
 ;; Table faces: package defaults (header bold, border comment, zebra
 ;; lazy-highlight).  Local C3 remaps and markdown `:align-to PIXEL'
 ;; were reverted 2026-08-25 (Invalid face 728 redisplay hang).
-;; C1 still pins U+2500–257F to TX-02 in init-ui.el.
 ;;
 ;; Grok uses the OFFICIAL agent-shell-xai.el (upstream PR #720) — process
 ;; contract, welcome screen and auth all come from the package:
 ;;   command: grok agent stdio       (absolute path set below)
 ;;   auth:    ACP authenticate with `cached_token' (~/.grok/auth.json,
 ;;            written by `grok login'; no API key involved)
+;;   model:   package default nil (CLI/session chooses; `C-c C-v' to switch).
+;;            Do not pin ACP IDs.  README `-m grok-build' is a CLI alias,
+;;            not an ACP model id; `--always-approve' is not used here.
 ;; Claude:  claude-agent-acp (npm: @agentclientprotocol/claude-agent-acp)
 ;;          — not the bare `claude' CLI; that is only for `claude login'.
 ;; Pi:      pi-acp adapter (npm: pi-acp) → spawns `pi --mode rpc'
@@ -26,23 +28,24 @@
 ;;          and not a bare `cursor' binary.  Auth is external (`agent
 ;;          login'); leave `agent-shell-cursor-authentication' at :none.
 ;;
-;; Grok model: ACP IDs like "grok-4.5" via `agent-shell-xai-default-model-id'.
-;; Zed's default_model "grok-build" is NOT a valid Grok ACP model id.
+;; MCP: package default `agent-shell-mcp-servers' is nil — each agent uses
+;; its own native MCP/plugins (same idea as Zed agent-owned context servers).
 ;;
-;; MCP: agent-shell-mcp-servers stays nil — each agent uses its own native
-;; MCP/plugins (same idea as Zed agent-owned context servers).
-;;
-;; Keys (agent-shell DWIM):
-;;   C-c C-g          start or reuse a shell; picker when creating a NEW one
-;;   C-u C-c C-g      force a new shell (picker: Grok / Cursor / Claude / Pi)
-;;   C-u C-u C-c C-g  pick among existing shells
-;;   C-c C-;          compose a multi-line prompt (agent-shell-prompt-compose)
+;; Keys: package has no global bind (README: M-x agent-shell).  Author
+;; dotsies uses C-c C-w globally and in agent-shell / emacs-lisp maps.
+;; Do not steal org-mode C-c C-w (org-refile).  In-buffer keys stay at
+;; package defaults (RET send, C-c C-c interrupt, C-c C-v/m/t, C-c C-o).
+;;   C-c C-w          start or reuse a shell; picker when creating a NEW one
+;;   C-u C-c C-w      force a new shell (picker: Grok / Cursor / Claude / Pi)
+;;   C-u C-u C-c C-w  pick among existing shells
 ;;   C-c C-v          set session model (when advertised)
 ;;   C-c C-m          set session mode
 ;;   C-c C-t          set thought level (when advertised)
+;;   C-c C-s          set session config option (when advertised)
 ;;   C-<tab>          cycle session mode
 ;;   C-c C-o          switch viewport ↔ shell buffer
 ;;   Viewport view:   y / c / m / r (and ? for help)
+;;   Compose:         M-x agent-shell-prompt-compose (prefer-viewport: C-c C-w)
 ;;   M-x +agent-shell-start-grok    always new Grok
 ;;   M-x +agent-shell-start-claude  always new Claude
 ;;   M-x +agent-shell-start-pi      always new Pi
@@ -379,7 +382,7 @@ TRAMP (copy + base64 encode/decode) and the UI freezes."
        (+agent-shell-xai-handle-ask-user-question state acp-request))
       (_ (apply orig args)))))
 
-;;; Entry commands (always force a NEW shell; DWIM reuse is on C-c C-g)
+;;; Entry commands (always force a NEW shell; DWIM reuse is on C-c C-w)
 
 (defun +agent-shell-start-grok ()
   "Start a new interactive Grok Build agent shell (official config)."
@@ -457,9 +460,11 @@ default `:none'."
                          agent-shell-pi-start-agent
                          agent-shell-cursor-start-agent
                          agent-shell-prompt-compose)
-  :bind (("C-c C-g" . agent-shell)
-         ;; V3: multi-line compose (works with or without prefer-viewport).
-         ("C-c C-;" . agent-shell-prompt-compose))
+  :bind (("C-c C-w" . agent-shell)
+         :map agent-shell-mode-map
+         ("C-c C-w" . agent-shell)
+         :map emacs-lisp-mode-map
+         ("C-c C-w" . agent-shell))
   :config
   (+agent-shell-ensure-path)
   ;; Official Grok Build support (agent-shell-xai.el, upstream PR #720).
@@ -467,12 +472,13 @@ default `:none'."
   (require 'agent-shell-pi)
   (require 'agent-shell-cursor)
 
-  ;; Absolute CLI path (do not depend on PATH alone), preferred model, and
-  ;; inherited environment — the official client passes this list verbatim,
-  ;; and `grok' needs HOME/PATH from the login environment (~/.grok/auth.json).
+  ;; Official argv is `grok agent stdio' (agent-shell-xai.el / README).
+  ;; Absolute path is load-bearing for GUI/daemon PATH; do not drop for the
+  ;; PATH-only default.  inherit-env is the README-documented way to pass
+  ;; HOME/PATH so `grok' can read ~/.grok/auth.json.  Model id stays at the
+  ;; package default nil (CLI/session chooses).
   (setq agent-shell-xai-acp-command
         (list +agent-shell-grok-bin "agent" "stdio")
-        agent-shell-xai-default-model-id "grok-4.6"
         agent-shell-xai-environment
         (agent-shell-make-environment-variables :inherit-env t))
 
@@ -488,28 +494,21 @@ default `:none'."
         agent-shell-cursor-environment
         (agent-shell-make-environment-variables :inherit-env t))
 
-  ;; Picker order: Grok → Cursor → Claude → Pi.
-  ;; preselect grok-build: picker still shown on NEW shell; Grok first.
+  ;; Picker: README lets you narrow `agent-shell-agent-configs'.
+  ;; Official skip-picker form is a bare symbol (`'grok-build'); the
+  ;; documented `(preselect . id)' form still shows the picker.
+  ;; Viewport: README optional (`setopt agent-shell-prefer-viewport-interaction t').
+  ;; display-action / session-strategy / mcp-servers stay at package defaults
+  ;; (same-window, prompt, nil).  inhibit-system-sleep: README "turn it off"
+  ;; — ns-block-system-sleep SIGSEGV on this machine (2026-08-14).
   (setq agent-shell-agent-configs
         (list #'agent-shell-xai-make-grok-config
               #'agent-shell-cursor-make-agent-config
               #'agent-shell-anthropic-make-claude-code-config
               #'agent-shell-pi-make-agent-config)
         agent-shell-preferred-agent-config '(preselect . grok-build)
-        ;; Agents own native MCP/plugins; editor-forwarded MCP is opt-in later.
-        agent-shell-mcp-servers nil
-        ;; V1: author primary interaction (view latest turn + compose + y/c/m/r).
         agent-shell-prefer-viewport-interaction t
-        ;; D1a: package/author default — same-window (was right 0.42 Zed-style).
-        agent-shell-display-action '(display-buffer-same-window)
-        ;; S1, 2026-08-14: Emacs 31.0.91 ns-block-system-sleep SIGSEGV on
-        ;; macOS 26 (setObject:forKey:).  Package default t calls this when
-        ;; the agent is busy.  Display may still idle-sleep during long turns.
         agent-shell-inhibit-system-sleep nil)
-
-  ;; Only agent-shell defcustom with a :set setter (validates the value);
-  ;; use setopt so it runs — agent-shell is loaded here, so the setter exists.
-  (setopt agent-shell-session-strategy 'prompt)
 
   ;; header-style STANDARD is (if (display-graphic-p) 'graphical 'text) with no
   ;; :set.  Daemon + use-package-always-demand loads under no GUI → freezes as

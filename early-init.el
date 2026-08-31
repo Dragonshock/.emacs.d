@@ -80,13 +80,6 @@
 (push '(tool-bar-lines . 0) default-frame-alist)
 (push '(vertical-scroll-bars) default-frame-alist)
 (push '(internal-border-width . 0) default-frame-alist)
-;; Default frame: 120x50, centered on screen.  Float `left'/`top' in
-;; [0.0, 1.0] position the frame proportionally inside the workarea
-;; (0.5 = centered); verified on the NS port.
-(push '(width . 120) default-frame-alist)
-(push '(height . 50) default-frame-alist)
-(push '(left . 0.5) default-frame-alist)
-(push '(top . 0.5) default-frame-alist)
 ;; (push '(undecorated-round . t) default-frame-alist)
 (when (featurep 'ns)
   (push '(ns-transparent-titlebar . t) default-frame-alist))

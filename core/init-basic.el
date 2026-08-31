@@ -492,6 +492,8 @@
 
 ;; [comint] Command interpreter
 (use-package comint
+  :bind (:map comint-mode-map
+              ("M-r" . consult-history))
   :config
   (setq comint-prompt-read-only t
         comint-buffer-maximum-size 2048
@@ -556,7 +558,10 @@
 (use-package project
   :straight (:type built-in)
   :bind (:map project-prefix-map
-              ("m" . magit-status))
+              ("m" . magit-status)
+              ;; Emacs 31: same relative path in another project/worktree.
+              ;; `w' is free on `project-prefix-map' (ghostel uses `m'/`M').
+              ("w" . project-find-matching-buffer))
   :config
   (setq project-switch-commands '((project-find-file "File")
                                   (project-find-regexp "Regexp")
@@ -564,4 +569,5 @@
                                   (project-dired "Dired")
                                   (project-eshell "Eshell")
                                   (project-search "Search")
+                                  (project-find-matching-buffer "Matching" ?w)
                                   (magit-status "Magit"))))

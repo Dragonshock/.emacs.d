@@ -59,13 +59,39 @@
         ghostel-max-scrollback (* 50 1024 1024))
 
   :preface
+  (defvar +ghostel-ctl-x-map nil
+    "Ctl-x map for Ghostel semi-char: `C-x C-e' is sent to the PTY.")
+
   (defun +ghostel-send-C-k-and-kill ()
     "Send C-k to the terminal and copy the rest of the line to the kill-ring."
     (interactive)
     (kill-ring-save (point) (line-end-position))
     (ghostel-send-key "k" "ctrl"))
 
+  (defun +ghostel-edit-and-execute ()
+    "Send `C-x C-e' to the PTY (zsh `edit-command-line' / bash readline).
+Semi-char keeps `C-x' for Emacs, so this has to be an explicit send.
+Finish the edit with `C-x #' in the `emacsclient' buffer."
+    (interactive)
+    (ghostel-send-key "x" "ctrl")
+    (ghostel-send-key "e" "ctrl"))
+
+  (defun +ghostel--install-ctl-x-map ()
+    "Bind `C-x C-e' on a child of `ctl-x-map' so other `C-x' keys stay Emacs.
+A naive `C-x C-e' on `ghostel-semi-char-mode-map' would steal the whole
+`C-x' prefix.  Re-run after `ghostel--rebuild-semi-char-keymap'."
+    (unless (keymapp +ghostel-ctl-x-map)
+      (setq +ghostel-ctl-x-map (make-sparse-keymap))
+      (set-keymap-parent +ghostel-ctl-x-map ctl-x-map)
+      (define-key +ghostel-ctl-x-map (kbd "C-e") #'+ghostel-edit-and-execute))
+    (when (boundp 'ghostel-semi-char-mode-map)
+      (define-key ghostel-semi-char-mode-map (kbd "C-x") +ghostel-ctl-x-map)))
+
   :config
+  (+ghostel--install-ctl-x-map)
+  (advice-add #'ghostel--rebuild-semi-char-keymap :after
+              #'+ghostel--install-ctl-x-map)
+
   ;; project-switch-commands (?m / ?M) live in init-tools so the project
   ;; setq does not clobber them (init-ghostel loads before init-tools).
 
@@ -135,6 +161,7 @@
 ;;   C-c M-w  复制全部 scrollback · C-y bracketed paste
 ;;   C-c C-n/p  超链接 · C-c M-n/p  提示符导航（进 emacs mode）
 ;;   C-s consult-line（README）· M-<backspace> 默认进 PTY（README 函数名未实现）
+;;   C-x C-e  发给 PTY（zsh edit-command-line / bash readline；其余 C-x 仍走 Emacs）
 
 (provide 'init-ghostel)
 

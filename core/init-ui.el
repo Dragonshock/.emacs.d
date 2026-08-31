@@ -68,6 +68,11 @@
 (setq use-file-dialog nil
       use-dialog-box nil)
 
+;; Emacs 31 context menu (right-click / `C-<down-mouse-3>').  Independent of
+;; `use-dialog-box'.  Ghostel binds its own mouse-3 on the terminal maps.
+(use-package mouse
+  :hook (after-init . context-menu-mode))
+
 
 ;; Disable menu/tool/scroll bars in daemon/client frames
 (add-hook! after-make-frame-functions
@@ -96,37 +101,21 @@
 (setq epg-pinentry-mode 'loopback)
 
 
-;; Font: Same width and height for emoji, chinese and english characters
-(defvar +font-size (if (eq system-type 'darwin) 14 26))
-
-(defun +apply-default-frame-geometry-h (&optional frame force)
-  "Re-apply 120x50 and center geometry for FRAME once after font setup.
-Needed under `frame-inhibit-implied-resize' (early-init).  Skips frames that
-already got this pass so `server-after-make-frame-hook' reusing a GUI frame
-does not clobber maximized/custom sizes.  FORCE non-nil re-applies."
-  (let ((frame (or frame (selected-frame))))
-    (when (and (display-graphic-p frame)
-               (or force (not (frame-parameter frame '+geometry-applied))))
-      (with-selected-frame frame
-        (set-frame-size frame 120 50)
-        (modify-frame-parameters frame '((left . 0.5) (top . 0.5)))
-        (set-frame-parameter frame '+geometry-applied t)))))
+;; Font: Same width and height for emoji, chinese and english characters.
+;; Families match upstream roife (Sarasa Mono SC / Slab / UI).
+(defvar +font-size (if (eq system-type 'darwin) 16 26))
 
 (add-hook! server-after-make-frame-hook :unless-daemonp-call-immediately
   (defun +setup-fonts ()
     "Setup fonts."
     (when (display-graphic-p)
-      (set-face-attribute 'default nil :font (font-spec :family "TX-02" :size +font-size))
-      (set-face-font 'fixed-pitch "TX-02")
-      (set-face-font 'fixed-pitch-serif "TX-02") ; Sarasa Mono Slab SC
+      (set-face-attribute 'default nil :font (font-spec :family "Sarasa Mono SC" :size +font-size))
+      (set-face-font 'fixed-pitch "Sarasa Mono SC")
+      (set-face-font 'fixed-pitch-serif "Sarasa Mono Slab SC")
       (set-face-font 'variable-pitch "Sarasa UI SC")
 
       (dolist (charset '(han cjk-misc))
-        (set-fontset-font t charset (font-spec :family "LXGW Neo ZhiSong Screen Full"))) ; Sarasa Mono SC, LXGW WenKai Mono
-
-      ;; Box Drawing (U+2500–257F): pin TX-02 so agent-shell table
-      ;; borders (│ ─ ┼ ├ ┤) do not fall back to a different-width font.
-      (set-fontset-font t (cons #x2500 #x257F) (font-spec :family "TX-02") nil 'prepend)
+        (set-fontset-font t charset (font-spec :family "Sarasa Mono SC")))
 
       ;; Emoji script (Emacs 28+ NEWS); 'prepend so color emoji wins composition.
       ;; Do not bind color-emoji fonts to broad 'unicode — that can miss script
@@ -134,12 +123,7 @@ does not clobber maximized/custom sizes.  FORCE non-nil re-applies."
       (if (eq system-type 'darwin)
           (progn (set-fontset-font t 'emoji (font-spec :family "Apple Color Emoji") nil 'prepend)
                  (setq face-font-rescale-alist '(("Apple Color Emoji" . 0.79))))
-        (set-fontset-font t 'emoji (font-spec :family "Noto Color Emoji") nil 'prepend))
-      ;; First graphic setup for this frame only (reused emacsclient frames skip).
-      (+apply-default-frame-geometry-h))))
-
-;; Non-daemon: window-setup after immediate +setup-fonts; once-guarded.
-(add-hook 'window-setup-hook #'+apply-default-frame-geometry-h)
+        (set-fontset-font t 'emoji (font-spec :family "Noto Color Emoji") nil 'prepend)))))
 
 
 ;; Smooth Scroll (less "jumpy" than defaults).

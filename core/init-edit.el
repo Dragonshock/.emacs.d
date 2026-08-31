@@ -9,6 +9,29 @@
 
 (kill-ring-deindent-mode)
 
+;; Emacs 31: `C-x C-x' exchanges point and mark without activating the
+;; region (Mastering Emacs; stock default t highlights).  Independent of
+;; Transient Mark mode being on.
+(setq exchange-point-and-mark-highlight-region nil)
+
+;; After `M-x delete-pair', leave mark at the far delimiter so `C-x C-x'
+;; can act on the enclosed region.
+(setq delete-pair-push-mark t)
+
+;; Mickey's slick-cut: `C-w' / `s-x' kill the current line when there is
+;; no active region.  Do not remap `kill-ring-save' — `M-w' is `easy-kill'.
+;; `puni-mode-map' binds `C-w' to `puni-kill-region' (not `kill-region'),
+;; so structured kill in prog-mode is unchanged.
+(defun +kill-line-or-region (beg end &optional region)
+  "Kill the active region, or the current line if none is active."
+  (interactive
+   (if (use-region-p)
+       (list (region-beginning) (region-end) 'region)
+     (list (line-beginning-position)
+           (line-beginning-position 2))))
+  (kill-region beg end region))
+(define-key global-map [remap kill-region] #'+kill-line-or-region)
+
 
 ;; Make script file executable with `chmod +x' after save
 (add-hook! after-save-hook #'executable-make-buffer-file-executable-if-script-p)

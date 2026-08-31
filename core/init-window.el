@@ -23,6 +23,11 @@ Shared by maximize and true fullscreen (macOS often uses `fullboth', not
 (advice-add #'toggle-frame-maximized :after #'+window-rotate-stacked-if-two-vertical)
 (advice-add #'toggle-frame-fullscreen :after #'+window-rotate-stacked-if-two-vertical)
 
+;; Emacs 31 repeat maps: `C-x w r/f/t', `C-x o'/`C-x O', Smerge `C-c ^ n/p'.
+;; Transient map only; does not steal letters in Dired/Proced/Meow (Meow is off).
+(use-package repeat
+  :hook (after-init . repeat-mode))
+
 ;; [ace-window] Add number for each window
 (use-package ace-window
   :straight t

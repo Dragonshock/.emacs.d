@@ -2,8 +2,8 @@
 
 ;; [eshell] Emacs command shell
 (use-package esh-mode
-  :defines eshell-prompt-function
-  :functions eshell/alias
+  :defines (eshell-prompt-function eshell-history-ring eshell-mode-map)
+  :functions (eshell/alias eshell-get-history)
   :hook ((eshell-mode . compilation-shell-minor-mode))
   :bind (("C-`" . +eshell-toggle)
          ("C-·" . +eshell-toggle))
@@ -11,6 +11,35 @@
   ;; Emacs 31 binds M-r on `eshell-hist-mode-map' (minor); major-map binding is shadowed.
   (with-eval-after-load 'em-hist
     (keymap-set eshell-hist-mode-map "M-r" #'consult-history))
+
+  ;; Readline/zsh M-. is yank-last-arg.  Global M-. stays xref; only Eshell.
+  (defvar-local +eshell-insert-previous-argument--ring-index 0)
+  (defvar-local +eshell-insert-previous-argument--start nil)
+  (defun +eshell-insert-previous-argument (&optional arg)
+    "Insert an argument from a previous Eshell command (readline `M-.').
+Without prefix, insert the last argument.  Prefix N inserts the Nth
+argument (0 is the command name).  Repeat to walk earlier history."
+    (interactive "P")
+    (unless (and (ring-p eshell-history-ring)
+                 (not (ring-empty-p eshell-history-ring)))
+      (user-error "No Eshell history"))
+    (require 'comint)
+    (let ((index (and arg (prefix-numeric-value arg))))
+      (cond
+       ((eq last-command this-command)
+        (delete-region +eshell-insert-previous-argument--start (point)))
+       (t
+        (setq +eshell-insert-previous-argument--ring-index 0)))
+      (let ((word (comint-arguments
+                   (eshell-get-history +eshell-insert-previous-argument--ring-index)
+                   index index)))
+        (unless (or (bobp) (bolp) (memq (char-before) '(?\s ?\t)))
+          (insert " "))
+        (setq +eshell-insert-previous-argument--start (point-marker))
+        (insert word)
+        (setq +eshell-insert-previous-argument--ring-index
+              (1+ +eshell-insert-previous-argument--ring-index)))))
+  (keymap-set eshell-mode-map "M-." #'+eshell-insert-previous-argument)
   (setq
    ;; banner
    eshell-banner-message ""

@@ -114,10 +114,12 @@
 
    ;; Source blocks
    org-src-preserve-indentation t
+   org-src-tab-acts-natively t
    org-src-window-setup 'other-window
 
    ;; Store ID-based attachments centrally and inherit them in subtrees.
    org-attach-id-dir (expand-file-name ".attach/" org-directory)
+   org-attach-store-link-p 'attached
    org-attach-use-inheritance t
    org-archive-subtree-save-file-p t
    org-num-face '(:inherit org-special-keyword :underline nil :weight bold)
@@ -279,16 +281,8 @@ Temporarily prepend `save-buffer' to `org-after-refile-insert-hook' only while
   :after org
   :hook ((org-mode . org-modern-mode)
          (org-agenda-finalize . org-modern-agenda))
-  :custom
-  ;; Tables: leave pixel alignment to valign (init-writing.el).
-  ;; org-modern table display props conflict with valign overlays.
-  (org-modern-table nil))
-
-;; Align upstream 3608874: org-modern-indent off (indent/valign clash).
-;; (use-package org-modern-indent
-;;   :straight (org-modern-indent :type git :host github :repo "jdtsmith/org-modern-indent")
-;;   :config
-;;   (add-hook! org-mode-hook :depth 90 #'org-modern-indent-mode))
+  :config
+  (setq org-modern-star 'replace))
 
 
 ;; [ox]

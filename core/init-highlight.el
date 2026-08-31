@@ -17,7 +17,9 @@
   (setq show-paren-when-point-inside-paren t
         show-paren-when-point-in-periphery t
         show-paren-context-when-offscreen t
-        blink-matching-paren-highlight-offscreen t)
+        blink-matching-paren-highlight-offscreen t
+        ;; Emacs 31: skip matching parens in comments/strings unless they mismatch.
+        show-paren-not-in-comments-or-strings 'on-mismatch)
   ;; Must use setopt while show-paren-mode is on so the idle timer is recreated.
   (setopt show-paren-delay 0.2)
   )

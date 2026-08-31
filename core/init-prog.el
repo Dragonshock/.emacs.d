@@ -628,6 +628,13 @@ asynchronous checker cannot report after Eglot has taken over
   (setq treesit-auto-install-grammar 'always))
 
 
+;; Emacs 31: copy jq-style path of the JSON node at point.
+(use-package json-ts-mode
+  :when (treesit-available-p)
+  :bind (:map json-ts-mode-map
+              ("C-c C-j" . json-ts-jq-path-at-point)))
+
+
 ;; [indent-bars] Show indent guides
 (use-package indent-bars
   :straight (indent-bars :type git :host github :repo "jdtsmith/indent-bars")
