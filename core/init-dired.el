@@ -75,7 +75,10 @@
 
 ;; [dired-hacks] Several additional extensions for dired
 (use-package dired-hacks
-  :straight (:host github :repo "roife/dired-hacks" :branch "fix/collapse-subtree")
+  :straight (:type git
+                   :repo "/Users/dragon/src/github.com/Dragonshock/dired-hacks"
+                   :local-repo "dired-hacks"
+                   :branch "fix/emacs-31-when-let")
   :after dired
   :init
   (use-package dired-subtree

@@ -2,12 +2,12 @@
 *~
 .DS_Store
 
-# Emacs runtime files (no-littering)
+# Emacs runtime files
 /.cache/
 /auto-save-list/
 /etc/*
-/etc/tempel/
-/etc/mermaid/
+!/etc/tempel/
+!/etc/mermaid/
 /var/
 /rime/
 

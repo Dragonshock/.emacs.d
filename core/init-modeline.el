@@ -105,6 +105,14 @@
 (add-hook! envrc-mode-hook #'+mode-line-update-envrc)
 
 
+(defun +breadcrumb-imenu-crumbs ()
+  "Mode-line crumbs; ignore empty-imenu `args-out-of-range' from breadcrumb."
+  (when (fboundp 'breadcrumb-imenu-crumbs)
+    (condition-case nil
+        (breadcrumb-imenu-crumbs)
+      (args-out-of-range nil)
+      (error nil))))
+
 (defsubst +mode-line-normal ()
   "Formatting active-long mode-line."
   (let* ((active-p (mode-line-window-selected-p))
@@ -126,7 +134,7 @@
       (:propertize +mode-line-remote-host-name
                    face +mode-line-host-name-active-face)
       "  "
-      (:eval (breadcrumb-imenu-crumbs))
+      (:eval (+breadcrumb-imenu-crumbs))
       (:eval +mode-line-encoding))
     ))
 

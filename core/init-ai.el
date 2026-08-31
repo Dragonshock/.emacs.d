@@ -3,11 +3,18 @@
 (use-package gptel
   :straight t
   :init
-  (setq gptel-model 'gpt-5.3-codex-spark
+  ;; README: default backend via gptel-make-deepseek; key from ~/.authinfo
+  ;; (machine api.deepseek.com login apikey …).  Model ids are the package's
+  ;; current DeepSeek catalog (v4-flash / v4-pro), not the older reasoner id.
+  (setq gptel-model 'deepseek-v4-flash
         gptel-default-mode 'org-mode
-        gptel-confirm-tool-calls nil)
+        gptel-confirm-tool-calls 'auto)
   :config
-  (setq-default gptel-backend (gptel-make-openai-oauth "OpenAI OAuth"))
+  (setq gptel-backend
+        (gptel-make-deepseek "DeepSeek"
+          :stream t
+          :key gptel-api-key
+          :request-params '(:thinking (:type "enabled"))))
   (add-hook! gptel-post-stream-hook #'gptel-auto-scroll)
   (add-hook! gptel-post-response-functions #'gptel-end-of-response))
 
@@ -170,9 +177,6 @@ Use this format:
               ("C-e" . +gptel-copilot-complete)
               ("M-f" . +gptel-copilot-complete-word))
   :config
-  (require 'gptel-openai-oauth)
-
-  (setq gptel-copilot-model 'gpt-5.4-mini
-        gptel-copilot-backend
-        (gptel-make-openai-oauth "OpenAI OAuth Inline"
-          :request-params '(:reasoning (:effort "low")))))
+  ;; Nil backend/model: inherit gptel-backend / gptel-model (DeepSeek).
+  (setq gptel-copilot-backend nil
+        gptel-copilot-model nil))
