@@ -143,7 +143,7 @@ Global `window-selection-change-functions' also receives a frame."
 (use-package apheleia
   :straight t
   :commands (apheleia-format-buffer)
-  :bind (("C-c f f" . apheleia-format-buffer))
+  :bind (("C-c r f" . apheleia-format-buffer))
   :hook (after-init . apheleia-global-mode)
   :config
   (setq apheleia-hide-log-buffers t))

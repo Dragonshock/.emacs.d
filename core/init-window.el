@@ -1,32 +1,14 @@
 ;;; -*- lexical-binding: t -*-
 
-;; Prefer side-by-side splits on wide frames (stock split-width-threshold is 150
-;; columns; with large CJK fonts a "maximized" frame can still be < 150 cols and
-;; stay vertical).  120 is a practical default for Sarasa 16pt on modern displays.
-(setq split-width-threshold 120
-      split-height-threshold 80)
-
-(defun +window-rotate-stacked-if-two-vertical (&rest _)
-  "If FRAME has exactly two vertically stacked windows, rotate to side-by-side.
-Shared by maximize and true fullscreen (macOS often uses `fullboth', not
-`maximized', so an advice only on `toggle-frame-maximized' never fired)."
+(defadvice! +window-rotate-stacked-after-maximize-a (&rest _)
+  :after #'toggle-frame-maximized
   (let* ((frame (selected-frame))
-         (fs (frame-parameter frame 'fullscreen))
          (wins (window-list frame 'no-minibuf)))
-    (when (and (memq fs '(maximized fullboth fullwidth fullheight))
+    (when (and (eq (frame-parameter frame 'fullscreen) 'maximized)
                (= (length wins) 2)
-               ;; nil AXIS ⇒ vertical combination (top/bottom stack).
                (window-combined-p (car wins) nil))
       (with-selected-frame frame
         (window-layout-rotate-anticlockwise (frame-root-window frame))))))
-
-(advice-add #'toggle-frame-maximized :after #'+window-rotate-stacked-if-two-vertical)
-(advice-add #'toggle-frame-fullscreen :after #'+window-rotate-stacked-if-two-vertical)
-
-;; Emacs 31 repeat maps: `C-x w r/f/t', `C-x o'/`C-x O', Smerge `C-c ^ n/p'.
-;; Transient map only; does not steal letters in Dired/Proced/Meow (Meow is off).
-(use-package repeat
-  :hook (after-init . repeat-mode))
 
 ;; [ace-window] Add number for each window
 (use-package ace-window
@@ -38,10 +20,10 @@ Shared by maximize and true fullscreen (macOS often uses `fullboth', not
   :hook ((window-configuration-change . aw-update)) ;; For modeline
   ;; (add-hook 'after-make-frame-functions #'aw--after-make-frame t)
   :config
-  (setq aw-background nil
+  (setq aw-scope 'global
+        aw-background nil
         aw-ignore-current t)
 
-  ;; Select window via `M-1'...`M-9'
   (defun +aw--select-window (number)
     "Select the specified window."
     (let* ((window-list (aw-window-list))
@@ -66,16 +48,18 @@ Shared by maximize and true fullscreen (macOS often uses `fullboth', not
                 (+aw--select-window (1+ n))))))
 
 
-;; [winner] Window-layout undo/redo (stock keys C-c <left>/<right>).
-;; Do not set winner-dont-bind-my-keys t without rebinding — mode would
-;; record history but stay key-dead (audit silent-nop).
+;; [winner] Restore old window configurations
 (use-package winner
+  :commands (winner-undo winner-redo)
+  :init
+  (setq winner-dont-bind-my-keys t)
   :hook (after-init . winner-mode)
   :config
   (setq winner-boring-buffers
         '("*Completions*" "*Compile-Log*" "*inferior-lisp*" "*Fuzzy Completions*"
           "*Apropos*" "*Help*" "*cvs*" "*Buffer List*" "*Ibuffer*"
-          "*esh command on file*")))
+          "*esh command on file*"))
+  )
 
 
 ;; [popper] Enforce rules for popup windows like *Help*
@@ -135,9 +119,7 @@ Shared by maximize and true fullscreen (macOS often uses `fullboth', not
           "\\*Graphviz Preview: .*\\*"
 
           gptel-mode
-          ;; ghostel-mode intentionally omitted: dakra opens terminals via
-          ;; same-window (display-buffer--same-window-action); Popper bottom
-          ;; half-splits fight that.  Use C-x m / C-x p m without popup wrap.
+          ghostel-mode
 
           (lambda (buffer)
             (with-current-buffer buffer
@@ -169,31 +151,41 @@ Shared by maximize and true fullscreen (macOS often uses `fullboth', not
         (when (window-live-p window)
           (delete-window window)))))
 
-  ;; No-select list is matched via public patterns only (avoid popper--*
-  ;; internal unpack vars, which break across popper versions).
-  (defun +popper-match-reference-p (buffer entries)
-    "Return non-nil if BUFFER matches any ENTRY in ENTRIES.
-ENTRY may be a regexp string, major-mode symbol, or predicate."
-    (let ((name (buffer-name buffer))
-          (mode (buffer-local-value 'major-mode buffer)))
-      (cl-some
-       (lambda (entry)
-         (cond
-          ((stringp entry) (string-match-p entry name))
-          ((symbolp entry) (provided-mode-derived-p mode entry))
-          ((functionp entry) (funcall entry buffer))))
-       entries)))
+  ;; HACK: do not select window in `+popper-reference-buffer-no-select'
+  (defvar +popper-unpacked-vars '(popper--reference-names
+                                  popper--reference-modes
+                                  popper--reference-predicates
+                                  popper--suppressed-names
+                                  popper--suppressed-modes
+                                  popper--suppressed-predicates))
+  (defvar +popper-unpacked-vars-no-select '())
+
+  (dolist (var +popper-unpacked-vars)
+    (let ((var-name (intern (concat "+" (symbol-name var) "-no-select"))))
+      (eval
+       `(progn
+          (defvar ,var-name nil)
+          (push ',var-name +popper-unpacked-vars-no-select)))))
+  (setq +popper-unpacked-vars-no-select (reverse +popper-unpacked-vars-no-select))
+
+  (cl-progv `(popper-reference-buffers ,@+popper-unpacked-vars)
+      (list +popper-reference-buffer-no-select)
+    (popper--set-reference-vars)
+    (cl-loop for var in +popper-unpacked-vars
+             for var-no-select in +popper-unpacked-vars-no-select
+             do (eval `(setq ,var-no-select ',(symbol-value var))))
+    )
 
   (defun +popper-smart-popup (buffer &optional alist)
-    "Display BUFFER as a half-height popup; select unless no-select listed."
     (let ((window (or (display-buffer-reuse-window buffer alist)
                       (display-buffer-in-direction
                        buffer
                        (append alist '((direction . below)
                                        (window-height . 0.5)))))))
-      (unless (+popper-match-reference-p buffer +popper-reference-buffer-no-select)
-        (select-window window))
-      window))
+      (unless (cl-progv +popper-unpacked-vars
+                  (mapcar #'symbol-value +popper-unpacked-vars-no-select)
+                (popper-popup-p buffer))
+        (select-window window))))
   (setq popper-display-function #'+popper-smart-popup)
   )
 
@@ -201,11 +193,7 @@ ENTRY may be a regexp string, major-mode symbol, or predicate."
 ;; [zoom] Managing the window sizes automatically
 (use-package zoom
   :straight t
-  :hook (window-setup . zoom-mode)
-  :config
-  (setq zoom-minibuffer-preserve-layout nil
-        zoom-ignored-major-modes '(ediff-mode vundo-mode minibuffer-mode speedbar-mode reader-mode))
-
+  :init
   (add-hook! vundo-mode-hook
     (defun +zoom-fix-window-size-h ()
       (setq-local window-size-fixed t)))
@@ -216,48 +204,8 @@ ENTRY may be a regexp string, major-mode symbol, or predicate."
 
   (add-hook! ediff-mode-hook
     (defun +zoom-fix-window-height-h ()
-      (setq-local window-size-fixed 'height))))
-
-;; [auto-dim-other-buffers] Dim non-active buffers
-(use-package auto-dim-other-buffers
-  :straight t
-  :hook ((after-init . auto-dim-other-buffers-mode))
+      (setq-local window-size-fixed 'height)))
+  :hook (window-setup . zoom-mode)
   :config
-  (setq auto-dim-other-buffers-dim-on-focus-out nil
-        auto-dim-other-buffers-dim-on-switch-to-minibuffer nil)
-
-  ;; `adob--rescan-windows' does not honor this option.
-  (defadvice! +auto-dim-other-buffers-respect-minibuffer-option-a (fn)
-    :around #'adob--rescan-windows
-    (when (or auto-dim-other-buffers-dim-on-switch-to-minibuffer
-              (not (window-minibuffer-p)))
-      (funcall fn)))
-
-  ;; 让行号也参与 dim
-  (setq auto-dim-other-buffers-affected-faces
-        (append
-         auto-dim-other-buffers-affected-faces
-         '((line-number
-            . (auto-dim-other-buffers . nil))
-           (line-number-current-line
-            . (auto-dim-other-buffers . nil)))))
-
-  ;; Never dim minibuffer
-  (add-hook! auto-dim-other-buffers-never-dim-buffer-functions
-    (defun +auto-dim-other-buffers-never-dim-minibuffer (buffer)
-      "Keep minibuffer-backed UI buffers, such as Vertico buffer display, lit."
-      (with-current-buffer buffer
-        (minibufferp))))
-
-  ;; Follow current theme
-  (add-hook! (auto-dim-other-buffers-mode-hook enable-theme-functions server-after-make-frame-hook) :unless-daemonp-call-immediately
-    (defun +auto-dim-other-buffers-auto-set-face (&rest _)
-      (let ((dim (or (face-background 'mode-line)
-                     'unspecified)))
-        ;; Face renamed in auto-dim-other-buffers 2.2.1
-        ;; (`auto-dim-other-buffers-face' is obsolete).
-        (set-face-background 'auto-dim-other-buffers dim)
-        (set-face-attribute 'auto-dim-other-buffers-hide nil
-                            :foreground dim
-                            :background dim))))
-  )
+  (setq zoom-minibuffer-preserve-layout nil
+        zoom-ignored-major-modes '(ediff-mode vundo-mode minibuffer-mode speedbar-mode)))

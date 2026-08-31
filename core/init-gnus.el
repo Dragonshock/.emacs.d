@@ -129,7 +129,7 @@ Mail only: Hacker News and other feeds are updated by Elfeed
 (`scripts/update-elfeed-feeds`), not by this path."
     (if (and +gnus--refresh-process
              (process-live-p +gnus--refresh-process))
-        (message "A Gnus source update is already running")
+        (message "Mail synchronization is already running")
       (let ((group-buffer (current-buffer))
             (output-buffer (get-buffer-create "*gnus-source-update*"))
             (command
@@ -140,9 +140,9 @@ Mail only: Hacker News and other feeds are updated by Elfeed
           (erase-buffer))
         (setq +gnus--refresh-process
               (make-process
-               :name "gnus-source-update"
+               :name "gnus-mbsync"
                :buffer output-buffer
-               :command command
+               :command '("mbsync" "--all")
                :noquery t
                :sentinel
                (lambda (process _event)

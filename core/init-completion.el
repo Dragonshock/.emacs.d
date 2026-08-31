@@ -7,15 +7,11 @@
   :bind (:map vertico-map
               ("TAB" . minibuffer-complete)
               ("<tab>" . minibuffer-complete)
-              ("C-<return>" . vertico-exit-input)
-              ;; Single key (vertico-quick also binds C-, — keep one path only).
-              ("C-," . vertico-quick-jump))
+              ("C-<return>" . vertico-exit-input))
   :hook ((after-init . vertico-mode))
   :config
   (setq vertico-cycle t
         vertico-count 15)
-
-  (vertico-mouse-mode)
 
   ;; WORKAROUND: https://github.com/minad/vertico#problematic-completion-commands
   (setq org-refile-use-outline-path 'file
@@ -389,9 +385,7 @@
       (setq +tempel-trigger-capf (cape-capf-trigger #'tempel-complete ?/)))
     (unless (memq +tempel-trigger-capf completion-at-point-functions)
       (setq-local completion-at-point-functions
-                  (cons +tempel-trigger-capf completion-at-point-functions))))
-  :config
-  (setq tempel-path (expand-file-name "tempel-templates" user-emacs-directory)))
+                  (cons +tempel-trigger-capf completion-at-point-functions)))))
 
 
 (use-package tempel-collection

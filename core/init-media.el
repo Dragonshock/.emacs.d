@@ -82,20 +82,24 @@
 (autoload 'emms-info-exiftool "emms-info-exiftool")
 (autoload 'emms-last-played-update-current "emms-last-played")
 
+(defun +emms-ui-now-playing-view ()
+  "Switch the EMMS UI Now Playing view from the invoking key."
+  (interactive)
+  (emms-ui-now-playing-view
+   (alist-get last-command-event
+              '((?C . cover) (?M . metadata)
+                (?T . lyrics) (?P . playlist)))))
+
 (use-package emms
   :straight t
   :bind (("C-c m b" . emms-smart-browse)
          ("C-c m c" . +emms-extract-embedded-covers)
-         ("C-c m e" . emms-tag-editor-edit)
          ("C-c m i" . emms-show)
          ("C-c m l" . emms-playlist-mode-go)
          ("C-c m p" . emms-previous)
          ("C-c m n" . emms-next)
          ("C-c m P" . emms-pause)
          ("C-c m s" . emms-stop)
-         ("C-c m y" . emms-lyrics-visit-lyric)
-         ("C-c m +" . emms-volume-mode-plus)
-         ("C-c m -" . emms-volume-mode-minus)
          ("<XF86AudioPlay>" . emms-pause)
          ("<XF86AudioStop>" . emms-stop)
          ("<XF86AudioPrev>" . emms-previous)
@@ -105,13 +109,18 @@
         emms-cache-file (no-littering-expand-var-file-name "emms/cache")
         emms-history-file (no-littering-expand-var-file-name "emms/history")
         emms-source-file-default-directory "~/Music/"
-        emms-player-list '(emms-player-mpv)
-        emms-player-mpv-parameters '("--quiet" "--no-video" "--force-window=no"))
+        emms-player-list '(emms-player-ffplay))
   (make-directory emms-directory t)
   :config
-  (require 'emms-player-mpv)
+  (require 'emms-player-simple)
   (require 'emms-cache)
   (require 'emms-history)
+
+  (define-emms-simple-player ffplay '(file url)
+    (concat "\\`http[s]?://\\|"
+            (apply #'emms-player-simple-regexp
+                   emms-player-base-format-list))
+    "ffplay" "-nodisp" "-autoexit" "-loglevel" "quiet")
 
   (add-to-list 'emms-track-initialize-functions
                #'emms-info-initialize-track)
@@ -132,18 +141,13 @@
         emms-playlist-mode-center-when-go t
         emms-info-asynchronously t
         emms-info-auto-update t
-        emms-volume-change-amount 5
-        emms-volume-change-function #'emms-volume-mpv-change
         emms-show-format "♪ %s")
 
-  (emms-cache 1)
-  (setopt emms-player-mpv-update-metadata t))
+  (emms-cache 1))
 
 (use-package consult-emms
   :straight (:host github :repo "Hugo-Heagren/consult-emms")
-  :after (consult emms)
-  :bind (("C-c m a" . consult-emms-library)
-         ("C-c m j" . consult-emms-current-playlist))
+  :bind (("C-c d m" . consult-emms-library))
   :config
   (setq consult-emms--sort-album-function #'string<))
 
@@ -159,10 +163,14 @@
   (emms-ui-now-playing-cover-max-size 640)
   (emms-ui-now-playing-default-view 'cover)
   :config
-  (define-key emms-ui-albums-mode-map [remap meow-left] #'emms-ui-albums-previous)
-  (define-key emms-ui-albums-mode-map [remap meow-next] #'emms-ui-albums-down)
-  (define-key emms-ui-albums-mode-map [remap meow-prev] #'emms-ui-albums-up)
-  (define-key emms-ui-albums-mode-map [remap meow-right] #'emms-ui-albums-next)
+  (define-key emms-ui-albums-mode-map [remap meow-left]
+              #'emms-ui-albums-previous)
+  (define-key emms-ui-albums-mode-map [remap meow-next]
+              #'emms-ui-albums-down)
+  (define-key emms-ui-albums-mode-map [remap meow-prev]
+              #'emms-ui-albums-up)
+  (define-key emms-ui-albums-mode-map [remap meow-right]
+              #'emms-ui-albums-next)
 
   (dolist (map (list emms-ui-albums-mode-map
                      emms-ui-list-mode-map
@@ -171,12 +179,19 @@
     (define-key map (kbd "L") #'emms-ui-list)
     (define-key map (kbd "N") #'emms-ui-now-playing))
 
-  (define-key emms-ui-now-playing-mode-map [remap meow-left] #'emms-seek-backward)
+  (define-key emms-ui-now-playing-mode-map [remap meow-left]
+              #'emms-seek-backward)
   (define-key emms-ui-now-playing-mode-map [remap meow-next] #'emms-next)
   (define-key emms-ui-now-playing-mode-map [remap meow-prev] #'emms-previous)
-  (define-key emms-ui-now-playing-mode-map [remap meow-right] #'emms-seek-forward)
-  (define-key emms-ui-now-playing-mode-map [remap meow-keypad] #'emms-pause)
-  (define-key emms-ui-now-playing-mode-map (kbd "T") #'(lambda () (interactive) (emms-ui-now-playing-view 'lyrics)))
-  (define-key emms-ui-now-playing-mode-map (kbd "C") #'(lambda () (interactive) (emms-ui-now-playing-view 'cover)))
-  (define-key emms-ui-now-playing-mode-map (kbd "P") #'(lambda () (interactive) (emms-ui-now-playing-view 'playlist)))
-  (define-key emms-ui-now-playing-mode-map (kbd "M") #'(lambda () (interactive) (emms-ui-now-playing-view 'metadata))))
+  (define-key emms-ui-now-playing-mode-map [remap meow-right]
+              #'emms-seek-forward)
+  (define-key emms-ui-now-playing-mode-map [remap meow-keypad]
+              #'emms-pause)
+  (define-key emms-ui-now-playing-mode-map (kbd "r")
+              #'emms-ui-now-playing-toggle-random)
+  (define-key emms-ui-now-playing-mode-map (kbd "R")
+              #'emms-ui-now-playing-toggle-repeat)
+
+  (dolist (key '("C" "M" "T" "P"))
+    (define-key emms-ui-now-playing-mode-map (kbd key)
+                #'+emms-ui-now-playing-view)))

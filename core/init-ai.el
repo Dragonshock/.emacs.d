@@ -15,8 +15,7 @@
                   :request-params '(:thinking (:type "enabled"))
                   :key #'gptel-api-key-from-auth-source))
   (add-hook! gptel-post-stream-hook #'gptel-auto-scroll)
-  (add-hook! gptel-post-response-functions #'gptel-end-of-response)
-  )
+  (add-hook! gptel-post-response-functions #'gptel-end-of-response))
 
 (use-package gptel-rewrite
   :straight nil
@@ -100,18 +99,52 @@ When OVERLAYS is nil, export all pending rewrites in the current buffer."
   (setq gptel-magit-body-length 72))
 
 (use-package gptel-quick
-  :straight (gptel-quick :type git :host github :repo "karthink/gptel-quick")
-  :after (gptel embark)
-  :bind (("C-c g d" . +gptel-quick-dict))
+  :straight (gptel-quick :type git :host github :repo "roife/gptel-quick")
+  :bind (("C-c g e" . +gptel-quick-explain)
+         ("C-c g t" . +gptel-quick-translate-to-chinese)
+         ("C-c g s" . +gptel-quick-summarize)
+         ("C-c g d" . +gptel-quick-dict))
   :preface
-  (defun +gptel-quick-dict ()
-    "Explain the word at point in dictionary style."
-    (interactive)
-    (let ((word (or (thing-at-point 'word t)
-                    (user-error "No word at point")))
-          (gptel-quick-system-message
-           (lambda (&rest _)
-             "Given a word, explain it in the style of a concise English dictionary entry,
+  (defun +gptel-quick-region-or-buffer (system-message &optional limit-response thing)
+    "Run `gptel-quick' on THING, the active region, or the buffer.
+Preserve SYSTEM-MESSAGE when requesting another response with `+'.  When
+LIMIT-RESPONSE is non-nil, apply gptel-quick's count-derived token limit."
+    (require 'gptel-quick)
+    (let ((query-text
+           (if thing
+               (or (thing-at-point thing t)
+                   (user-error "No %s at point" thing))
+             (if (use-region-p)
+                 (buffer-substring-no-properties (region-beginning) (region-end))
+               (buffer-substring-no-properties (point-min) (point-max))))))
+      (when (string-empty-p query-text)
+        (user-error "Buffer is empty"))
+      (gptel-quick query-text nil
+                   (append (list :system system-message)
+                           (unless limit-response
+                             (list :max-tokens nil))))))
+
+  (defmacro +gptel-quick-define-command (name doc prompt &optional limit thing)
+    "Define NAME as a gptel-quick action over the region or buffer."
+    `(defun ,name ()
+       ,doc (interactive)
+       (+gptel-quick-region-or-buffer ,prompt ,limit ,thing)))
+
+  (+gptel-quick-define-command +gptel-quick-explain
+                               "Explain the active region, or the whole buffer, in Chinese."
+                               "Explain in clear Chinese, preserving necessary context and details." t)
+
+  (+gptel-quick-define-command +gptel-quick-translate-to-chinese
+                               "Translate the active region, or the whole buffer, to Chinese."
+                               "Translate into fluent Chinese.")
+
+  (+gptel-quick-define-command +gptel-quick-summarize
+                               "Summarize the active region, or the whole buffer, in Chinese."
+                               "Summarize in Chinese while preserving details and key information." t)
+
+  (+gptel-quick-define-command +gptel-quick-dict
+                               "Explain the word at point in dictionary style."
+                               "Given a word, explain it in the style of a concise English dictionary entry,
 and add accurate Chinese translations for each sense. Preserve the compact dictionary
 format in plain text rather than giving a long explanatory article or markdown document.
 No need for chinese in sentences.
@@ -125,19 +158,19 @@ Use this format:
      *Example sentence.*
 • ...
 2. English definition **中文**
-     *Example sentence.*")))
-      (gptel-quick word)))
+     *Example sentence.*"
+                               nil 'word)
+
+  (with-eval-after-load 'embark
+    (keymap-set embark-general-map "?" #'gptel-quick)
+    (keymap-set embark-region-map "E" #'+gptel-quick-explain)
+    (keymap-set embark-region-map "T" #'+gptel-quick-translate-to-chinese)
+    (keymap-set embark-region-map "S" #'+gptel-quick-summarize)
+    (keymap-set embark-region-map "D" #'+gptel-quick-dict))
+
   :config
-  (setq gptel-quick-backend (gptel-make-deepseek "DeepSeek-quick"
-                              :stream t
-                              :request-params '(:thinking (:type "disabled"))
-                              :key #'gptel-api-key-from-auth-source)
-        gptel-quick-model 'deepseek-v4-flash
-        gptel-quick-word-count 500
-        gptel-quick-system-message (lambda (&rest _) "一句话解释："))
-  (keymap-set embark-general-map "?" #'gptel-quick)
-  (keymap-set embark-general-map "D" #'+gptel-quick-dict)
-  )
+  (setq gptel-quick-word-count 50
+        gptel-quick-timeout nil))
 
 (use-package codex-ide
   :straight (:type git :host github :repo "dgillis/emacs-codex-ide")
@@ -146,14 +179,17 @@ Use this format:
   (codex-ide-item-detail-face ((t (:inherit shadow :height 0.8))))
   :init
   (setq codex-ide-diff-inline-fold-threshold 20
+        codex-ide-image-detail "auto"
         codex-ide-prompt-placeholder-text ""
         codex-ide-placeholder-ellipsis-animation-interval nil
         codex-ide-status-mode-auto-refresh-delay 0.3
         codex-ide-want-mcp-bridge nil
         codex-ide-emacs-context-policy nil
-        codex-ide-session-transcript-default-detail-level 'compact)
-  ;; Keep stock `codex-ide--default-buffer-name' (`*%s[%s]*`) so
-  ;; `codex-ide--session-buffer-p' and multi-session names stay correct.
+        codex-ide-session-transcript-default-detail-level 'compact
+        codex-ide-buffer-name-function (lambda (dir)
+                                         (format "%s: %s"
+                                                 codex-ide-buffer-name-prefix
+                                                 (file-name-nondirectory (directory-file-name dir)))))
   )
 
 (use-package codex-ide-session
@@ -183,3 +219,33 @@ Use this format:
               ("C-c C-r" . codex-ide-status))
   :config
   (require 'codex-ide))
+
+
+;; [gptel-copilot] gptel-powered inline code completion
+(use-package gptel-copilot
+  :straight (:type git :host github :repo "roife/gptel-copilot")
+  :commands gptel-copilot-mode
+  :preface
+  (defun +gptel-copilot-complete ()
+    "Accept the completion, or move to the end of code or line."
+    (interactive)
+    (or (gptel-copilot-accept-completion)
+        (mwim-end-of-code-or-line)))
+
+  (defun +gptel-copilot-complete-word ()
+    "Accept one completion word, or move forward one word."
+    (interactive)
+    (or (gptel-copilot-accept-completion-by-word 1)
+        (forward-word)))
+
+  :hook (prog-mode . gptel-copilot-mode)
+  :bind (:map gptel-copilot-mode-map
+              ("C-e" . +gptel-copilot-complete)
+              ("M-f" . +gptel-copilot-complete-word))
+  :config
+  (require 'gptel-openai-oauth)
+
+  (setq gptel-copilot-model 'gpt-5.4-mini
+        gptel-copilot-backend
+        (gptel-make-openai-oauth "OpenAI OAuth Inline"
+          :request-params '(:reasoning (:effort "low")))))

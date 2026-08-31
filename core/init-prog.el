@@ -169,19 +169,17 @@ Diagnostics for all files are published separately for project listings."
 
 ;; [xref] Cross reference
 (use-package xref
+  :init
+  (defadvice! +xref--push-marker-stack-a (&rest _)
+    :before '(find-function consult-imenu consult-ripgrep citre-jump)
+    (require 'xref)
+    (xref-push-marker-stack (point-marker)))
   :config
   (setq
    xref-search-program 'ripgrep
    ;; TODO: https://github.com/oantolin/embark/issues/162#issuecomment-785039305
    ;; Maybe a bug?
-   ;; xref-show-definitions-function #'xref-show-definitions-completing-read
-   ;; xref-show-xrefs-function #'xref-show-definitions-completing-read
-   xref-history-storage 'xref-window-local-history)
-
-  (defadvice! +xref--push-marker-stack-a (&rest rest)
-    :before '(find-function consult-imenu consult-ripgrep citre-jump)
-    (xref-push-marker-stack (point-marker)))
-  )
+   xref-history-storage 'xref-window-local-history))
 
 
 ;; [Eglot] LSP support
@@ -358,7 +356,7 @@ Diagnostics for all files are published separately for project listings."
   ;; `dumb-jump-selector' only affects legacy dumb-jump-go*; we use xref only.
   (setq dumb-jump-prefer-searcher 'rg
         dumb-jump-aggressive t
-        dumb-jump-default-project user-emacs-directory)
+        dumb-jump-default-project nil)
   )
 
 
@@ -409,6 +407,7 @@ Diagnostics for all files are published separately for project listings."
 ;; [quickrun] Run commands quickly
 (use-package quickrun
   :straight t
+  :bind (("C-c r r" . quickrun))
   :config
   (setq quickrun-focus-p nil))
 
@@ -417,8 +416,6 @@ Diagnostics for all files are published separately for project listings."
 (use-package dape
   :straight t
   :commands (dape)
-  :bind (:map prog-mode-map
-              ("C-c D" . dape))
   :preface
   (defun +dape-save-buffers-h ()
     "Save file-visiting buffers before starting a debug session."
@@ -457,7 +454,18 @@ asynchronous checker cannot report after Eglot has taken over
     (unless (memq major-mode +eglot-auto-start-modes)
       (flymake-mode 1)))
 
-  :hook ((prog-mode . +flymake-mode-unless-eglot-auto-starts))
+  (defun +flymake-mode-h ()
+    "Enable Flymake with local shared backends."
+    ;; Eglot will supply diagnostics for these modes.  Remove their native
+    ;; backends before enabling Flymake so an asynchronous checker cannot
+    ;; report after Eglot has taken over (notably `rust-ts-flymake').
+    (when (memq major-mode +eglot-auto-start-modes)
+      (dolist (backend '(rust-ts-flymake flymake-cc python-flymake))
+        (remove-hook 'flymake-diagnostic-functions backend t)))
+    (dolist (backend '(hl-todo-flymake +compilation-flymake-backend))
+      (add-hook 'flymake-diagnostic-functions backend nil t))
+    (flymake-mode 1))
+  :hook ((prog-mode . +flymake-mode-h))
   :bind (("C-c f ]" . flymake-goto-next-error)
          ("C-c f [" . flymake-goto-prev-error)
          ("C-c f b" . flymake-show-buffer-diagnostics)
@@ -526,7 +534,11 @@ asynchronous checker cannot report after Eglot has taken over
 
 
 (use-package rust-playground
-  :straight t)
+  :straight t
+  :init
+  (setq rust-playground-basedir
+        (no-littering-expand-var-file-name "rust-playground/"))
+  (make-directory rust-playground-basedir t))
 
 
 (use-package verilog-mode

@@ -29,10 +29,10 @@ exist but may be commented out in `init.el`.
   + `Sarasa Gothic`
 - `rg`
 - `fd`
-- `enchant` (AppleSpell provider)
+- `aspell`
 - `librime`
 - `isync`
-- `mpv`
+- `ffplay`
 - `ffmpeg`
 - `exiftool`
 - `universal-ctags`
@@ -40,8 +40,6 @@ exist but may be commented out in `init.el`.
 
 ## Credentials
 
-- `~/.authinfo`
-  + Deepseek API (for `gptel`)
 - `~/.authinfo.gpg`
   + Gmail app password (for Gnus, mbsync, and SMTP, note: use imap.googlemail.com with TLS 1.2 for Gmail)
   + GitHub token (for `forge`)

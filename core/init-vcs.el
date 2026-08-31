@@ -3,16 +3,10 @@
 ;; [vc-mode] Version control interface
 (use-package vc
   :config
-  ;; NOTE: `vc-auto-revert-mode' (new in Emacs 31.1) is a globalized minor
-  ;; mode, so `setq'-ing it never enabled anything.  Deliberately left off:
-  ;; enabling it would run real `auto-revert-mode' (timer + file notifications)
-  ;; in every VC-tracked buffer, which is exactly what `+auto-revert-mode' in
-  ;; init-edit.el exists to avoid.
   (setq vc-handled-backends '(Git)
         vc-consult-headers nil
         vc-allow-async-revert t
-        ;; Emacs 31: `t' rewrites published history with no prompt — prefer ask.
-        vc-allow-rewriting-published-history 'ask
+        vc-allow-rewriting-published-history t
         vc-dir-auto-hide-up-to-date 'revert))
 
 
@@ -27,9 +21,7 @@
 ;; [diff-hl] Highlight uncommitted changes using VC
 (use-package diff-hl
   :straight t
-  ;; Enable global mode once at startup (not on every find-file — that
-  ;; re-runs globalized-mode body and rescans the buffer list each open).
-  :hook ((after-init . global-diff-hl-mode)
+  :hook ((find-file . global-diff-hl-mode)
          (vc-dir-mode  . diff-hl-dir-mode)
          (dired-mode   . diff-hl-dired-mode))
   :bind (:map diff-hl-mode-map
@@ -38,14 +30,15 @@
               ("C-c v [" . diff-hl-previous-hunk)
               ("C-c v ]" . diff-hl-next-hunk)
               ("C-c v s" . diff-hl-stage-current-hunk)
-              ;; `diff-hl-undo-revert-hunk' does not exist; use plain undo after revert.
-              ("C-c v u" . undo))
+              ("C-c v u" . diff-hl-undo-revert-hunk))
   :config
   (setq
    ;; Reduce load on remote
    diff-hl-disable-on-remote t
    ;; A slightly faster algorithm for diffing
-   vc-git-diff-switches '("--histogram"))
+   vc-git-diff-switches '("--histogram")
+   ;; Use margins in terminal frames where fringes don't exist.
+   diff-hl-fallback-to-margin t)
 
   (defun +diff-hl--vc-face (type)
     (pcase type
@@ -81,25 +74,6 @@
   )
 
 
-;; [with-editor] Lets git-invoked editors reuse this Emacs.  The GUI
-;; Emacs.app here is a plain copy (no Contents/MacOS/bin/) and emacs-plus
-;; is keg-only, so with-editor's own search cannot find emacsclient and
-;; warns "Cannot determine a suitable Emacsclient" on first magit use.
-;; Pre-seed it from the Homebrew opt path (stable across minor upgrades);
-;; when nothing is found, leave the default so with-editor still falls
-;; back to its sleeping editor.
-(use-package with-editor
-  :straight t
-  :init
-  (when-let* ((client
-               (or (executable-find "emacsclient")
-                   (seq-find #'file-executable-p
-                             '("/opt/homebrew/opt/emacs-plus@31/bin/emacsclient"
-                               "/opt/homebrew/opt/emacs-plus/bin/emacsclient"
-                               "/usr/local/opt/emacs-plus@31/bin/emacsclient")))))
-    (setq with-editor-emacsclient-executable client)))
-
-
 ;; [magit] Version control interface
 (use-package magit
   :straight t
@@ -107,15 +81,18 @@
   :hook ((magit-process-mode . goto-address-mode))
   :config
   (setq
-   ;; word-granularity refine (also required for abridge-diff impact)
-   magit-diff-refine-hunk 'all
+   ;; word-granularity diff
+   ;; magit-diff-refine-hunk nil
+   ;; Highlight the changed region in the hunk
+   ;; magit-diff-fontify-hunk t
    ;; dont paint whitespace
    magit-diff-paint-whitespace nil
    ;; Don't autosave repo buffers. This is too magical
    magit-save-repository-buffers nil
    ;; Don't display parent/related refs in commit buffers; they are rarely helpful and only add to runtime costs.
    magit-revision-insert-related-refs nil
-   magit-diff-use-indicator-faces t)
+   magit-diff-use-indicator-faces t
+   magit-diff-highlight-trailing nil)
 
   ;; Exterminate Magit buffers
   (defun +magit-kill-buffers (&rest _)
@@ -156,95 +133,40 @@
 (use-package forge
   :straight t
   :after magit
+  :init
+  (setq forge-post-fallback-directory
+        (no-littering-expand-var-file-name "forge/drafts/"))
+  (make-directory forge-post-fallback-directory t)
   :custom-face
-  (forge-topic-label ((t (:inherit variable-pitch :height 0.9 :width condensed :weight regular :underline unspecified)))))
-;; NOTE: `forge-topic-list-columns' was removed upstream; forge now only has
-;; `forge-repository-list-columns'.  The old setting was dead configuration.
-
-;; [magh.el] Magit-style GitHub frontend powered by the `gh' CLI.
-;; Upstream github.com/roife/magh.el was DELETED (404). Source of truth is the
-;; local backup clone ~/src/github.com/roife/gh.el → straight/repos/magh.el (origin → that path).
-;; MERGE LOCK: do not point recipe at roife/magh.el. Prefer publishing a private
-;; remote later and switching :repo to HTTPS/SSH so rebuilds work off this machine.
-;; Package-Requires Emacs 31.1+ (header); runs on 31.0.91 builds with care.
-(use-package magh
-  :straight (:type git :repo "/Users/dragon/src/github.com/roife/gh.el" :local-repo "magh.el")
-  :bind (("C-, g g" . magh)
-         ("C-, g G" . magh-dispatch)
-         ("C-, g d" . magh-repo-status)
-         ("C-, g D" . magh-repo-status-other)
-         ("C-, g H" . magh-user-status)
-         ("C-, g i" . magh-issue-list)
-         ("C-, g p" . magh-pr-list)
-         ("C-, g v" . magh-review-requests)
-         ("C-, g w" . magh-run-list)
-         ("C-, g e" . magh-release-list)
-         ("C-, g /" . magh-search-dispatch)
-         ("C-, g t" . magh-browse-repository)
-         ("C-, g n" . magh-notifications-dispatch)
-         ("C-, g r" . magh-command)
-         ("C-, g a" . magh-api-request))
+  (forge-topic-label ((t (:inherit variable-pitch :height 0.9 :width condensed :weight regular :underline unspecified))))
   :config
-  (setq magh-list-limit 50
-        magh-client-cache-ttl 30
-        magh-confirm-destructive-actions t
-        magh-notifications-unread-only t
-        magh-notifications-group-by 'repository
-        magh-view-inline-images t)
-
-  ;; Keep user-maintained GitHub shortcuts across Emacs sessions.  savehist is
-  ;; enabled from init-basic.el's after-init hook in non-daemon sessions.
-  (with-eval-after-load 'savehist
-    (dolist (variable '(magh-known-repositories
-                        magh-favorite-organizations
-                        magh-workflow-template-repositories))
-      (add-to-list 'savehist-additional-variables variable))))
+  (setq forge-topic-list-columns
+        '(("#" 5 forge-topic-list-sort-by-number (:right-align t) number nil)
+          ("Title" 60 t nil title  nil)
+          ("State" 6 t nil state nil)
+          ("Updated" 10 t nil updated nil)))
+  )
 
 
-;; [magh-magit] Lightweight asynchronous magh.el summaries in Magit status
-(use-package magh-magit
-  :straight (:type git :repo "/Users/dragon/src/github.com/roife/gh.el" :local-repo "magh.el")
-  :after magit
-  :demand t
-  :config
-  (setq magh-magit-dispatch-key "@"
-        magh-magit-status-sections '(pr issue run)
-        magh-magit-summary-scope 'repository
-        magh-magit-list-limit 10
-        magh-magit-cache-ttl 30
-        ;; Forge owns its PR and Issue sections; magh.el still shows Actions.
-        magh-hide-forge-duplicates t)
-  (magh-magit-mode 1))
-
-
-;; Structured actions for magh.el candidates in Embark.
-(use-package magh-embark
-  :straight (:type git :repo "/Users/dragon/src/github.com/roife/gh.el" :local-repo "magh.el")
-  :after embark
-  :demand t
-  :config
-  (magh-embark-mode 1))
-
-
-;; Keep magh.el's native Issue/PR viewer, with an explicit Forge -> magh.el bridge.
-(use-package magh-forge
-  :straight (:type git :repo "/Users/dragon/src/github.com/roife/gh.el" :local-repo "magh.el")
-  :after forge
-  :commands (magh-forge-open-current-topic-in-magh)
-  :bind (:map forge-topic-mode-map
-              ("C-c C-g" . magh-forge-open-current-topic-in-magh)))
-
-
-;; Show TODOs in magit (`magit-todos-mode' is global; enable once).
+;; Show TODOs in magit
 (use-package magit-todos
   :straight t
   :after magit
+  :hook (magit-mode . magit-todos-mode)
   :config
-  (magit-todos-mode 1))
+  (with-eval-after-load 'magit-status
+    (transient-append-suffix 'magit-status-jump '(0 0 -1)
+      '("t " "Todos" magit-todos-jump-to-todos)))
+  )
 
 
+;; [remoto] Browse GitHub repositories without cloning
+(use-package remoto
+  :straight (:host github :repo "agzam/remoto.el")
+  :demand t)
 
-;; [smerge] VC/Git already calls `smerge-start-session' on conflicts.
+
+;; [smerge] Highlight all the conflicted regions for git
 (use-package smerge-mode
   :preface
   (defun +smerge-flymake-backend (report-fn &rest _args)
@@ -295,9 +217,8 @@
   :straight t)
 
 
-;; [abridge-diff] Global minor mode (not a magit-diff-visit-file buffer hook).
+;; [abridge-diff]
 (use-package abridge-diff
   :straight t
-  :after magit
-  :config
-  (abridge-diff-mode 1))
+  :after magit ;; optional, if you'd like to use with magit
+  :hook (magit-diff-visit-file . abridge-diff-mode))

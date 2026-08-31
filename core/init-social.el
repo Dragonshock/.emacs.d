@@ -44,9 +44,9 @@ Prefer the straight git repo; fall back to `telega--lib-directory'."
   (defvar +telega-socks-proxy
     (pcase system-type
       ('darwin '(:server "127.0.0.1" :port 6153
-                 :type (:@type "proxyTypeSocks5")))
+                         :type (:@type "proxyTypeSocks5")))
       ('gnu/linux '(:server "127.0.0.1" :port 7891
-                    :type (:@type "proxyTypeSocks5")))
+                            :type (:@type "proxyTypeSocks5")))
       (_ nil))
     "Local SOCKS5 for TDLib (`telega--addProxy'), or nil for the system network.
 Darwin uses Surge's default SOCKS port; GNU/Linux uses Clash 7891.
@@ -57,8 +57,8 @@ localhost SOCKS usually bypasses the TUN.")
     "Enable `+telega-socks-proxy' before TDLib authorization."
     (when +telega-socks-proxy
       (telega--addProxy +telega-socks-proxy
-                        :enable-p 'enable
-                        :comment "local socks5")))
+        :enable-p 'enable
+        :comment "local socks5")))
 
   (defun +telega-apply-count-faces (&rest _)
     "Unmuted unread = modus blue-warmer + bold; muted unread = fg-dim.
@@ -271,9 +271,14 @@ instead of replacing it with root."
          (telega-chat-mode . telega-completions-setup-capf)
          (telega-chat-mode . +telega-disable-visual-fill-column-h))
   :config
-  ;; Upstream 8f668f5: keep chat/root from auto-filling long lines.
   (setq telega-root-fill-column 79
         telega-chat-fill-column 79)
+
+  (add-hook! telega-chat-mode-hook
+    (defun +telega-disable-visual-fill-column-h ()
+      "Disable visual fill column in Telega chat buffers."
+      (visual-fill-column-mode -1)))
+
   (telega-root-auto-fill-mode -1)
   (remove-hook 'telega-chat-mode-hook #'telega-chat-auto-fill-mode)
 
@@ -450,6 +455,12 @@ Update straight recipe files or run make from straight/repos/telega.el"
              chirp-profile
              chirp-profile-followers
              chirp-profile-following-users)
+  :init
+  (setq chirp-cache-directory (no-littering-expand-var-file-name "chirp/")
+        chirp-compose-temporary-directory
+        (no-littering-expand-var-file-name "chirp/compose/"))
+  (make-directory chirp-cache-directory t)
+  (make-directory chirp-compose-temporary-directory t)
   :config
   (setq chirp-show-avatars nil
         chirp-show-tweet-media nil

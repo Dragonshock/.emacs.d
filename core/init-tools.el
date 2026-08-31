@@ -112,8 +112,8 @@ Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
          ;; Indentation-style hs is for classic yaml-mode; treesit yaml uses
          ;; treesit-hs predicates from major-mode setup — keep yaml-ts off here.
          ((yaml-mode) . hs-indentation-mode))
-  :bind (("C-c h TAB" . hs-cycle)
-         ("C-c h `" . hs-toggle-all))
+  :bind (("C-c TAB" . hs-cycle)
+         ("C-c `" . hs-toggle-all))
   :config
   ;; Leave `hs-show-indicators' at default nil; do not set `hs-indicator-type'
   ;; alone (it only applies when indicators are enabled).
@@ -161,7 +161,7 @@ Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
 ;; [undo-hl] Highlight undo changes (buffer-local; not global after-init)
 (use-package undo-hl
   :straight (:host github :repo "casouri/undo-hl")
-  :hook ((prog-mode text-mode conf-mode) . undo-hl-mode)
+  :hook (((prog-mode text-mode conf-mode) . undo-hl-mode))
   :config (setq undo-hl-flash-duration 0.1))
 
 
@@ -197,51 +197,13 @@ Ruby uses treesit (`ruby-ts-mode`) + prog-mode hs; no special ruby arm."
 (use-package reader
   :straight `(reader :type git :host codeberg :repo "MonadicSheep/emacs-reader"
                      :files (:defaults ,(concat "render-core" module-file-suffix))
-                     ;; NOTE: Makefile shells out to `emacs' for checkdoc;
-                     ;; init-straight.el ensures emacs is on PATH.
-                     :pre-build ("make" "all"))
-  :config
-  (defun +reader-close-native-doc ()
-    "Free the MuPDF DocState for this buffer.  Must run while overlays exist.
-`reader-dyn--close-doc' no-ops unless the selected window has an overlay,
-so iterate this buffer's windows instead of gating on `selected-window'."
-    (when (and (derived-mode-p 'reader-mode)
-               (fboundp 'reader-dyn--close-doc)
-               (bound-and-true-p reader-current-doc-state-ptr))
-      (dolist (window (get-buffer-window-list nil nil t))
-        (when (and (bound-and-true-p reader-current-doc-state-ptr)
-                   (reader-current-doc-overlay window))
-          (with-selected-window window
-            (reader-dyn--close-doc))))))
-
-  (defadvice! +reader-refresh-close-before-reload-a (orig &rest args)
-    :around #'reader-refresh-doc-buffer
-    ;; close-doc no-ops if the overlay is already gone; call it before
-    ;; upstream `remove-overlays'.
-    (+reader-close-native-doc)
-    (prog1 (apply orig args)
-      (when buffer-file-name
-        (set-visited-file-modtime)
-        (set-buffer-modified-p nil))))
-
-  (defun +reader-mode-setup ()
-    "Stop polling auto-revert; free native memory when the buffer dies."
-    (auto-revert-mode -1)
-    (add-hook 'kill-buffer-hook #'+reader-close-native-doc nil t))
-  (add-hook 'reader-mode-hook #'+reader-mode-setup)
-
-  (with-eval-after-load 'zoom
-    (when (boundp 'zoom-ignored-major-modes)
-      (add-to-list 'zoom-ignored-major-modes 'reader-mode))))
-
+                     :pre-build ("make" "all")))
 
 ;; [browse-url] Pass a URL to browser
 (use-package browse-url
   :defines dired-mode-map
   :bind (("C-, o" . browse-url-at-point)
-         ("C-, e" . browse-url-emacs))
-  :config
-  (setq browse-url-browser-function #'eww-browse-url))
+         ("C-, e" . browse-url-emacs)))
 
 ;; [eww] Builtin browser
 ;; TTY: skip SHR images so kitty-graphics does not freeze on GitHub-sized

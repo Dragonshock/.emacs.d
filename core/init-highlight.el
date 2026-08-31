@@ -121,8 +121,8 @@
   :hook ((imenu-after-jump . +recenter-and-pulse)
          ((bookmark-after-jump magit-diff-visit-file next-error) . +recenter-and-pulse-line))
   :init
-  (setq pulse-delay 0.1
-        pulse-iterations 2)
+  (setq pulse-delay 0.2
+        pulse-iterations 1)
 
   (defadvice! +pulse-momentary-line (&rest _)
     :after '(recenter-top-bottom
@@ -130,8 +130,8 @@
              aw-select
              windmove-do-window-select
              pager-page-up
-             treemacs-select-window
-             tab-bar-select-tab)
+             tab-bar-select-tab
+             +tab-bar-echo)
     "Pulse the current line."
     (pulse-momentary-highlight-one-line (point)))
 
@@ -198,5 +198,4 @@
       (+highlight-changes-mode-turn-on)
       (add-hook! after-save-hook :local #'+highlight-changes-mode-turn-on)
       (add-hook! before-save-hook :local #'+highlight-changes-mode-turn-off)))
-  :hook ((prog-mode conf-mode text-mode) . +highlight-changes-auto)
-  )
+  :hook ((prog-mode conf-mode text-mode) . +highlight-changes-auto))

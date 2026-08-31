@@ -6,8 +6,8 @@
 /.cache/
 /auto-save-list/
 /etc/*
-!/etc/mermaid/
-!/etc/mermaid/**
+/etc/tempel/
+/etc/mermaid/
 /var/
 
 # Package and native build artifacts

@@ -4,33 +4,9 @@
   :straight (:host github :repo "emacscollective/no-littering")
   :demand t
   :config
-  ;; `no-littering' intentionally leaves `custom-file' to the user.
-  (setq custom-file (no-littering-expand-etc-file-name "custom.el")
-
-        ;; Package-specific paths not covered by no-littering.
-        tramp-rpc-deploy-local-cache-directory (no-littering-expand-var-file-name "tramp-rpc/")
-        forge-post-fallback-directory (no-littering-expand-var-file-name "forge/drafts/")
-        rust-playground-basedir (no-littering-expand-var-file-name "rust-playground/")
-        typst-ts-lsp-download-path (no-littering-expand-var-file-name "lsp/tinymist/tinymist")
-        chirp-cache-directory (no-littering-expand-var-file-name "chirp/")
-        chirp-compose-temporary-directory (no-littering-expand-var-file-name "chirp/compose/")
-        ghostel-module-directory (no-littering-expand-var-file-name "ghostel/"))
-
   ;; The existing configuration enables backups and auto-save.  This moves
   ;; them under `var/' as well.
-  (no-littering-theme-backups)
-
-  (dolist (directory
-           (list tramp-rpc-deploy-local-cache-directory
-                 forge-post-fallback-directory
-                 rust-playground-basedir
-                 chirp-cache-directory
-                 chirp-compose-temporary-directory
-                 ghostel-module-directory
-                 (file-name-directory typst-ts-lsp-download-path)
-                 ;; Local Atom feeds (elfeed); keep ready before scripts run.
-                 (no-littering-expand-var-file-name "rss/")))
-    (make-directory directory t)))
+  (no-littering-theme-backups))
 
 ;; Never write numbered backups / auto-saves for credential-like paths
 ;; (align patterns with recentf / undo-fu-session excludes).
@@ -378,7 +354,7 @@
                   highlight-parentheses-mode
                   hl-line-mode
                   indent-bars-mode
-                  jinx-mode
+                  flyspell-mode
                   ligature-mode
                   prettify-symbols-mode
                   rainbow-delimiters-mode
@@ -454,9 +430,7 @@
 ;; [tramp] Edit file remotely
 (use-package tramp
   :config
-  (require 'tramp-sh)
-  ;; Keep ssh ControlMaster for long-lived ACP stdio (agent-shell on VPS).
-  (setq tramp-default-method "ssh"
+  (setq tramp-default-method "rpc"
         tramp-backup-directory-alist backup-directory-alist
         remote-file-name-inhibit-cache 60
         tramp-use-connection-share t
@@ -471,6 +445,10 @@
                    :host github
                    :repo "ArthurHeymans/emacs-tramp-rpc")
   :after tramp
+  :init
+  (setq tramp-rpc-deploy-local-cache-directory
+        (no-littering-expand-var-file-name "tramp-rpc/"))
+  (make-directory tramp-rpc-deploy-local-cache-directory t)
   :config
   ;; Default git policy is `auto' (cargo-build from source tree).  `release'
   ;; is only for forced prebuilt binaries and skews with git-installed Lisp.
@@ -515,25 +493,15 @@
 ;; spawn an extra shell on every graphical startup.
 (use-package exec-path-from-shell
   :straight t
-  :unless noninteractive
+  :unless (or noninteractive (daemonp) (not (display-graphic-p)))
   :init
   (setq exec-path-from-shell-arguments '("-l")
-        exec-path-from-shell-variables
-        (let ((vars '("HOMEBREW" "JAVA_HOME" "JAVA21_HOME" "JAVA26_HOME"
-                      "JDTLS_JAVA_HOME" "MANPATH")))
-          (if (bound-and-true-p ns-emacs-plus-injected-path)
-              vars
-            (cons "PATH" vars))))
-  (defvar +exec-path-from-shell--initialized nil
-    "Non-nil after `exec-path-from-shell-initialize' has run once this session.")
-  (defun +exec-path-from-shell-maybe-initialize ()
-    "Copy shell env once for GUI frames or Emacs daemon sessions."
-    (unless +exec-path-from-shell--initialized
-      (when (or (daemonp) (display-graphic-p))
-        (require 'exec-path-from-shell)
-        (exec-path-from-shell-initialize)
-        (setq +exec-path-from-shell--initialized t))))
-  :hook (after-init . +exec-path-from-shell-maybe-initialize))
+        exec-path-from-shell-variables '("PATH" "HOMEBREW"
+                                         "JAVA_HOME" "JAVA21_HOME" "JAVA26_HOME"
+                                         "JDTLS_JAVA_HOME" "MANPATH"))
+  ;; External programs can be needed by mode hooks during startup, so import
+  ;; the login-shell environment before the rest of the configuration loads.
+  (exec-path-from-shell-initialize))
 
 
 ;; [backup walker] A utility to view Emacs backup files.
@@ -551,8 +519,6 @@
 
 ;; [posframe]
 (use-package posframe :straight t)
-
-(use-package cl-lib :straight t)
 
 ;; [project] Project manager
 (use-package project

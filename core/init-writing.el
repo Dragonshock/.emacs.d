@@ -1,9 +1,7 @@
 ;;; -*- lexical-binding: t -*-
 
 
-;; [visual-fill-column] Center text in prose modes only.
-;; Do not hook bare text-mode: yaml-ts-mode / toml-ts-mode derive text-mode and
-;; would get column-centered soft-wrap under treesit remaps.
+;; [visual-fill-column] Center text in markdown and org
 (use-package visual-fill-column
   :straight t
   :config
@@ -14,31 +12,13 @@
 
 ;; [pangu] Add pangu spaces
 (use-package pangu-spacing
-  :straight t
-  :hook ((org-mode markdown-ts-mode) . pangu-spacing-mode)
-  ;; pangu-spacing-real-insert-separtor defaults to nil (overlay-only) — no setq.
-  )
-
-;; [valign] Off: Org tables use org-modern (same as roife). Overlays fought
-;; org-modern table display properties.
-;; (use-package valign
-;;   :straight t
-;;   :hook ((org-mode . valign-mode)
-;;          (markdown-ts-mode . valign-mode)
-;;          ;; classic markdown-mode if ever used without treesit remap
-;;          (markdown-mode . valign-mode))
-;;   :config
-;;   ;; Thinner visual bars on org/markdown pipe tables.
-;;   (setq valign-fancy-bar t)
-;;   ;; Keep default valign-max-table-size (4000 chars); large tables are laggy.
-;;   )
+  :straight t)
 
 (use-package markdown-ts-mode
   :straight (:type built-in)
   :mode (("\\.md\\'" . markdown-ts-mode)
          ("\\.markdown\\'" . markdown-ts-mode))
   :config
-  ;; Hide markup / inline images are buffer-local (:local t) — set defaults.
   (setq-default markdown-ts-hide-markup t
                 markdown-ts-inline-images t)
   (setq
@@ -58,17 +38,6 @@
                         :inherit (intern (format "org-level-%d" (1+ i)))
                         :weight 'unspecified)))
 
-;; Re-front `.md'/`.markdown' after forge/magit load markdown-mode autoloads.
-;; Do not remap `markdown-mode': separedit requires the exact mode.
-(add-hook! emacs-startup-hook
-  (defun +markdown-ts-refront-auto-mode-alist ()
-    "Put `markdown-ts-mode' first for `.md' and `.markdown' files."
-    (dolist (elt '(("\\.md\\'" . markdown-ts-mode)
-                   ("\\.markdown\\'" . markdown-ts-mode)))
-      (setq auto-mode-alist (cons elt (delete elt auto-mode-alist))))))
-(with-eval-after-load 'markdown-mode-autoloads
-  (+markdown-ts-refront-auto-mode-alist))
-
 
 ;; [md-babel] Execute Markdown fenced blocks through Org Babel
 (use-package md-babel
@@ -78,24 +47,24 @@
 
 ;; [typst-ts-mode]
 (use-package typst-ts-mode
-  ;; Upstream migrated from SourceHut to Codeberg (local checkout re-pointed).
-  :straight (:host codeberg :repo "meow_king/typst-ts-mode")
+  :straight (:host sourcehut :repo "meow_king/typst-ts-mode")
+  :init
+  (setq typst-ts-lsp-download-path
+        (no-littering-expand-var-file-name "lsp/tinymist/tinymist"))
+  (make-directory (file-name-directory typst-ts-lsp-download-path) t)
   :custom
-  ;; 0.12+: list of CLI args (was a string on 0.10 SourceHut).
-  (typst-ts-watch-options '("--open")))
+  (typst-ts-watch-options "--open"))
 
 ;; [auctex]
 (use-package tex
   :straight auctex
   :config
-  ;; Global minor mode: bare mode symbol on a hook toggles per buffer and
-  ;; can flip SyncTeX off when opening multiple TeX buffers. Enable once.
-  (TeX-source-correlate-mode 1)
   (setq TeX-parse-self t             ; parse on load
         TeX-auto-save t              ; parse on save
         ;; Use hidden directories for AUCTeX files.
         TeX-auto-local ".auctex-auto"
         TeX-style-local ".auctex-style"
+        TeX-source-correlate-mode t
         TeX-source-correlate-method 'synctex
         ;; Don't start the Emacs server when correlating sources.
         TeX-source-correlate-start-server nil
@@ -107,18 +76,12 @@
 
 ;; [cdlatex]
 (use-package cdlatex
-  :straight t
-  :hook ((LaTeX-mode . turn-on-cdlatex)
-         (latex-mode . turn-on-cdlatex)))
+  :straight t)
 
 
 ;; [reftex]
 (use-package reftex
-  :straight (:type built-in)
-  :hook ((LaTeX-mode . turn-on-reftex)
-         (latex-mode . turn-on-reftex))
-  :config
-  (setq reftex-plug-into-AUCTeX t))
+  :straight (:type built-in))
 
 
 (use-package mermaid-mode
