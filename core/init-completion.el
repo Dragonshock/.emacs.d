@@ -102,7 +102,7 @@
   :straight t
   :bind (("C-;" . embark-act)
          ("M-;" . embark-dwim)
-         ("C-h E" . embark-bindings)
+         ("C-h B" . embark-bindings)
          :map embark-file-map
          ("s" . sudo-edit)
          ("g" . +embark-magit-status))

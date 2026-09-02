@@ -83,7 +83,7 @@ projects are urgent; every other unfinished state is not urgent."
     (define-key org-agenda-mode-map (kbd "V") #'+org-agenda-toggle-dashboard))
 
   (setq
-   org-directory (file-truename "~/org/")
+   org-directory (file-truename "~/Documents/Emacs/org/")
    +org-agenda-directory (expand-file-name "agenda/" org-directory)
    +org-refile-files (mapcar (lambda (file) (expand-file-name file +org-agenda-directory))
                              '("actions.org" "projects.org" "routines.org" "someday.org"))
@@ -333,18 +333,6 @@ projects are urgent; every other unfinished state is not urgent."
   (add-to-list 'org-src-lang-modes '("md" . markdown-ts-mode))
   (define-key org-src-mode-map (kbd "C-c C-c") #'org-edit-src-exit)
 
-  (add-hook! meow-insert-exit-hook
-    (defun +org-realign-table-maybe-h ()
-      "Realign the Org table at point when its contents changed."
-      (when (and (derived-mode-p 'org-mode)
-                 org-table-automatic-realign
-                 (org-at-table-p)
-                 org-table-may-need-update)
-        (let ((point (point))
-              (inhibit-message t))
-          (org-table-align)
-          (goto-char point)))))
-
   (add-hook! org-babel-after-execute-hook
     (defun +org-redisplay-inline-images-in-babel-result-h ()
       "Refresh inline images produced by the Babel block at point.
@@ -529,14 +517,7 @@ Temporarily prepend `save-buffer' to `org-after-refile-insert-hook' only while
 
    org-appear-delay 0.1
 
-   org-appear-trigger 'manual)
-
-  (add-hook! org-mode-hook
-    (defun +org-appear-meow-integration ()
-      (add-hook! meow-insert-enter-hook :local #'org-appear-manual-start)
-      (add-hook! meow-insert-exit-hook :local #'org-appear-manual-stop)))
-  (when (derived-mode-p 'org-mode) (+org-appear-meow-integration))
-  )
+   org-appear-trigger 'always))
 
 
 (use-package org-modern
