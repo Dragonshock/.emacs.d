@@ -136,7 +136,9 @@
 (use-package doom-themes
   :straight t
   :config
-  (require 'doom-themes-ext-org)
+  (setq doom-themes-enable-bold t
+        doom-themes-enable-italic t)
+
   (doom-themes-org-config)
   (setcdr (assoc 'gnus-group-news-low-empty doom-themes-base-faces)
           '(:inherit 'gnus-group-mail-1-empty :weight 'normal)))
@@ -145,7 +147,7 @@
 (unless (featurep 'modus-themes)
   (load (expand-file-name "themes/modus-themes" data-directory) nil 'nomessage))
 (setq modus-themes-italic-constructs t
-      modus-themes-bold-constructs nil
+      modus-themes-bold-constructs t
       modus-themes-mixed-fonts nil
       modus-themes-variable-pitch-ui nil
       modus-themes-headings nil)
