@@ -126,7 +126,7 @@
       (:propertize +mode-line-remote-host-name
                    face +mode-line-host-name-active-face)
       "  "
-      (:eval (breadcrumb-imenu-crumbs))
+      (:eval (+breadcrumb-imenu-crumbs))
       (:eval +mode-line-encoding))
     ))
 
@@ -145,6 +145,13 @@
   (setq breadcrumb-imenu-crumb-separator " ⋅ "
         breadcrumb-project-max-length 0.55
         breadcrumb-idle-time 5)
+  (defun +breadcrumb-imenu-crumbs ()
+    "Like `breadcrumb-imenu-crumbs', but never throw from redisplay.
+Empty imenu nodes make `bc--summarize' call `substring' on \"\" and
+signal `args-out-of-range'."
+    (condition-case nil
+        (breadcrumb-imenu-crumbs)
+      (error nil)))
   )
 
 ;; [tab-bar] Tab bar

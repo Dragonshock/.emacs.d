@@ -40,6 +40,11 @@
   :hook ((telega-chat-mode . corfu-mode)
          (telega-chat-mode . +telega-completions-setup-capf))
   :config
+  ;; telega-webpage.el / telega-rich-text.el use this face, but telega
+  ;; never deffaces it (only telega-entity-type-strikethrough exists).
+  (unless (facep 'telega-webpage-strike-through)
+    (put 'telega-webpage-strike-through 'face-alias
+         'telega-entity-type-strikethrough))
   (setq telega-root-fill-column 79
         telega-chat-fill-column 79)
 
