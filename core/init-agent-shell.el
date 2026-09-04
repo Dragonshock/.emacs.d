@@ -460,11 +460,29 @@ default `:none'."
                          agent-shell-pi-start-agent
                          agent-shell-cursor-start-agent
                          agent-shell-prompt-compose)
-  :bind (("C-c C-w" . agent-shell)
+  :bind (("C-c g a" . agent-shell)
+         ("C-c g p" . agent-shell-prompt-compose)
+         ("C-c g w" . agent-shell-send-dwim)
          :map agent-shell-mode-map
-         ("C-c C-w" . agent-shell)
-         :map emacs-lisp-mode-map
-         ("C-c C-w" . agent-shell))
+         ("M-<return>" . agent-shell-newline)
+         ("C-c C-h" . agent-shell-help-menu)
+         ("C-c C-q" . agent-shell-prompt-queue)
+         ("C-c C-e" . agent-shell-prompt-steer))
+  :custom-face
+  (agent-shell-section-heading ((t (t (:inherit font-lock-function-name-face :height 0.9)))))
+  (agent-shell-section-annotation ((t (:inherit shadow :height 0.8))))
+  :preface
+  (defun +agent-shell-dot-subdir (subdir)
+    "Return the centralized Agent Shell data directory for SUBDIR."
+    (let* ((cwd (directory-file-name (agent-shell-cwd)))
+           (name (file-name-nondirectory cwd))
+           (slug (replace-regexp-in-string
+                  "[^[:alnum:]._-]+" "-" (if (string-empty-p name) "root" name)))
+           (project-key
+            (format "%s-%s" slug (substring (secure-hash 'sha1 cwd) 0 10))))
+      (expand-file-name
+       (file-name-concat project-key ".agent-shell" subdir)
+       (locate-user-emacs-file "var/agent-shell/"))))
   :config
   (+agent-shell-ensure-path)
   ;; Official Grok Build support (agent-shell-xai.el, upstream PR #720).
@@ -508,7 +526,12 @@ default `:none'."
               #'agent-shell-pi-make-agent-config)
         agent-shell-preferred-agent-config '(preselect . grok-build)
         agent-shell-prefer-viewport-interaction t
-        agent-shell-inhibit-system-sleep nil)
+        agent-shell-inhibit-system-sleep nil
+        agent-shell-tool-use-expand-by-default nil
+        agent-shell-thought-process-expand-by-default nil
+        agent-shell-dot-subdir-function #'+agent-shell-dot-subdir
+        agent-shell-show-context-usage-indicator 'detailed
+        agent-shell-file-display-action '((display-buffer-reuse-window display-buffer-pop-up-window)))
 
   ;; header-style STANDARD is (if (display-graphic-p) 'graphical 'text) with no
   ;; :set.  Daemon + use-package-always-demand loads under no GUI → freezes as

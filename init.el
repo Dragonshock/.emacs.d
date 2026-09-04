@@ -32,7 +32,7 @@
                      ;; 'init-modal
                      'init-modeline
                      'init-ai
-                     'init-agent-shell
+                     ;; 'init-agent-shell
                      'init-social
                      'init-gnus
                      'init-elfeed
