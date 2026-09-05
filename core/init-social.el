@@ -40,11 +40,12 @@
   :hook ((telega-chat-mode . corfu-mode)
          (telega-chat-mode . +telega-completions-setup-capf))
   :config
-  ;; telega-webpage.el / telega-rich-text.el use this face, but telega
+  ;; telega-webpage.el / telega-rich-text.el use this name, but telega
   ;; never deffaces it (only telega-entity-type-strikethrough exists).
-  (unless (facep 'telega-webpage-strike-through)
-    (put 'telega-webpage-strike-through 'face-alias
-         'telega-entity-type-strikethrough))
+  (defface telega-webpage-strike-through
+    '((t :strike-through t))
+    "Strike-through for Instant View (missing upstream defface)."
+    :group 'telega-faces)
   (setq telega-root-fill-column 79
         telega-chat-fill-column 79)
 
@@ -53,7 +54,12 @@
       "Disable visual fill column in Telega chat buffers."
       (visual-fill-column-mode -1)))
 
-  (telega-root-auto-fill-mode -1)
+  ;; telega.el (provide 'telega) runs before it enables this mode, and
+  ;; the command lives in telega-root.el without an autoload.  Calling
+  ;; it here at `provide' time is void and aborts the rest of init.
+  (with-eval-after-load 'telega-root
+    (when (fboundp 'telega-root-auto-fill-mode)
+      (telega-root-auto-fill-mode -1)))
   (remove-hook 'telega-chat-mode-hook #'telega-chat-auto-fill-mode)
 
   (setq telega-chat-show-avatars nil
