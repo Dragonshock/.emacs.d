@@ -183,3 +183,9 @@
 (use-package xwidget
   :config
   (setq xwidget-webkit-buffer-name-format "*XWidget: %T*"))
+
+
+;; [bitwarden.el] Manage the Bitwarden vault through `bw'
+(use-package bitwarden
+  :straight (:host github :repo "roife/bitwarden.el")
+  :commands bitwarden)
