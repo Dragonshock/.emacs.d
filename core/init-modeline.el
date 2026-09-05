@@ -19,15 +19,16 @@
 
 ;;; Indicators
 (defsubst +mode-line-overwrite-readonly-indicator ()
-  "Display whether it is in overwrite mode or read-only buffer."
-  (when-let* ((mo (pcase (buffer-modified-p)
-                    ('t (and (buffer-file-name) " *"))
-                    ('autosaved " ~")
-                    (_ "")))
-              (ro (and buffer-read-only " %%"))
-              (ov (and overwrite-mode " #"))
-              (ans (concat mo ro ov)))
-    (concat " | " ans)))
+  "Display modified, read-only, and overwrite indicators independently."
+  (let* ((mo (pcase (buffer-modified-p)
+               ('t (and (buffer-file-name) " *"))
+               ('autosaved " ~")
+               (_ "")))
+         (ro (and buffer-read-only " %%"))
+         (ov (and overwrite-mode " #"))
+         (ans (concat mo ro ov)))
+    (unless (string-empty-p ans)
+      (concat " | " ans))))
 
 (defsubst +mode-line-macro-indicator ()
   "Display current Emacs macro being recorded."
@@ -126,7 +127,7 @@
       (:propertize +mode-line-remote-host-name
                    face +mode-line-host-name-active-face)
       "  "
-      (:eval (+breadcrumb-imenu-crumbs))
+      (:eval (breadcrumb-imenu-crumbs))
       (:eval +mode-line-encoding))
     ))
 
@@ -145,13 +146,6 @@
   (setq breadcrumb-imenu-crumb-separator " ⋅ "
         breadcrumb-project-max-length 0.55
         breadcrumb-idle-time 5)
-  (defun +breadcrumb-imenu-crumbs ()
-    "Like `breadcrumb-imenu-crumbs', but never throw from redisplay.
-Empty imenu nodes make `bc--summarize' call `substring' on \"\" and
-signal `args-out-of-range'."
-    (condition-case nil
-        (breadcrumb-imenu-crumbs)
-      (error nil)))
   )
 
 ;; [tab-bar] Tab bar
@@ -264,10 +258,11 @@ signal `args-out-of-range'."
                                                        (telega-filter-chats chats '(and is-known mention)))))
                      (reaction-count (apply #'+ (mapcar (telega--tl-prop :unread_reaction_count)
                                                         (telega-filter-chats chats '(and is-known unread-reactions)))))
-                     (count (+ unread-count mention-count reaction-count)))
-                (propertize
-                 (concat " T" (unless (zerop count) (number-to-string count)) " ")
-                 'face `(:inherit font-lock-keyword-face :inverse-video ,online-p))))))
+                     (count (+ unread-count mention-count reaction-count))
+                     (text (propertize (concat " T" (unless (zerop count) (number-to-string count)) " ")
+                                       'face `(:inherit font-lock-keyword-face :inverse-video ,online-p))))
+                `((tab-bar-telega menu-item ,text telega
+                                  :help "Open Telega"))))))
 
     (add-hook! (telega-ready-hook
                 telega-chats-fetched-hook
@@ -280,8 +275,11 @@ signal `args-out-of-range'."
       "Update the cached EMMS track indicator in the tab bar."
       (setq +tab-bar-emms-indicator-cache
             (when (and (bound-and-true-p emms-player-playing-p))
-              (propertize (concat " " (if emms-player-paused-p "Ⅱ" "♫") " ")
-                          'face 'font-lock-keyword-face))))
+              (let ((text
+                     (propertize (concat " " (if emms-player-paused-p "Ⅱ" "♫") " ")
+                                 'face 'font-lock-keyword-face)))
+                `((tab-bar-emms menu-item ,text emms-ui-now-playing
+                                :help "Open EMMS Now Playing"))))))
 
     (add-hook! (emms-player-started-hook
                 emms-player-paused-hook
