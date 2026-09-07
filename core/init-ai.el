@@ -505,6 +505,7 @@ into ACP stdio (that leaves the session on Initializing)."
         agent-shell-session-strategy 'prompt
         agent-shell-session-restore-verbosity 'full
         agent-shell-show-welcome-message nil
+        agent-shell-header-style 'text
         agent-shell-activity-group-expand-by-default 'latest
         agent-shell-prefer-viewport-interaction t
         agent-shell-inhibit-system-sleep nil
@@ -655,6 +656,6 @@ into ACP stdio (that leaves the session on Initializing)."
   (require 'gptel-openai-oauth)
 
   (setq gptel-copilot-model 'gpt-5.4-mini
-        gptel-copilot-backend
-        (gptel-make-openai-oauth "OpenAI OAuth Inline"
-          :request-params '(:reasoning (:effort "low")))))
+        gptel-copilot-idle-delay 0.2
+        gptel-copilot-backend (gptel-make-openai-oauth "OpenAI OAuth Inline"
+                                :request-params '(:reasoning (:effort "low")))))

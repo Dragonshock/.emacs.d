@@ -143,7 +143,8 @@
 
   (setq flyspell-issue-message-flag nil
         flyspell-issue-welcome-flag nil
-        flyspell-use-meta-tab nil))
+        flyspell-use-meta-tab nil
+        flyspell-delay-use-timer t))
 
 
 ;; [ediff] Diff & patch

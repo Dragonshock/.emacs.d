@@ -23,12 +23,11 @@
   (let* ((mo (pcase (buffer-modified-p)
                ('t (and (buffer-file-name) " *"))
                ('autosaved " ~")
-               (_ "")))
+               (_ nil)))
          (ro (and buffer-read-only " %%"))
          (ov (and overwrite-mode " #"))
          (ans (concat mo ro ov)))
-    (unless (string-empty-p ans)
-      (concat " | " ans))))
+    ans))
 
 (defsubst +mode-line-macro-indicator ()
   "Display current Emacs macro being recorded."
@@ -106,15 +105,6 @@
 (add-hook! envrc-mode-hook #'+mode-line-update-envrc)
 
 
-(defun +breadcrumb-imenu-crumbs ()
-  "Like `breadcrumb-imenu-crumbs', but never throw from redisplay.
-Empty imenu nodes make breadcrumb call substring on an empty string
-and signal `args-out-of-range'."
-  (when (fboundp 'breadcrumb-imenu-crumbs)
-    (condition-case nil
-        (breadcrumb-imenu-crumbs)
-      (error nil))))
-
 (defsubst +mode-line-normal ()
   "Formatting active-long mode-line."
   (let* ((active-p (mode-line-window-selected-p))
@@ -136,7 +126,7 @@ and signal `args-out-of-range'."
       (:propertize +mode-line-remote-host-name
                    face +mode-line-host-name-active-face)
       "  "
-      (:eval (+breadcrumb-imenu-crumbs))
+      (:eval (breadcrumb-imenu-crumbs))
       (:eval +mode-line-encoding))
     ))
 
