@@ -133,27 +133,34 @@
 (setq custom-safe-themes t)
 
 
-(use-package doom-themes
-  :straight t
+;; (use-package doom-themes
+;;   :straight t
+;;   :config
+;;   (setq doom-themes-enable-bold t
+;;         doom-themes-enable-italic t)
+;;
+;;   (doom-themes-org-config)
+;;   (setcdr (assoc 'gnus-group-news-low-empty doom-themes-base-faces)
+;;           '(:inherit 'gnus-group-mail-1-empty :weight 'normal)))
+;;
+;; (defvar +light-theme 'doom-gruvbox-light)
+;; (defvar +dark-theme 'doom-gruvbox)
+
+;; Default pair is Doric.  Load the package before `+load-theme' (this
+;; hook runs immediately) so `load-theme' can find the theme files.
+;; Do not call `doric-themes-select' here: appearance hooks pick light/dark.
+(use-package doric-themes
+  :straight (doric-themes :type git :host github :repo "protesilaos/doric-themes")
+  :demand t
+  :bind (("C-c t t" . doric-themes-toggle)
+         ("C-c t s" . doric-themes-select)
+         ("C-c t r" . doric-themes-rotate))
   :config
-  (setq doom-themes-enable-bold t
-        doom-themes-enable-italic t)
+  (setq doric-themes-to-toggle '(doric-light doric-dark)
+        doric-themes-to-rotate doric-themes-collection))
 
-  (doom-themes-org-config)
-  (setcdr (assoc 'gnus-group-news-low-empty doom-themes-base-faces)
-          '(:inherit 'gnus-group-mail-1-empty :weight 'normal)))
-
-;; Built-in Emacs 31; load the library first so defcustom does not clobber setq.
-(unless (featurep 'modus-themes)
-  (load (expand-file-name "themes/modus-themes" data-directory) nil 'nomessage))
-(setq modus-themes-italic-constructs t
-      modus-themes-bold-constructs t
-      modus-themes-mixed-fonts nil
-      modus-themes-variable-pitch-ui nil
-      modus-themes-headings nil)
-
-(defvar +light-theme 'modus-operandi-tinted)
-(defvar +dark-theme 'modus-vivendi)
+(defvar +light-theme 'doric-light)
+(defvar +dark-theme 'doric-dark)
 ;; Align with upstream roife: always re-detect dark/light and switch when the
 ;; picked theme differs.  First pass may run before xterm OSC 11; tty-setup-hook
 ;; re-runs after reportBackground so TUI can correct light → dark.

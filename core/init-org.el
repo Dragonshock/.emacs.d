@@ -186,7 +186,10 @@
   :straight t
   :after org
   :hook ((org-mode . org-modern-mode)
-         (org-agenda-finalize . org-modern-agenda)))
+         (org-agenda-finalize . org-modern-agenda))
+  :config
+  (setq org-modern-star 'replace
+        org-modern-replace-stars "◉○◈◇✳"))
 
 ;; [ox]
 (use-package ox
