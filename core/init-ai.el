@@ -142,6 +142,12 @@ Use this format:
 
 (use-package agent-shell
   :straight (:type git :host github :repo "xenodium/agent-shell")
+  :require-incrementally
+  (acp-traffic acp comint shell shell-maker transient
+               agent-shell-faces agent-shell-work-buffer agent-shell-project
+               agent-shell-config agent-shell-markdown agent-shell-diff
+               agent-shell-styles agent-shell-usage agent-shell-list-edit
+               agent-shell-viewport agent-shell-ui t)
   :bind (("C-c g a" . agent-shell)
          ("C-c g p" . agent-shell-prompt-compose)
          ("C-c g w" . agent-shell-send-dwim)
@@ -507,8 +513,6 @@ into ACP stdio (that leaves the session on Initializing)."
         agent-shell-show-welcome-message nil
         agent-shell-header-style 'text
         agent-shell-activity-group-expand-by-default 'latest
-        agent-shell-prefer-viewport-interaction t
-        agent-shell-inhibit-system-sleep nil
         agent-shell-tool-use-expand-by-default nil
         agent-shell-thought-process-expand-by-default nil
         agent-shell-dot-subdir-function #'+agent-shell-dot-subdir
@@ -572,15 +576,13 @@ into ACP stdio (that leaves the session on Initializing)."
 (use-package agent-shell-tramp
   :straight (:type git :host github :repo "junyi-hou/agent-shell-tramp")
   :after agent-shell
+  :require-incrementally t
   :init
   (setq agent-shell-tramp-transcript-directory
-        (no-littering-expand-var-file-name "agent-shell-tramp/transcripts/"))
-  (make-directory agent-shell-tramp-transcript-directory t)
+        (expand-file-name
+         (locate-user-emacs-file "var/agent-shell/remote-transcripts/")))
   :config
-  (agent-shell-tramp-mode 1)
-  ;; Mode overwrites the path function; keep tramp-safe local transcripts.
-  (setq agent-shell-transcript-file-path-function
-        #'+agent-shell-transcript-file-path))
+  (agent-shell-tramp-mode 1))
 
 (use-package agent-shell-attention
   :straight (:type git :host github :repo "ultronozm/agent-shell-attention.el")

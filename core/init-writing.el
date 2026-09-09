@@ -47,7 +47,7 @@
 
 ;; [typst-ts-mode]
 (use-package typst-ts-mode
-  :straight (:type git :host codeberg :repo "meow_king/typst-ts-mode")
+  :straight (:host sourcehut :repo "meow_king/typst-ts-mode")
   :init
   (setq typst-ts-lsp-download-path
         (no-littering-expand-var-file-name "lsp/tinymist/tinymist"))

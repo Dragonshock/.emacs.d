@@ -92,6 +92,10 @@
 
 (use-package emms
   :straight t
+  :require-incrementally
+  (emms-compat t emms-source-file emms-source-playlist emms-playlist-mode
+               emms-last-played emms-playlist-sort emms-volume emms-filters emms-browser
+               emms-lyrics emms-playing-time)
   :bind (("C-c m b" . emms-smart-browse)
          ("C-c m c" . +emms-extract-embedded-covers)
          ("C-c m i" . emms-show)
@@ -117,10 +121,10 @@
   (require 'emms-history)
 
   (define-emms-simple-player ffplay '(file url)
-    (concat "\\`http[s]?://\\|"
-            (apply #'emms-player-simple-regexp
-                   emms-player-base-format-list))
-    "ffplay" "-nodisp" "-autoexit" "-loglevel" "quiet")
+                             (concat "\\`http[s]?://\\|"
+                                     (apply #'emms-player-simple-regexp
+                                            emms-player-base-format-list))
+                             "ffplay" "-nodisp" "-autoexit" "-loglevel" "quiet")
 
   (add-to-list 'emms-track-initialize-functions
                #'emms-info-initialize-track)
@@ -147,12 +151,14 @@
 
 (use-package consult-emms
   :straight (:host github :repo "Hugo-Heagren/consult-emms")
+  :require-incrementally (emms consult t)
   :bind (("C-c d m" . consult-emms-library))
   :config
   (setq consult-emms--sort-album-function #'string<))
 
 (use-package emms-ui
   :straight (:host github :repo "roife/emms-ui")
+  :require-incrementally (emms-browser emms-lyrics emms-playing-time t)
   :commands (emms-ui emms-ui-albums
                      emms-ui-list emms-ui-now-playing)
   :custom
