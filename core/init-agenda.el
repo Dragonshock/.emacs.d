@@ -23,7 +23,8 @@
                    (:endgroup)
                    ("note" . ?n))
    org-archive-location "%s_archive::* Archived"
-   org-archive-subtree-save-file-p t)
+   org-archive-subtree-save-file-p t
+   org-deadline-warning-days 3)
 
   (add-hook! org-mode-hook
     (defun +org-set-project-archive-location ()

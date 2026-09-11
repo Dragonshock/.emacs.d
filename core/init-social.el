@@ -2,6 +2,14 @@
 (use-package telega
   :straight (:host github :repo "zevlg/telega.el"
                    :files (:defaults "contrib/*.el" "etc"))
+  :require-incrementally
+  (password-cache cl-lib find-func emacsbug
+                  telega-customize telega-server telega-root telega-ins
+                  telega-match telega-filter telega-chat telega-folders
+                  telega-user telega-info telega-media telega-sticker
+                  telega-util telega-vvnote telega-webpage telega-notifications
+                  telega-modes telega-i18n telega-story telega-completions
+                  telega-tdlib telega-tdlib-events t)
   :preface
   (defun +telega-install-tdlib ()
     "Fetch and install telega's expected TDLib commit under ~/.local."
@@ -121,8 +129,8 @@
       (defun +telega-enable-linux-proxy-h ()
         "Add and enable the local SOCKS5 proxy before Telega authorizes."
         (telega--addProxy '(:server "127.0.0.1" :port 7891 :type (:@type "proxyTypeSocks5"))
-          :enable-p t
-          :comment "Local SOCKS5 proxy"))))
+                          :enable-p t
+                          :comment "Local SOCKS5 proxy"))))
 
   ;; HACK: Work around upstream bot command completion returning nested lists.
   ;; Each mapped candidate list is freshly allocated, so `mapcan' is safe here.

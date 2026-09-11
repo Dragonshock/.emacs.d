@@ -509,13 +509,12 @@ into ACP stdio (that leaves the session on Initializing)."
   (setq agent-shell-openai-codex-acp-command '("mise" "exec" "--" "codex-acp")
         agent-shell-context-sources nil
         agent-shell-mcp-servers nil
-        agent-shell-session-strategy 'prompt
         agent-shell-session-restore-verbosity 'full
         agent-shell-show-welcome-message nil
+        agent-shell-chat-mode-enabled nil
         agent-shell-header-style 'text
         agent-shell-activity-group-expand-by-default 'latest
-        agent-shell-tool-use-expand-by-default nil
-        agent-shell-thought-process-expand-by-default nil
+        agent-shell-markdown-table-zebra-stripe nil
         agent-shell-dot-subdir-function #'+agent-shell-dot-subdir
         agent-shell-show-context-usage-indicator 'detailed
         agent-shell-file-display-action '((display-buffer-reuse-window display-buffer-pop-up-window)))
