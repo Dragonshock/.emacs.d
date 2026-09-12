@@ -164,24 +164,12 @@ Use this format:
   (defconst +agent-shell-grok-bin
     (expand-file-name "~/.grok/bin/grok")
     "Absolute path to the Grok Build CLI.")
-  (defconst +agent-shell-pi-acp-bin
-    "/opt/homebrew/bin/pi-acp"
-    "Absolute path to the pi-acp ACP adapter (not bare `pi').")
-  (defconst +agent-shell-pi-bin
-    "/opt/homebrew/bin/pi"
-    "Absolute path to the pi CLI, passed to pi-acp as PI_ACP_PI_COMMAND.")
-  (defconst +agent-shell-cursor-bin
-    (expand-file-name "~/.local/bin/agent")
-    "Absolute path to the Cursor CLI (`agent acp'), not Cursor.app.")
   (defconst +agent-shell-bin-dirs
-    (list (file-name-directory +agent-shell-grok-bin)
-          (file-name-directory +agent-shell-cursor-bin)
-          "/opt/homebrew/bin"
-          "/usr/local/bin")
-    "Directories that may hold ACP agent CLIs.")
+    (list (file-name-directory +agent-shell-grok-bin))
+    "Directories that hold the Grok Build CLI (Dock Emacs has no shell PATH).")
 
   (defun +agent-shell-ensure-path ()
-    "Ensure ACP agent CLI directories are on `exec-path' and process PATH."
+    "Ensure the Grok CLI directory is on `exec-path' and process PATH."
     (dolist (dir +agent-shell-bin-dirs)
       (when (file-directory-p dir)
         (add-to-list 'exec-path dir)
@@ -231,20 +219,13 @@ into ACP stdio (that leaves the session on Initializing)."
         (apply orig args))))
 
   (defun +agent-shell-reject-non-grok-remote (&rest args)
-    "Remote ACP is Grok-only; refuse Claude / Pi / Cursor / Codex on TRAMP."
+    "Remote ACP is Grok-only; refuse any other identifier on TRAMP."
     (when-let* ((remote (file-remote-p default-directory))
                 (config (plist-get args :config))
                 (id (and (consp config) (map-elt config :identifier))))
       (unless (eq id 'grok-build)
         (user-error "Remote ACP supports Grok only (not %s). Cwd: %s"
                     id remote))))
-
-  (defun +agent-shell-require-local-acp (who)
-    "Signal an error if starting non-Grok ACP agent WHO on a TRAMP cwd."
-    (when (file-remote-p default-directory)
-      (user-error
-       "Remote ACP supports Grok only. Use M-x +agent-shell-start-grok (not %s)."
-       who)))
 
   (defun +agent-shell-transcript-file-path ()
     "Transcript path that is never a TRAMP file."
@@ -462,51 +443,13 @@ into ACP stdio (that leaves the session on Initializing)."
     (agent-shell--dwim :config (agent-shell-xai-make-grok-config)
                        :new-shell t))
 
-  (defun +agent-shell-start-claude ()
-    "Start a new interactive Claude Code agent shell (ACP)."
-    (interactive)
-    (+agent-shell-require-local-acp "Claude")
-    (require 'agent-shell)
-    (require 'agent-shell-anthropic)
-    (+agent-shell-ensure-path)
-    (unless (executable-find "claude-agent-acp")
-      (user-error
-       "Cannot find claude-agent-acp. Install: npm i -g @agentclientprotocol/claude-agent-acp"))
-    (agent-shell--dwim :config (agent-shell-anthropic-make-claude-code-config)
-                       :new-shell t))
-
-  (defun +agent-shell-start-pi ()
-    "Start a new interactive Pi coding agent shell via pi-acp."
-    (interactive)
-    (+agent-shell-require-local-acp "Pi")
-    (require 'agent-shell)
-    (require 'agent-shell-pi)
-    (+agent-shell-ensure-path)
-    (unless (file-executable-p +agent-shell-pi-acp-bin)
-      (user-error "Cannot find pi-acp at %s" +agent-shell-pi-acp-bin))
-    (unless (file-executable-p +agent-shell-pi-bin)
-      (user-error "Cannot find pi at %s" +agent-shell-pi-bin))
-    (agent-shell--dwim :config (agent-shell-pi-make-agent-config)
-                       :new-shell t))
-
-  (defun +agent-shell-start-cursor ()
-    "Start a new interactive Cursor agent shell (`agent acp')."
-    (interactive)
-    (+agent-shell-require-local-acp "Cursor")
-    (require 'agent-shell)
-    (require 'agent-shell-cursor)
-    (+agent-shell-ensure-path)
-    (unless (file-executable-p +agent-shell-cursor-bin)
-      (user-error "Cannot find Cursor CLI at %s" +agent-shell-cursor-bin))
-    (agent-shell--dwim :config (agent-shell-cursor-make-agent-config)
-                       :new-shell t))
-
   (defun +agent-shell-force-graphic-header ()
     "Prefer graphical agent-shell header when a GUI frame is available."
     (when (display-graphic-p)
       (setq agent-shell-header-style 'graphical)))
   :init
-  (setq agent-shell-openai-codex-acp-command '("mise" "exec" "--" "codex-acp")
+  (setq agent-shell-agent-configs '(agent-shell-xai-make-grok-config)
+        agent-shell-preferred-agent-config 'grok-build
         agent-shell-context-sources nil
         agent-shell-mcp-servers nil
         agent-shell-session-restore-verbosity 'full
@@ -521,27 +464,12 @@ into ACP stdio (that leaves the session on Initializing)."
   :config
   (+agent-shell-ensure-path)
   (require 'agent-shell-xai)
-  (require 'agent-shell-pi)
-  (require 'agent-shell-cursor)
   (setq agent-shell-xai-acp-command
         (list +agent-shell-grok-bin "agent" "stdio")
         agent-shell-xai-environment
         (agent-shell-make-environment-variables :inherit-env t)
-        agent-shell-pi-acp-command (list +agent-shell-pi-acp-bin)
-        agent-shell-pi-environment
-        (agent-shell-make-environment-variables
-         "PI_ACP_PI_COMMAND" +agent-shell-pi-bin
-         :inherit-env t)
-        agent-shell-cursor-acp-command (list +agent-shell-cursor-bin "acp")
-        agent-shell-cursor-environment
-        (agent-shell-make-environment-variables :inherit-env t)
-        agent-shell-agent-configs
-        (list #'agent-shell-xai-make-grok-config
-              #'agent-shell-openai-make-codex-config
-              #'agent-shell-cursor-make-agent-config
-              #'agent-shell-anthropic-make-claude-code-config
-              #'agent-shell-pi-make-agent-config)
-        agent-shell-preferred-agent-config '(preselect . grok-build))
+        agent-shell-agent-configs (list #'agent-shell-xai-make-grok-config)
+        agent-shell-preferred-agent-config 'grok-build)
   (+agent-shell-force-graphic-header)
   (add-hook 'server-after-make-frame-hook
             (lambda ()
@@ -551,13 +479,6 @@ into ACP stdio (that leaves the session on Initializing)."
               (executable-find "grok"))
     (warn "Cannot find Grok Build CLI at %s. Install it and run `grok login'."
           +agent-shell-grok-bin))
-  (unless (executable-find "claude-agent-acp")
-    (warn "Cannot find claude-agent-acp. Install: npm i -g @agentclientprotocol/claude-agent-acp"))
-  (unless (file-executable-p +agent-shell-pi-acp-bin)
-    (warn "Cannot find pi-acp at %s" +agent-shell-pi-acp-bin))
-  (unless (or (file-executable-p +agent-shell-cursor-bin)
-              (executable-find "agent"))
-    (warn "Cannot find Cursor CLI at %s" +agent-shell-cursor-bin))
   (with-eval-after-load 'zoom
     (when (boundp 'zoom-ignored-major-modes)
       (add-to-list 'zoom-ignored-major-modes 'agent-shell-mode)))
@@ -623,13 +544,14 @@ into ACP stdio (that leaves the session on Initializing)."
 (use-package agent-review
   :straight (:type git :host github :repo "nineluj/agent-review")
   :commands agent-review
-  :bind ("C-c g r" . +agent-review-codex)
+  :bind ("C-c g r" . +agent-review-grok)
   :preface
-  (defun +agent-review-codex ()
-    "Review staged and unstaged Git changes with Codex."
+  (defun +agent-review-grok ()
+    "Review staged and unstaged Git changes with Grok Build."
     (interactive)
     (require 'agent-review)
-    (agent-review (agent-shell-openai-make-codex-config))))
+    (require 'agent-shell-xai)
+    (agent-review (agent-shell-xai-make-grok-config))))
 
 
 ;; [gptel-copilot] gptel-powered inline code completion

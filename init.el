@@ -12,7 +12,6 @@
                      'init-basic
                      'init-ui
                      'init-xterm
-                     'init-ghostel
                      (when (eq system-type 'darwin) 'init-mac)
                      'init-completion
                      'init-tools
@@ -21,6 +20,7 @@
                      'init-window
                      'init-dired
                      'init-shell
+                     ;; 'init-ghostel
                      'init-prog
                      'init-scheme
                      'init-writing
@@ -32,7 +32,6 @@
                      ;; 'init-modal
                      'init-modeline
                      'init-ai
-                     ;; 'init-agent-shell
                      'init-social
                      'init-gnus
                      'init-elfeed
