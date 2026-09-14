@@ -164,19 +164,14 @@ Use this format:
   (defconst +agent-shell-grok-bin
     (expand-file-name "~/.grok/bin/grok")
     "Absolute path to the Grok Build CLI.")
-  (defconst +agent-shell-bin-dirs
-    (list (file-name-directory +agent-shell-grok-bin))
-    "Directories that hold the Grok Build CLI (Dock Emacs has no shell PATH).")
-
   (defun +agent-shell-ensure-path ()
     "Ensure the Grok CLI directory is on `exec-path' and process PATH."
-    (dolist (dir +agent-shell-bin-dirs)
+    (let ((dir (file-name-directory +agent-shell-grok-bin)))
       (when (file-directory-p dir)
         (add-to-list 'exec-path dir)
         (let ((path (getenv "PATH")))
           (unless (and path (string-match-p (regexp-quote dir) path))
             (setenv "PATH" (concat dir path-separator (or path ""))))))))
-
   (defun +agent-shell-dot-subdir (subdir)
     "Return the centralized Agent Shell data directory for SUBDIR."
     (let* ((cwd (directory-file-name (agent-shell-cwd)))
@@ -188,265 +183,6 @@ Use this format:
       (expand-file-name
        (file-name-concat project-key ".agent-shell" subdir)
        (locate-user-emacs-file "var/agent-shell/"))))
-
-  (defun +agent-shell-xai-acp-command ()
-    "Grok ACP argv for the current `default-directory'.
-Remote buffers use local `ssh -T' so TRAMP login-shell MOTD cannot leak
-into ACP stdio (that leaves the session on Initializing)."
-    (if-let* ((remote (file-remote-p default-directory)))
-        (let* ((host (file-remote-p default-directory 'host))
-               (user (file-remote-p default-directory 'user))
-               (target (if user (format "%s@%s" user host) host))
-               (cwd (directory-file-name
-                     (file-local-name (expand-file-name default-directory))))
-               (remote-sh
-                (format "cd %s && exec grok agent stdio"
-                        (shell-quote-argument cwd))))
-          (list "ssh" "-T" "-o" "BatchMode=yes" "-o" "RequestTTY=no"
-                target remote-sh))
-      (list +agent-shell-grok-bin "agent" "stdio")))
-
-  (defun +agent-shell-xai-make-client-around (orig &rest args)
-    "Bind `agent-shell-xai-acp-command' to the cwd-appropriate grok."
-    (let ((agent-shell-xai-acp-command (+agent-shell-xai-acp-command)))
-      (apply orig args)))
-
-  (defun +acp-start-client-without-tramp-pty (orig &rest args)
-    "Start ACP locally when the command is already `ssh -T'."
-    (if (not (file-remote-p default-directory))
-        (apply orig args)
-      (let ((default-directory (expand-file-name "~/")))
-        (apply orig args))))
-
-  (defun +agent-shell-reject-non-grok-remote (&rest args)
-    "Remote ACP is Grok-only; refuse any other identifier on TRAMP."
-    (when-let* ((remote (file-remote-p default-directory))
-                (config (plist-get args :config))
-                (id (and (consp config) (map-elt config :identifier))))
-      (unless (eq id 'grok-build)
-        (user-error "Remote ACP supports Grok only (not %s). Cwd: %s"
-                    id remote))))
-
-  (defun +agent-shell-transcript-file-path ()
-    "Transcript path that is never a TRAMP file."
-    (let ((cwd (or (ignore-errors (agent-shell-cwd)) default-directory)))
-      (if (not (file-remote-p cwd))
-          (agent-shell--default-transcript-file-path)
-        (let* ((root (no-littering-expand-var-file-name
-                      "agent-shell-tramp/transcripts/"))
-               (host (or (file-remote-p cwd 'host) "remote"))
-               (dir (expand-file-name host root)))
-          (make-directory dir t)
-          (expand-file-name (format-time-string "%F-%H-%M-%S.md") dir)))))
-
-  (defun +agent-shell-xai-json-get (obj key)
-    "Get KEY from JSON alist OBJ (symbol or string key)."
-    (when obj
-      (or (map-elt obj key)
-          (let ((name (if (symbolp key) (symbol-name key) key)))
-            (or (map-elt obj name)
-                (map-elt obj (intern name)))))))
-
-  (defun +agent-shell-xai-ext-kind (method)
-    "Return `exit-plan-mode', `ask-user-question', or nil for METHOD."
-    (when (stringp method)
-      (let ((m (if (string-prefix-p "_" method) (substring method 1) method)))
-        (cond
-         ((or (equal m "x.ai/exit_plan_mode")
-              (string-suffix-p "/exit_plan_mode" m))
-          'exit-plan-mode)
-         ((or (equal m "x.ai/ask_user_question")
-              (string-suffix-p "/ask_user_question" m))
-          'ask-user-question)))))
-
-  (defun +agent-shell-xai-send-result (state request-id result)
-    "Reply to Grok reverse-request REQUEST-ID on STATE with RESULT alist."
-    (acp-send-response
-     :client (map-elt state :client)
-     :response `((:request-id . ,request-id)
-                 (:result . ,result))))
-
-  (defun +agent-shell-xai-plan-file-candidates (state params)
-    "Possible remote/local plan.md paths for this Grok session."
-    (let* ((sid (or (+agent-shell-xai-json-get params 'sessionId)
-                    (map-nested-elt state '(:session :id))))
-           (cwd (or (ignore-errors (agent-shell-cwd)) default-directory))
-           (local (directory-file-name
-                   (file-local-name (expand-file-name cwd))))
-           (sess-root (let ((default-directory cwd))
-                        (expand-file-name "~/.grok/sessions/"))))
-      (when sid
-        (delq nil
-              (list
-               (expand-file-name
-                (format "%s/%s/plan.md" (url-hexify-string local) sid)
-                sess-root)
-               (when (file-remote-p cwd)
-                 (expand-file-name
-                  (format "%s/%s/plan.md"
-                          (url-hexify-string (directory-file-name cwd))
-                          sid)
-                  sess-root)))))))
-
-  (defun +agent-shell-xai-read-plan-markdown (state params)
-    "Plan body from PARAMS `planContent', or plan.md on disk."
-    (or (let ((text (+agent-shell-xai-json-get params 'planContent)))
-          (and (stringp text) (not (string-empty-p text)) text))
-        (catch 'found
-          (dolist (path (+agent-shell-xai-plan-file-candidates state params))
-            (when (and path (file-readable-p path))
-              (throw 'found
-                     (with-temp-buffer
-                       (insert-file-contents path)
-                       (buffer-string)))))
-          nil)
-        "# No plan written yet\n"))
-
-  (defun +agent-shell-xai-show-plan (markdown)
-    "Show MARKDOWN in *Grok Plan* so the minibuffer prompt stays usable."
-    (let ((buf (get-buffer-create "*Grok Plan*")))
-      (with-current-buffer buf
-        (let ((inhibit-read-only t))
-          (erase-buffer)
-          (insert (or markdown "# No plan written yet\n"))
-          (goto-char (point-min))
-          (view-mode 1)))
-      (display-buffer buf)))
-
-  (defun +agent-shell-xai-handle-exit-plan-mode (state acp-request)
-    "Approve / revise / abandon Grok plan mode for ACP-REQUEST."
-    (let* ((id (+agent-shell-xai-json-get acp-request 'id))
-           (params (+agent-shell-xai-json-get acp-request 'params))
-           (plan (+agent-shell-xai-read-plan-markdown state params)))
-      (when (fboundp 'agent-shell--update-fragment)
-        (ignore-errors
-          (agent-shell--update-fragment
-           :state state
-           :block-id "xai-exit-plan-mode"
-           :label-left (propertize "Grok plan"
-                                   'font-lock-face 'agent-shell-section-heading)
-           :body plan
-           :expanded t
-           :above-last-prompt t)))
-      (+agent-shell-xai-show-plan plan)
-      (condition-case nil
-          (let* ((choice (car (read-multiple-choice
-                               "Grok 计划审批: "
-                               '((?a "批准" "退出 plan mode 并开始改文件")
-                                 (?s "改计划" "留在 plan mode，可附修改意见")
-                                 (?q "放弃" "丢掉计划并退出 plan mode")))))
-                 (feedback (if (eq choice ?s)
-                               (read-string "修改意见（可空）: ")
-                             ""))
-                 (outcome (pcase choice
-                            (?a "approved")
-                            (?q "abandoned")
-                            (_ "keep_planning"))))
-            (+agent-shell-xai-send-result
-             state id
-             `((outcome . ,outcome)
-               (feedback . ,(or feedback "")))))
-        (quit
-         (+agent-shell-xai-send-result
-          state id
-          '((outcome . "keep_planning")
-            (feedback . "")))))))
-
-  (defun +agent-shell-xai-normalize-questions (params)
-    "Return a list of question alists from ask_user_question PARAMS."
-    (let ((qs (+agent-shell-xai-json-get params 'questions)))
-      (cond
-       ((vectorp qs) (append qs nil))
-       ((listp qs) qs)
-       ((+agent-shell-xai-json-get params 'question)
-        (list params))
-       (t nil))))
-
-  (defun +agent-shell-xai-option-label (option)
-    "Label string for one ask_user_question OPTION."
-    (or (and (stringp option) option)
-        (+agent-shell-xai-json-get option 'label)
-        (format "%s" option)))
-
-  (defun +agent-shell-xai-ask-one-question (question)
-    "Prompt for one QUESTION alist; return chosen label string."
-    (let* ((text (or (+agent-shell-xai-json-get question 'question)
-                     "Question"))
-           (options (let ((raw (+agent-shell-xai-json-get question 'options)))
-                      (cond ((vectorp raw) (append raw nil))
-                            ((listp raw) raw)
-                            (t nil))))
-           (labels (mapcar #'+agent-shell-xai-option-label options))
-           (multi (+agent-shell-xai-json-get question 'multiSelect))
-           (help (mapconcat
-                  (lambda (o)
-                    (format "  %s — %s"
-                            (+agent-shell-xai-option-label o)
-                            (or (+agent-shell-xai-json-get o 'description) "")))
-                  options
-                  "\n")))
-      (if (null labels)
-          (read-string (format "%s\n(自由作答): " text))
-        (if multi
-            (string-join
-             (completing-read-multiple
-              (format "%s\n%s\n可多选（逗号分隔）: " text help)
-              labels nil t)
-             ", ")
-          (completing-read (format "%s\n%s\n选择: " text help)
-                           labels nil t)))))
-
-  (defun +agent-shell-xai-handle-ask-user-question (state acp-request)
-    "Answer Grok ask_user_question for ACP-REQUEST via the minibuffer."
-    (let* ((id (+agent-shell-xai-json-get acp-request 'id))
-           (params (+agent-shell-xai-json-get acp-request 'params))
-           (questions (+agent-shell-xai-normalize-questions params)))
-      (condition-case nil
-          (if (null questions)
-              (+agent-shell-xai-send-result
-               state id '((outcome . "cancelled")))
-            (let ((answers (make-hash-table :test 'equal))
-                  (annotations (make-hash-table :test 'equal)))
-              (dolist (q questions)
-                (let ((text (or (+agent-shell-xai-json-get q 'question)
-                                "Question")))
-                  (puthash text (+agent-shell-xai-ask-one-question q) answers)))
-              (+agent-shell-xai-send-result
-               state id
-               `((outcome . "accepted")
-                 (answers . ,answers)
-                 (annotations . ,annotations)))))
-        (quit
-         (+agent-shell-xai-send-result
-          state id '((outcome . "cancelled")))))))
-
-  (defun +agent-shell-xai-on-request (orig &rest args)
-    "Handle Grok `_x.ai/*' reverse-requests; otherwise call ORIG."
-    (let* ((acp-request (plist-get args :acp-request))
-           (state (plist-get args :state))
-           (kind (+agent-shell-xai-ext-kind
-                  (or (map-elt acp-request 'method)
-                      (+agent-shell-xai-json-get acp-request 'method)))))
-      (pcase kind
-        ('exit-plan-mode
-         (+agent-shell-xai-handle-exit-plan-mode state acp-request))
-        ('ask-user-question
-         (+agent-shell-xai-handle-ask-user-question state acp-request))
-        (_ (apply orig args)))))
-
-  (defun +agent-shell-start-grok ()
-    "Start a new interactive Grok Build agent shell."
-    (interactive)
-    (require 'agent-shell)
-    (require 'agent-shell-xai)
-    (+agent-shell-ensure-path)
-    (agent-shell--dwim :config (agent-shell-xai-make-grok-config)
-                       :new-shell t))
-
-  (defun +agent-shell-force-graphic-header ()
-    "Prefer graphical agent-shell header when a GUI frame is available."
-    (when (display-graphic-p)
-      (setq agent-shell-header-style 'graphical)))
   :init
   (setq agent-shell-agent-configs '(agent-shell-xai-make-grok-config)
         agent-shell-preferred-agent-config 'grok-build
@@ -470,29 +206,11 @@ into ACP stdio (that leaves the session on Initializing)."
         (agent-shell-make-environment-variables :inherit-env t)
         agent-shell-agent-configs (list #'agent-shell-xai-make-grok-config)
         agent-shell-preferred-agent-config 'grok-build)
-  (+agent-shell-force-graphic-header)
-  (add-hook 'server-after-make-frame-hook
-            (lambda ()
-              (when (display-graphic-p)
-                (+agent-shell-force-graphic-header))))
   (unless (or (file-executable-p +agent-shell-grok-bin)
               (executable-find "grok"))
     (warn "Cannot find Grok Build CLI at %s. Install it and run `grok login'."
           +agent-shell-grok-bin))
-  (with-eval-after-load 'zoom
-    (when (boundp 'zoom-ignored-major-modes)
-      (add-to-list 'zoom-ignored-major-modes 'agent-shell-mode)))
-  (advice-add #'agent-shell--update-bootstrapping-fragment :override #'ignore)
-  (advice-add 'agent-shell-xai-make-client :around
-              #'+agent-shell-xai-make-client-around)
-  (advice-add 'acp--start-client :around
-              #'+acp-start-client-without-tramp-pty)
-  (advice-add 'agent-shell--start :before
-              #'+agent-shell-reject-non-grok-remote)
-  (advice-add 'agent-shell--on-request :around
-              #'+agent-shell-xai-on-request)
-  (setq agent-shell-transcript-file-path-function
-        #'+agent-shell-transcript-file-path))
+  (advice-add #'agent-shell--update-bootstrapping-fragment :override #'ignore))
 
 (use-package agent-shell-tramp
   :straight (:type git :host github :repo "junyi-hou/agent-shell-tramp")

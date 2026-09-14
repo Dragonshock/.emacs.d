@@ -525,11 +525,16 @@ separate argument, although the command accepts only one."
 
 
 ;; [treesit]
+;; `treesit-enabled-modes' has a :set that copies remaps into
+;; `major-mode-remap-alist'.  `setq' skips that setter; `:init' also races
+;; defcustom load.  Non-daemon sessions set `use-package-always-defer', so
+;; this block must `:demand' or JSON stays on `js-json-mode'.
 (use-package treesit
   :when (treesit-available-p)
-  :init
-  (setq treesit-enabled-modes t
-        treesit-auto-install-grammar 'always))
+  :demand t
+  :config
+  (setopt treesit-enabled-modes t
+          treesit-auto-install-grammar 'always))
 
 
 ;; [indent-bars] Show indent guides
