@@ -198,6 +198,18 @@ Use this format:
       (expand-file-name
        (file-name-concat project-key ".agent-shell" subdir)
        (locate-user-emacs-file "var/agent-shell/"))))
+  (defun +agent-shell-bootstrapping-remote-only-a (orig &rest args)
+    "Render bootstrapping fragments only for shells whose cwd is remote.
+Local shells keep the quiet startup.  For a `/rpc:HOST:' cwd the
+\"Starting agent / Initializing / Authenticating\" status stays visible,
+so a stalled remote start shows which step it is stuck on."
+    (let* ((state (plist-get args :state))
+           (buf (and state (alist-get :buffer state)))
+           (dir (if (buffer-live-p buf)
+                    (buffer-local-value 'default-directory buf)
+                  default-directory)))
+      (when (file-remote-p dir)
+        (apply orig args))))
   :init
   (setq agent-shell-agent-configs '(agent-shell-xai-make-grok-config)
         agent-shell-preferred-agent-config 'grok-build
@@ -223,7 +235,8 @@ Use this format:
               (executable-find "grok"))
     (warn "Cannot find Grok Build CLI at %s. Install it and run `grok login'."
           +agent-shell-grok-bin))
-  (advice-add #'agent-shell--update-bootstrapping-fragment :override #'ignore))
+  (advice-add #'agent-shell--update-bootstrapping-fragment :around
+              #'+agent-shell-bootstrapping-remote-only-a))
 
 (use-package agent-shell-tramp
   :straight (:type git :host github :repo "junyi-hou/agent-shell-tramp")
