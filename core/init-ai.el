@@ -4,9 +4,10 @@
   :straight t
   :init
   ;; README: default backend via gptel-make-deepseek; key from ~/.authinfo
-  ;; (machine api.deepseek.com login apikey …).  Model ids are the package's
-  ;; current DeepSeek catalog (v4-flash / v4-pro), not the older reasoner id.
-  (setq gptel-model 'deepseek-v4-flash
+  ;; (machine api.deepseek.com login apikey …).
+  ;; Official API (2026-09-10): deepseek-flash = V4.1-Flash.  Legacy
+  ;; deepseek-v4-flash / vision-exp still route there temporarily.
+  (setq gptel-model 'deepseek-flash
         gptel-default-mode 'org-mode
         gptel-confirm-tool-calls 'auto)
   :config
@@ -14,7 +15,21 @@
         (gptel-make-deepseek "DeepSeek"
           :stream t
           :key gptel-api-key
-          :request-params '(:thinking (:type "enabled"))))
+          :request-params '(:thinking (:type "enabled"))
+          ;; gptel's bundled catalog still lists retired v4-flash ids.
+          :models '((deepseek-flash
+                     :description "DeepSeek-V4.1-Flash"
+                     :capabilities (media tool-use reasoning url)
+                     :mime-types ("image/jpeg" "image/png" "image/gif" "image/webp")
+                     :context-window 1000
+                     :input-cost 0.3
+                     :output-cost 1.2)
+                    (deepseek-v4-pro
+                     :description "DeepSeek-V4-Pro-0813"
+                     :capabilities (tool-use reasoning)
+                     :context-window 1000
+                     :input-cost 1.32
+                     :output-cost 3.96))))
   (add-hook! gptel-post-stream-hook #'gptel-auto-scroll)
   (add-hook! gptel-post-response-functions #'gptel-end-of-response))
 
@@ -200,10 +215,8 @@ Use this format:
   :config
   (+agent-shell-ensure-path)
   (require 'agent-shell-xai)
-  (setq agent-shell-xai-acp-command
-        (list +agent-shell-grok-bin "agent" "stdio")
-        agent-shell-xai-environment
-        (agent-shell-make-environment-variables :inherit-env t)
+  (setq agent-shell-xai-acp-command '("grok" "agent" "stdio")
+        agent-shell-xai-environment nil
         agent-shell-agent-configs (list #'agent-shell-xai-make-grok-config)
         agent-shell-preferred-agent-config 'grok-build)
   (unless (or (file-executable-p +agent-shell-grok-bin)

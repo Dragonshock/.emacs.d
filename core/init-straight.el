@@ -46,6 +46,4 @@
 ;; [straight-overview]
 (use-package straight-overview
   :straight (:host github :repo "alberti42/straight-overview")
-  :commands (straight-overview)
-  :init
-  (setq straight-overview-build-on-pull t))
+  :commands (straight-overview))

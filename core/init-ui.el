@@ -101,7 +101,7 @@
 
 
 ;; Font: Same width and height for emoji, chinese and english characters
-(defvar +font-size (if (eq system-type 'darwin) 16 26))  ; 16 26
+(defvar +font-size (if (eq system-type 'darwin) 16 26))
 
 (add-hook! server-after-make-frame-hook :unless-daemonp-call-immediately
   (defun +setup-fonts ()
@@ -159,8 +159,8 @@
   (setq doric-themes-to-toggle '(doric-almond doric-borage)
         doric-themes-to-rotate doric-themes-collection))
 
-(defvar +light-theme 'doric-almond)
-(defvar +dark-theme 'doric-borage)
+(defvar +light-theme 'doric-valley)
+(defvar +dark-theme 'doric-water)
 ;; Align with upstream roife: always re-detect dark/light and switch when the
 ;; picked theme differs.  First pass may run before xterm OSC 11; tty-setup-hook
 ;; re-runs after reportBackground so TUI can correct light → dark.
