@@ -105,6 +105,16 @@
 (add-hook! envrc-mode-hook #'+mode-line-update-envrc)
 
 
+(defun +mode-line-imenu-crumbs ()
+  "Imenu crumbs for the mode line; never signal during redisplay.
+`breadcrumb-imenu-crumbs' does `put-text-property' / `substring' on
+empty imenu names (shell-maker's current prompt, svelte empty tags,
+…)."
+  (condition-case nil
+      (breadcrumb-imenu-crumbs)
+    (args-out-of-range nil)
+    (error nil)))
+
 (defsubst +mode-line-normal ()
   "Formatting active-long mode-line."
   (let* ((active-p (mode-line-window-selected-p))
@@ -126,7 +136,7 @@
       (:propertize +mode-line-remote-host-name
                    face +mode-line-host-name-active-face)
       "  "
-      (:eval (breadcrumb-imenu-crumbs))
+      (:eval (+mode-line-imenu-crumbs))
       (:eval +mode-line-encoding))
     ))
 
