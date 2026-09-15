@@ -242,12 +242,21 @@ so a stalled remote start shows which step it is stuck on."
   :straight (:type git :host github :repo "junyi-hou/agent-shell-tramp")
   :after agent-shell
   :require-incrementally t
+  :preface
+  (declare-function agent-shell--default-transcript-file-path "agent-shell")
   :init
   (setq agent-shell-tramp-transcript-directory
         (expand-file-name
          (locate-user-emacs-file "var/agent-shell/remote-transcripts/")))
   :config
-  (agent-shell-tramp-mode 1))
+  (agent-shell-tramp-mode 1)
+  ;; Must follow `agent-shell-tramp-mode', which overwrites this variable when
+  ;; enabled.  Remote sessions then also go through `+agent-shell-dot-subdir':
+  ;; transcripts land in the local var/agent-shell/<slug>-<hash>/.agent-shell/
+  ;; transcripts/ layout that agent-recall indexes, instead of
+  ;; remote-transcripts/<method>/<user>@<host>/.
+  (setq agent-shell-transcript-file-path-function
+        #'agent-shell--default-transcript-file-path))
 
 (use-package agent-shell-attention
   :straight (:type git :host github :repo "ultronozm/agent-shell-attention.el")
