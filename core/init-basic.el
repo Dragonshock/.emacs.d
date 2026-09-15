@@ -330,7 +330,33 @@
   :config
   (setq tramp-default-method "rpc"
         tramp-backup-directory-alist backup-directory-alist
-        remote-file-name-inhibit-cache 60))
+        remote-file-name-inhibit-cache 60)
+
+  ;; Remote executable search path.  The grok installer only adds ~/.grok/bin
+  ;; to ~/.bashrc, which non-interactive shells may skip (Debian's early
+  ;; `return'), and `getconf PATH' never has it, so list it explicitly instead
+  ;; of relying on `tramp-own-remote-path'.  tramp-rpc expands "~" per
+  ;; connection and drops directories missing on the host; tramp-sh does not
+  ;; expand "~".  npm global installs land in ~/.local/bin or /usr/local/bin.
+  (dolist (dir '("~/.local/bin" "~/.grok/bin"))
+    (add-to-list 'tramp-remote-path dir))
+  ;; Fallback: also merge the remote login shell's PATH (one `$SHELL -l -c'
+  ;; call, cached per connection).
+  (add-to-list 'tramp-remote-path 'tramp-own-remote-path t)
+
+  ;; Per-host PATH for the Grok Build VPSes, honored by tramp-rpc via
+  ;; `tramp-rpc--effective-remote-path-spec'.  `:machine' is compared with
+  ;; `equal' against the ssh alias, so spell it exactly ("DMIT-ipv4" is
+  ;; case-sensitive; the lowercase form does not resolve).
+  (connection-local-set-profile-variables
+   '+tramp-grok-host-profile
+   '((tramp-remote-path . ("~/.grok/bin" "~/.local/bin"
+                           tramp-own-remote-path tramp-default-remote-path
+                           "/usr/local/bin" "/usr/bin" "/bin"))))
+  (dolist (host '("DMIT-ipv4" "grok-bot"))
+    (connection-local-set-profiles
+     `(:application tramp :protocol "rpc" :machine ,host)
+     '+tramp-grok-host-profile)))
 
 
 (use-package tramp-rpc
