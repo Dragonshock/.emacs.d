@@ -167,6 +167,7 @@ Use this format:
   :bind (("C-c g a" . agent-shell)
          ("C-c g p" . agent-shell-prompt-compose)
          ("C-c g w" . agent-shell-send-dwim)
+         ("C-c g R" . +agent-shell-remote)
          :map agent-shell-mode-map
          ("M-<return>" . agent-shell-newline)
          ("C-c C-h" . agent-shell-help-menu)
@@ -198,6 +199,58 @@ Use this format:
       (expand-file-name
        (file-name-concat project-key ".agent-shell" subdir)
        (locate-user-emacs-file "var/agent-shell/"))))
+  (defun +agent-shell-bootstrapping-remote-only-a (orig &rest args)
+    "Render bootstrapping fragments only for shells whose cwd is remote.
+Local shells keep the quiet startup.  For a `/rpc:HOST:' cwd the
+\"Starting agent / Initializing / Authenticating\" status stays visible,
+so a stalled remote start shows which step it is stuck on."
+    (let* ((state (plist-get args :state))
+           (buf (and state (alist-get :buffer state)))
+           (dir (if (buffer-live-p buf)
+                    (buffer-local-value 'default-directory buf)
+                  default-directory)))
+      (when (file-remote-p dir)
+        (apply orig args))))
+  (defvar +agent-shell-remote-hosts '("DMIT-ipv4" "grok-bot")
+    "SSH aliases (exact case, as in ~/.ssh/config) that run Grok Build via tramp-rpc.")
+  (defun +agent-shell-remote-directory (host &optional localname)
+    "Return the tramp-rpc directory name of LOCALNAME (default \"~\") on HOST."
+    (format "/rpc:%s:%s" host (file-name-as-directory (or localname "~"))))
+  (defun +agent-shell-remote-read-args (host)
+    "Read (DIR NEW) for a remote shell on HOST, defaulting to its home directory."
+    (list (read-directory-name (format "%s project dir: " host)
+                               (+agent-shell-remote-directory host))
+          current-prefix-arg))
+  (defun +agent-shell-remote (dir &optional new)
+    "Start or reuse a Grok agent-shell whose cwd is the remote directory DIR.
+DIR is a tramp-rpc name such as \"/rpc:grok-bot:~/proj/\".  With prefix
+argument NEW, force a new shell instead of reusing one for the same cwd.
+Loads `agent-shell-tramp' first so the TRAMP path resolver is active."
+    (interactive
+     (+agent-shell-remote-read-args
+      (completing-read "Host: " +agent-shell-remote-hosts nil t)))
+    (require 'agent-shell-tramp)
+    (unless (bound-and-true-p agent-shell-tramp-mode)
+      (agent-shell-tramp-mode 1))
+    ;; Run from a scratch buffer: `agent-shell--dwim' toggles the *current*
+    ;; shell whenever the calling buffer is in `agent-shell-mode', which would
+    ;; hide the local shell instead of starting the remote one.
+    (with-temp-buffer
+      (setq default-directory (file-name-as-directory (expand-file-name dir)))
+      ;; `agent-shell' treats the prefix (4) as C-u: force a new shell.
+      (agent-shell (when new '(4)))))
+  (defun +agent-shell-on-dmit (dir &optional new)
+    "Start or reuse a Grok agent-shell in DIR on DMIT-ipv4 (via tramp-rpc).
+Interactively DIR defaults to the remote home directory; a prefix argument
+NEW forces a new shell."
+    (interactive (+agent-shell-remote-read-args "DMIT-ipv4"))
+    (+agent-shell-remote dir new))
+  (defun +agent-shell-on-grok-bot (dir &optional new)
+    "Start or reuse a Grok agent-shell in DIR on grok-bot (via tramp-rpc).
+Interactively DIR defaults to the remote home directory; a prefix argument
+NEW forces a new shell."
+    (interactive (+agent-shell-remote-read-args "grok-bot"))
+    (+agent-shell-remote dir new))
   :init
   (setq agent-shell-agent-configs '(agent-shell-xai-make-grok-config)
         agent-shell-preferred-agent-config 'grok-build
@@ -223,18 +276,28 @@ Use this format:
               (executable-find "grok"))
     (warn "Cannot find Grok Build CLI at %s. Install it and run `grok login'."
           +agent-shell-grok-bin))
-  (advice-add #'agent-shell--update-bootstrapping-fragment :override #'ignore))
+  (advice-add #'agent-shell--update-bootstrapping-fragment :around
+              #'+agent-shell-bootstrapping-remote-only-a))
 
 (use-package agent-shell-tramp
   :straight (:type git :host github :repo "junyi-hou/agent-shell-tramp")
   :after agent-shell
   :require-incrementally t
+  :preface
+  (declare-function agent-shell--default-transcript-file-path "agent-shell")
   :init
   (setq agent-shell-tramp-transcript-directory
         (expand-file-name
          (locate-user-emacs-file "var/agent-shell/remote-transcripts/")))
   :config
-  (agent-shell-tramp-mode 1))
+  (agent-shell-tramp-mode 1)
+  ;; Must follow `agent-shell-tramp-mode', which overwrites this variable when
+  ;; enabled.  Remote sessions then also go through `+agent-shell-dot-subdir':
+  ;; transcripts land in the local var/agent-shell/<slug>-<hash>/.agent-shell/
+  ;; transcripts/ layout that agent-recall indexes, instead of
+  ;; remote-transcripts/<method>/<user>@<host>/.
+  (setq agent-shell-transcript-file-path-function
+        #'agent-shell--default-transcript-file-path))
 
 (use-package agent-shell-attention
   :straight (:type git :host github :repo "ultronozm/agent-shell-attention.el")
