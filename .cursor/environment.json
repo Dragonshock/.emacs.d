@@ -1,0 +1,8 @@
+{
+  "name": "Emacs configuration (.emacs.d)",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "user": "ubuntu",
+  "install": "./scripts/cloud-agent-install.sh"
+}
