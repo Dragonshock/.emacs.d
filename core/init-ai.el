@@ -232,7 +232,11 @@ Loads `agent-shell-tramp' first so the TRAMP path resolver is active."
     (require 'agent-shell-tramp)
     (unless (bound-and-true-p agent-shell-tramp-mode)
       (agent-shell-tramp-mode 1))
-    (let ((default-directory (file-name-as-directory (expand-file-name dir))))
+    ;; Run from a scratch buffer: `agent-shell--dwim' toggles the *current*
+    ;; shell whenever the calling buffer is in `agent-shell-mode', which would
+    ;; hide the local shell instead of starting the remote one.
+    (with-temp-buffer
+      (setq default-directory (file-name-as-directory (expand-file-name dir)))
       ;; `agent-shell' treats the prefix (4) as C-u: force a new shell.
       (agent-shell (when new '(4)))))
   (defun +agent-shell-on-dmit (dir &optional new)
