@@ -358,7 +358,6 @@
      `(:application tramp :protocol "rpc" :machine ,host)
      '+tramp-grok-host-profile)))
 
-
 (use-package tramp-rpc
   :straight (:type git
                    :host github

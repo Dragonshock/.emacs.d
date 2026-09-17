@@ -156,10 +156,10 @@
          ("C-c t s" . doric-themes-select)
          ("C-c t r" . doric-themes-rotate))
   :config
-  (setq doric-themes-to-toggle '(doric-almond doric-borage)
+  (setq doric-themes-to-toggle '(doric-light doric-water)
         doric-themes-to-rotate doric-themes-collection))
 
-(defvar +light-theme 'doric-valley)
+(defvar +light-theme 'doric-tiger)
 (defvar +dark-theme 'doric-water)
 ;; Align with upstream roife: always re-detect dark/light and switch when the
 ;; picked theme differs.  First pass may run before xterm OSC 11; tty-setup-hook

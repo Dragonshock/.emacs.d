@@ -5,14 +5,10 @@
   :straight (:type built-in)
   :config
   (setq
-   ;; Tasks describe executable work; project states describe the lifecycle
-   ;; of a multi-step outcome.
+   ;; A single workflow keeps tasks and project headings consistent.
    org-todo-keywords '((sequence
-                        "TODO(t)" "NEXT(n)" "WAIT(w@/!)" "SOMEDAY(s)" "IMMEDIATE(i!)"
-                        "|" "DONE(d!)" "CANCELED(c@)")
-                       (sequence
-                        "PROPOSED(o)" "PLANNED(p)" "ACTIVE(a)" "BLOCKED(b@)" "URGENT(u!)"
-                        "|" "COMPLETED(f!)" "ABANDONED(x@)"))
+                        "TODO(t)" "NEXT(n)" "WAIT(w@/!)" "SOMEDAY(s)" "URGENT(i!)"
+                        "|" "DONE(d!)" "CANCELED(c@)"))
    org-log-done 'time
    org-log-into-drawer t
    org-log-reschedule 'time
@@ -28,16 +24,11 @@
 
   (add-hook! org-mode-hook
     (defun +org-set-project-archive-location ()
-      "Archive active projects by domain and completion year.
-Work and personal project files use separate yearly archives.  Other Org
-files keep the default value of `org-archive-location'."
-      (when-let* ((file buffer-file-name)
-                  (domain (pcase (file-name-base file)
-                            ("projects-work" "work")
-                            ("projects-personal" "personal"))))
+      "Archive entries by source filename and year."
+      (when buffer-file-name
         (setq-local org-archive-location
-                    (format "archives/projects-%s-%s.org::* Archived"
-                            domain
+                    (format "archives/%s-%s.org::* Archived"
+                            (file-name-base buffer-file-name)
                             (format-time-string "%Y")))))))
 
 
@@ -50,7 +41,7 @@ files keep the default value of `org-archive-location'."
   (setq org-refile-targets
         `((,(mapcar (lambda (file)
                       (expand-file-name (concat "agenda/" file) org-directory))
-                    '("actions.org" "projects-work.org" "projects-personal.org"
+                    '("actions.org" "work.org" "personal.org"
                       "routines.org" "someday.org"))
            :maxlevel . 3))
         org-refile-use-outline-path 'file
@@ -81,12 +72,12 @@ files keep the default value of `org-archive-location'."
                             :empty-lines 1)
                            ("p" "Project")
                            ("pw" "Work project" entry
-                            (file "agenda/projects-work.org")
-                            "* PLANNED %^{Project name} :project:\n:PROPERTIES:\n:CREATED: %U\n:END:\n** NEXT %?\n"
+                            (file "agenda/work.org")
+                            "* TODO %^{Project name} :project:\n:PROPERTIES:\n:CREATED: %U\n:END:\n** NEXT %?\n"
                             :empty-lines 1)
                            ("pp" "Personal project" entry
-                            (file "agenda/projects-personal.org")
-                            "* PLANNED %^{Project name} :project:\n:PROPERTIES:\n:CREATED: %U\n:END:\n** NEXT %?\n"
+                            (file "agenda/personal.org")
+                            "* TODO %^{Project name} :project:\n:PROPERTIES:\n:CREATED: %U\n:END:\n** NEXT %?\n"
                             :empty-lines 1)
                            ("r" "Reminder" entry
                             (file org-default-notes-file)
@@ -122,98 +113,59 @@ SCHEDULED: %(let ((time (org-read-date t t nil \"First occurrence: \")))
 (use-package org-agenda
   :straight nil
   :require-incrementally t
-  :preface
-  (defun +org-agenda-show-eisenhower-quadrants (&rest _)
-    (interactive)
-    (org-agenda
-     nil
-     (if (equal (cadr org-agenda-redo-command) "Eisenhower quadrants")
-         "d"
-       "e")))
-  :bind (("C-c o a" . org-agenda)
-         :map org-agenda-mode-map
-         ("V" . +org-agenda-show-eisenhower-quadrants))
+  :bind (("C-c o a" . org-agenda))
   :config
-  (setq
-   ;; All Org files directly under ~/org/agenda/ are included.
-   org-agenda-files (list (expand-file-name "agenda/" org-directory))
-   org-agenda-sticky t
-   org-agenda-window-setup 'current-window
-   org-agenda-restore-windows-after-quit t
-   org-agenda-skip-scheduled-if-done t
-   org-agenda-skip-deadline-if-done t
-   org-agenda-deadline-faces '((1.001 . error)
-                               (1.0 . org-warning)
-                               (0.5 . org-upcoming-deadline)
-                               (0.0 . org-upcoming-distant-deadline))
-   org-agenda-custom-commands '(("d" "Dashboard"
-                                 ((agenda ""
-                                          ((org-agenda-overriding-header "This week")
-                                           (org-agenda-span 7)
-                                           (org-agenda-start-on-weekday nil)
-                                           (org-agenda-start-day "+0d")))
-                                  (todo "NEXT"
-                                        ((org-agenda-overriding-header "Next actions")))
-                                  (todo "WAIT"
-                                        ((org-agenda-overriding-header "Waiting")))
-                                  (todo "ACTIVE"
-                                        ((org-agenda-overriding-header "Active projects")))
-                                  (todo "BLOCKED"
-                                        ((org-agenda-overriding-header "Blocked projects")))
-                                  (todo "PLANNED"
-                                        ((org-agenda-overriding-header "Planned projects")))
-                                  (todo "PROPOSED"
-                                        ((org-agenda-overriding-header "Proposed projects")))))
-                                ("e" "Eisenhower quadrants"
-                                 ((tags-todo "PRIORITY={A\\|B}/!IMMEDIATE|URGENT"
-                                             ((org-agenda-overriding-header
-                                               "Q1 · Important and urgent (A/B)")
-                                              (org-agenda-skip-function
-                                               '(org-agenda-skip-entry-if
-                                                 'notregexp org-priority-regexp))))
-                                  (tags-todo "PRIORITY={A\\|B}/!-IMMEDIATE-URGENT"
-                                             ((org-agenda-overriding-header
-                                               "Q2 · Important, not urgent (A/B)")
-                                              (org-agenda-skip-function
-                                               '(org-agenda-skip-entry-if
-                                                 'notregexp org-priority-regexp))))
-                                  (tags-todo "PRIORITY=\"C\"/!IMMEDIATE|URGENT"
-                                             ((org-agenda-overriding-header
-                                               "Q3 · Not important and urgent (C)")
-                                              (org-agenda-skip-function
-                                               '(org-agenda-skip-entry-if
-                                                 'notregexp org-priority-regexp))))
-                                  (tags-todo "PRIORITY=\"C\"/!-IMMEDIATE-URGENT"
-                                             ((org-agenda-overriding-header
-                                               "Q4 · Not important, not urgent (C)")
-                                              (org-agenda-skip-function
-                                               '(org-agenda-skip-entry-if
-                                                 'notregexp org-priority-regexp))))
-                                  (alltodo ""
-                                           ((org-agenda-overriding-header
-                                             "Unclassified · choose A, B, or C")
-                                            (org-agenda-skip-function
-                                             '(org-agenda-skip-entry-if
-                                               'regexp org-priority-regexp)))))
-                                 ((org-agenda-sorting-strategy
-                                   '(priority-down category-keep))))
-                                ("i" "Immediate actions" todo "IMMEDIATE")
-                                ("u" "Urgent projects" todo "URGENT")
-                                ("n" "Next actions" todo "NEXT")
-                                ("w" "Waiting" todo "WAIT")
-                                ("o" "Proposed projects" todo "PROPOSED")
-                                ("p" "Projects"
-                                 ((todo "URGENT"
-                                        ((org-agenda-overriding-header "Urgent projects")))
-                                  (todo "ACTIVE"
-                                        ((org-agenda-overriding-header "Active projects")))
-                                  (todo "BLOCKED"
-                                        ((org-agenda-overriding-header "Blocked projects")))
-                                  (todo "PLANNED"
-                                        ((org-agenda-overriding-header "Planned projects")))
-                                  (todo "PROPOSED"
-                                        ((org-agenda-overriding-header "Proposed projects")))))
-                                ("s" "Someday / maybe" todo "SOMEDAY"))))
+  (cl-flet ((files (&rest names)
+              (mapcar (lambda (name)
+                        (expand-file-name (concat "agenda/" name ".org") org-directory))
+                      names)))
+    (let* ((agenda-files (files "actions" "calendar" "inbox" "personal"
+                                "routines" "someday" "work"))
+           (dated-files (remove (car (files "someday")) agenda-files))
+           (action-files (remove (car (files "calendar")) dated-files))
+           (project-files (files "personal" "work"))
+           (someday-files (files "personal" "someday" "work")))
+      (setq
+       org-agenda-files agenda-files
+       org-agenda-sticky t
+       org-agenda-window-setup 'current-window
+       org-agenda-restore-windows-after-quit t
+       org-agenda-inhibit-startup t
+       org-agenda-dim-blocked-tasks nil
+       org-agenda-use-tag-inheritance nil
+       org-agenda-ignore-properties '(stats)
+       org-agenda-skip-scheduled-if-done t
+       org-agenda-skip-deadline-if-done t
+       org-agenda-deadline-faces '((1.001 . error)
+                                   (1.0 . org-warning)
+                                   (0.5 . org-upcoming-deadline)
+                                   (0.0 . org-upcoming-distant-deadline))
+       org-agenda-custom-commands
+       `(("d" "Dashboard"
+          ((agenda "" ((org-agenda-files ',dated-files)))
+           (todo "URGENT" ((org-agenda-files ',action-files)
+                           (org-agenda-overriding-header "Urgent actions")))
+           (todo "NEXT" ((org-agenda-files ',action-files)
+                         (org-agenda-overriding-header "Next actions")))
+           (tags-todo "+project/TODO"
+                      ((org-agenda-files ',project-files)
+                       (org-agenda-overriding-header "Projects")))
+           (todo "WAIT" ((org-agenda-files ',action-files)
+                         (org-agenda-overriding-header "Waiting")))
+           (todo "SOMEDAY" ((org-agenda-files ',someday-files)
+                            (org-agenda-overriding-header "Someday / maybe")))))
+         ("i" "Urgent actions" todo "URGENT"
+          ((org-agenda-files ',action-files)))
+         ("n" "Next actions" todo "NEXT"
+          ((org-agenda-files ',action-files)))
+         ("w" "Waiting" todo "WAIT"
+          ((org-agenda-files ',action-files)))
+         ("p" "Projects"
+          ((tags-todo "+project/TODO"
+                      ((org-agenda-files ',project-files)
+                       (org-agenda-overriding-header "Projects")))))
+         ("s" "Someday / maybe" todo "SOMEDAY"
+          ((org-agenda-files ',someday-files))))))))
 
 
 ;; [calendar]
@@ -243,10 +195,15 @@ SCHEDULED: %(let ((time (org-read-date t t nil \"First occurrence: \")))
   :straight nil
   :require-incrementally (org-agenda t)
   :preface
+  (defvar +appt-refresh-timer nil
+    "Timer for deferred appointment refreshes.")
   (defun +appt-refresh ()
-    (org-agenda-to-appt t))
-  :hook ((org-mode . +org-appt-refresh-after-save)
-         ((org-capture-after-finalize
+    "Schedule one appointment refresh after Emacs becomes idle."
+    (when +appt-refresh-timer
+      (cancel-timer +appt-refresh-timer))
+    (setq +appt-refresh-timer
+          (run-with-idle-timer 0.75 nil #'org-agenda-to-appt t)))
+  :hook (((org-capture-after-finalize
            org-after-todo-state-change) . +appt-refresh))
   :config
   (setq appt-message-warning-time 15
@@ -261,9 +218,11 @@ SCHEDULED: %(let ((time (org-read-date t t nil \"First occurrence: \")))
                    (string-join (ensure-list minutes) "\n")
                    (string-join (ensure-list message) "\n")))))
 
-  (add-hook! org-mode-hook
-    (defun +org-appt-refresh-after-save (&rest _)
-      (add-hook 'after-save-hook #'+appt-refresh nil t)))
+  (add-hook 'after-save-hook
+            (lambda ()
+              (when (and (derived-mode-p 'org-mode)
+                         (member buffer-file-name org-agenda-files))
+                (+appt-refresh))))
 
   (appt-activate 1)
   (+appt-refresh)
