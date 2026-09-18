@@ -125,7 +125,11 @@
       (:propertize +mode-line-remote-host-name
                    face +mode-line-host-name-active-face)
       "  "
-      (:eval (breadcrumb-imenu-crumbs))
+      ;; shell-maker imenu can yield empty names; breadcrumb then
+      ;; errors in redisplay (args-out-of-range 0 1). See joaotavora/breadcrumb#36.
+      (:eval (and buffer-file-name
+                  (not (derived-mode-p 'agent-shell-mode))
+                  (breadcrumb-imenu-crumbs)))
       (:eval +mode-line-encoding))
     ))
 

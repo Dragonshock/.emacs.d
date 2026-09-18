@@ -326,6 +326,10 @@
 
 
 ;; [tramp] Edit file remotely
+(defvar +agent-shell-remote-hosts '("DMIT-ipv4" "grok-bot")
+  "SSH aliases (exact case, as in ~/.ssh/config) that run Grok Build via tramp-rpc.
+Shared by tramp connection-local PATH profiles and `+agent-shell-remote'.")
+
 (use-package tramp
   :config
   (setq tramp-default-method "rpc"
@@ -353,7 +357,7 @@
    '((tramp-remote-path . ("~/.grok/bin" "~/.local/bin"
                            tramp-own-remote-path tramp-default-remote-path
                            "/usr/local/bin" "/usr/bin" "/bin"))))
-  (dolist (host '("DMIT-ipv4" "grok-bot"))
+  (dolist (host +agent-shell-remote-hosts)
     (connection-local-set-profiles
      `(:application tramp :protocol "rpc" :machine ,host)
      '+tramp-grok-host-profile)))

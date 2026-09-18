@@ -165,6 +165,7 @@ Use this format:
                agent-shell-styles agent-shell-usage agent-shell-list-edit
                agent-shell-viewport agent-shell-ui t)
   :bind (("C-c g a" . agent-shell)
+         ("C-c g g" . agent-shell-xai-start-grok)
          ("C-c g p" . agent-shell-prompt-compose)
          ("C-c g w" . agent-shell-send-dwim)
          ("C-c g R" . +agent-shell-remote)
@@ -211,8 +212,6 @@ so a stalled remote start shows which step it is stuck on."
                   default-directory)))
       (when (file-remote-p dir)
         (apply orig args))))
-  (defvar +agent-shell-remote-hosts '("DMIT-ipv4" "grok-bot")
-    "SSH aliases (exact case, as in ~/.ssh/config) that run Grok Build via tramp-rpc.")
   (defun +agent-shell-remote-directory (host &optional localname)
     "Return the tramp-rpc directory name of LOCALNAME (default \"~\") on HOST."
     (format "/rpc:%s:%s" host (file-name-as-directory (or localname "~"))))
@@ -252,9 +251,7 @@ NEW forces a new shell."
     (interactive (+agent-shell-remote-read-args "grok-bot"))
     (+agent-shell-remote dir new))
   :init
-  (setq agent-shell-agent-configs '(agent-shell-xai-make-grok-config)
-        agent-shell-preferred-agent-config 'grok-build
-        agent-shell-context-sources nil
+  (setq agent-shell-context-sources '(region)
         agent-shell-mcp-servers nil
         agent-shell-session-restore-verbosity 'full
         agent-shell-show-welcome-message nil
@@ -269,7 +266,12 @@ NEW forces a new shell."
   (+agent-shell-ensure-path)
   (require 'agent-shell-xai)
   (setq agent-shell-xai-acp-command '("grok" "agent" "stdio")
-        agent-shell-xai-environment nil
+        agent-shell-xai-environment
+        (let ((token (ignore-errors (+ghub--token-from-gh-cli))))
+          (and token (not (string-empty-p token))
+               (agent-shell-make-environment-variables
+                "GH_TOKEN" token
+                "GITHUB_TOKEN" token)))
         agent-shell-agent-configs (list #'agent-shell-xai-make-grok-config)
         agent-shell-preferred-agent-config 'grok-build)
   (unless (or (file-executable-p +agent-shell-grok-bin)
@@ -278,18 +280,6 @@ NEW forces a new shell."
           +agent-shell-grok-bin))
   (advice-add #'agent-shell--update-bootstrapping-fragment :around
               #'+agent-shell-bootstrapping-remote-only-a))
-
-(use-package agent-shell-links
-  :straight (:type git :host github :repo "ultronozm/agent-shell-links.el")
-  :after agent-shell
-  :require-incrementally (ol t)
-  :config
-  (agent-shell-links-bookmark-setup)
-  (with-eval-after-load 'ol
-    (org-link-set-parameters
-     "agent-shell"
-     :follow #'agent-shell-links-org-follow
-     :store #'agent-shell-links-org-store)))
 
 (use-package agent-shell-links
   :straight (:type git :host github :repo "ultronozm/agent-shell-links.el")
