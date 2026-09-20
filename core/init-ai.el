@@ -164,12 +164,9 @@ Use this format:
                agent-shell-config agent-shell-markdown agent-shell-diff
                agent-shell-styles agent-shell-usage agent-shell-list-edit
                agent-shell-viewport agent-shell-ui t)
-  :hook (agent-shell-mode . +agent-shell-table-mono)
   :bind (("C-c g a" . agent-shell)
-         ("C-c g g" . agent-shell-xai-start-grok)
          ("C-c g p" . agent-shell-prompt-compose)
          ("C-c g w" . agent-shell-send-dwim)
-         ("C-c g R" . +agent-shell-remote)
          :map agent-shell-mode-map
          ("M-<return>" . agent-shell-newline)
          ("C-c C-h" . agent-shell-help-menu)
@@ -201,61 +198,17 @@ Use this format:
       (expand-file-name
        (file-name-concat project-key ".agent-shell" subdir)
        (locate-user-emacs-file "var/agent-shell/"))))
-  (defun +agent-shell-remote-directory (host &optional localname)
-    "Return the tramp-rpc directory name of LOCALNAME (default \"~\") on HOST."
-    (format "/rpc:%s:%s" host (file-name-as-directory (or localname "~"))))
-  (defun +agent-shell-remote-read-args (host)
-    "Read (DIR NEW) for a remote shell on HOST, defaulting to its home directory."
-    (list (read-directory-name (format "%s project dir: " host)
-                               (+agent-shell-remote-directory host))
-          current-prefix-arg))
-  (defun +agent-shell-remote (dir &optional new)
-    "Start or reuse a Grok agent-shell whose cwd is the remote directory DIR.
-DIR is a tramp-rpc name such as \"/rpc:grok-bot:~/proj/\".  With prefix
-argument NEW, force a new shell instead of reusing one for the same cwd.
-Loads `agent-shell-tramp' first so the TRAMP path resolver is active."
-    (interactive
-     (+agent-shell-remote-read-args
-      (completing-read "Host: " +agent-shell-remote-hosts nil t)))
-    (require 'agent-shell-tramp)
-    (unless (bound-and-true-p agent-shell-tramp-mode)
-      (agent-shell-tramp-mode 1))
-    ;; Run from a scratch buffer: `agent-shell--dwim' toggles the *current*
-    ;; shell whenever the calling buffer is in `agent-shell-mode', which would
-    ;; hide the local shell instead of starting the remote one.
-    (with-temp-buffer
-      (setq default-directory (file-name-as-directory (expand-file-name dir)))
-      ;; `agent-shell' treats the prefix (4) as C-u: force a new shell.
-      (agent-shell (when new '(4)))))
-  (defun +agent-shell-on-dmit (dir &optional new)
-    "Start or reuse a Grok agent-shell in DIR on DMIT-ipv4 (via tramp-rpc).
-Interactively DIR defaults to the remote home directory; a prefix argument
-NEW forces a new shell."
-    (interactive (+agent-shell-remote-read-args "DMIT-ipv4"))
-    (+agent-shell-remote dir new))
-  (defun +agent-shell-on-grok-bot (dir &optional new)
-    "Start or reuse a Grok agent-shell in DIR on grok-bot (via tramp-rpc).
-Interactively DIR defaults to the remote home directory; a prefix argument
-NEW forces a new shell."
-    (interactive (+agent-shell-remote-read-args "grok-bot"))
-    (+agent-shell-remote dir new))
-  (defun +agent-shell-table-mono ()
-    "Pin markdown table faces to `default' so CJK/ASCII columns share one font.
-Header `bold' and border `font-lock-comment-face' otherwise change glyph
-width and misalign mixed Chinese/English tables."
-    (face-remap-add-relative 'agent-shell-markdown-table-header 'default)
-    (face-remap-add-relative 'agent-shell-markdown-table-border 'default)
-    (face-remap-add-relative 'agent-shell-markdown-table-zebra 'default))
   :init
-  (setq agent-shell-context-sources '(region)
+  (setq agent-shell-agent-configs '(agent-shell-xai-make-grok-config)
+        agent-shell-preferred-agent-config 'grok-build
+        agent-shell-context-sources nil
         agent-shell-mcp-servers nil
-        agent-shell-session-restore-verbosity 'minimal
+        agent-shell-session-restore-verbosity 'full
         agent-shell-show-welcome-message nil
         agent-shell-chat-mode-enabled nil
         agent-shell-header-style 'text
         agent-shell-activity-group-expand-by-default 'latest
         agent-shell-markdown-table-zebra-stripe nil
-        agent-shell-markdown-table-use-unicode-borders nil
         agent-shell-dot-subdir-function #'+agent-shell-dot-subdir
         agent-shell-show-context-usage-indicator 'detailed
         agent-shell-file-display-action '((display-buffer-reuse-window display-buffer-pop-up-window)))
@@ -263,18 +216,41 @@ width and misalign mixed Chinese/English tables."
   (+agent-shell-ensure-path)
   (require 'agent-shell-xai)
   (setq agent-shell-xai-acp-command '("grok" "agent" "stdio")
-        agent-shell-xai-environment
-        (let ((token (ignore-errors (+ghub--token-from-gh-cli))))
-          (and token (not (string-empty-p token))
-               (agent-shell-make-environment-variables
-                "GH_TOKEN" token
-                "GITHUB_TOKEN" token)))
+        agent-shell-xai-environment nil
         agent-shell-agent-configs (list #'agent-shell-xai-make-grok-config)
         agent-shell-preferred-agent-config 'grok-build)
   (unless (or (file-executable-p +agent-shell-grok-bin)
               (executable-find "grok"))
     (warn "Cannot find Grok Build CLI at %s. Install it and run `grok login'."
-          +agent-shell-grok-bin)))
+          +agent-shell-grok-bin))
+  (advice-add #'agent-shell--update-bootstrapping-fragment :override #'ignore))
+
+(use-package agent-shell-fork-tree
+  :straight (:type git :host github :repo "roife/agent-shell-fork-tree")
+  :after agent-shell
+  :demand t
+  :hook (agent-shell-mode . agent-shell-fork-tree-mode)
+  :custom
+  (agent-shell-fork-tree-auto-rebuild nil)
+  :bind (("C-c g f" . agent-shell-fork-tree)
+         :map agent-shell-mode-map
+         ("C-c g t" . agent-shell-fork-tree)
+         :map agent-shell-viewport-edit-mode-map
+         ("C-c g t" . agent-shell-fork-tree)
+         :map agent-shell-viewport-view-mode-map
+         ("C-c g t" . agent-shell-fork-tree)))
+
+(use-package agent-shell-btw
+  :straight (:type git :host github :repo "roife/agent-shell-btw")
+  :after agent-shell
+  :demand t
+  :bind (("C-c g b" . agent-shell-btw)
+         :map agent-shell-mode-map
+         ("C-c b" . agent-shell-btw)
+         :map agent-shell-viewport-edit-mode-map
+         ("C-c b" . agent-shell-btw)
+         :map agent-shell-viewport-view-mode-map
+         ("C-c b" . agent-shell-btw)))
 
 (use-package agent-shell-links
   :straight (:type git :host github :repo "ultronozm/agent-shell-links.el")
@@ -292,21 +268,12 @@ width and misalign mixed Chinese/English tables."
   :straight (:type git :host github :repo "junyi-hou/agent-shell-tramp")
   :after agent-shell
   :require-incrementally t
-  :preface
-  (declare-function agent-shell--default-transcript-file-path "agent-shell")
   :init
   (setq agent-shell-tramp-transcript-directory
         (expand-file-name
          (locate-user-emacs-file "var/agent-shell/remote-transcripts/")))
   :config
-  (agent-shell-tramp-mode 1)
-  ;; Must follow `agent-shell-tramp-mode', which overwrites this variable when
-  ;; enabled.  Remote sessions then also go through `+agent-shell-dot-subdir':
-  ;; transcripts land in the local var/agent-shell/<slug>-<hash>/.agent-shell/
-  ;; transcripts/ layout that agent-recall indexes, instead of
-  ;; remote-transcripts/<method>/<user>@<host>/.
-  (setq agent-shell-transcript-file-path-function
-        #'agent-shell--default-transcript-file-path))
+  (agent-shell-tramp-mode 1))
 
 (use-package agent-shell-attention
   :straight (:type git :host github :repo "ultronozm/agent-shell-attention.el")
