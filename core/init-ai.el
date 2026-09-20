@@ -164,6 +164,7 @@ Use this format:
                agent-shell-config agent-shell-markdown agent-shell-diff
                agent-shell-styles agent-shell-usage agent-shell-list-edit
                agent-shell-viewport agent-shell-ui t)
+  :hook (agent-shell-mode . +agent-shell-table-mono)
   :bind (("C-c g a" . agent-shell)
          ("C-c g g" . agent-shell-xai-start-grok)
          ("C-c g p" . agent-shell-prompt-compose)
@@ -200,18 +201,6 @@ Use this format:
       (expand-file-name
        (file-name-concat project-key ".agent-shell" subdir)
        (locate-user-emacs-file "var/agent-shell/"))))
-  (defun +agent-shell-bootstrapping-remote-only-a (orig &rest args)
-    "Render bootstrapping fragments only for shells whose cwd is remote.
-Local shells keep the quiet startup.  For a `/rpc:HOST:' cwd the
-\"Starting agent / Initializing / Authenticating\" status stays visible,
-so a stalled remote start shows which step it is stuck on."
-    (let* ((state (plist-get args :state))
-           (buf (and state (alist-get :buffer state)))
-           (dir (if (buffer-live-p buf)
-                    (buffer-local-value 'default-directory buf)
-                  default-directory)))
-      (when (file-remote-p dir)
-        (apply orig args))))
   (defun +agent-shell-remote-directory (host &optional localname)
     "Return the tramp-rpc directory name of LOCALNAME (default \"~\") on HOST."
     (format "/rpc:%s:%s" host (file-name-as-directory (or localname "~"))))
@@ -250,15 +239,23 @@ Interactively DIR defaults to the remote home directory; a prefix argument
 NEW forces a new shell."
     (interactive (+agent-shell-remote-read-args "grok-bot"))
     (+agent-shell-remote dir new))
+  (defun +agent-shell-table-mono ()
+    "Pin markdown table faces to `default' so CJK/ASCII columns share one font.
+Header `bold' and border `font-lock-comment-face' otherwise change glyph
+width and misalign mixed Chinese/English tables."
+    (face-remap-add-relative 'agent-shell-markdown-table-header 'default)
+    (face-remap-add-relative 'agent-shell-markdown-table-border 'default)
+    (face-remap-add-relative 'agent-shell-markdown-table-zebra 'default))
   :init
   (setq agent-shell-context-sources '(region)
         agent-shell-mcp-servers nil
-        agent-shell-session-restore-verbosity 'full
+        agent-shell-session-restore-verbosity 'minimal
         agent-shell-show-welcome-message nil
         agent-shell-chat-mode-enabled nil
         agent-shell-header-style 'text
         agent-shell-activity-group-expand-by-default 'latest
         agent-shell-markdown-table-zebra-stripe nil
+        agent-shell-markdown-table-use-unicode-borders nil
         agent-shell-dot-subdir-function #'+agent-shell-dot-subdir
         agent-shell-show-context-usage-indicator 'detailed
         agent-shell-file-display-action '((display-buffer-reuse-window display-buffer-pop-up-window)))
@@ -277,9 +274,7 @@ NEW forces a new shell."
   (unless (or (file-executable-p +agent-shell-grok-bin)
               (executable-find "grok"))
     (warn "Cannot find Grok Build CLI at %s. Install it and run `grok login'."
-          +agent-shell-grok-bin))
-  (advice-add #'agent-shell--update-bootstrapping-fragment :around
-              #'+agent-shell-bootstrapping-remote-only-a))
+          +agent-shell-grok-bin)))
 
 (use-package agent-shell-links
   :straight (:type git :host github :repo "ultronozm/agent-shell-links.el")
