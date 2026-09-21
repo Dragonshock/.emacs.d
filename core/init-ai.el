@@ -176,17 +176,6 @@ Use this format:
   (agent-shell-section-heading ((t (:inherit font-lock-function-name-face :height 0.9))))
   (agent-shell-section-annotation ((t (:inherit shadow :height 0.8))))
   :preface
-  (defconst +agent-shell-grok-bin
-    (expand-file-name "~/.grok/bin/grok")
-    "Absolute path to the Grok Build CLI.")
-  (defun +agent-shell-ensure-path ()
-    "Ensure the Grok CLI directory is on `exec-path' and process PATH."
-    (let ((dir (file-name-directory +agent-shell-grok-bin)))
-      (when (file-directory-p dir)
-        (add-to-list 'exec-path dir)
-        (let ((path (getenv "PATH")))
-          (unless (and path (string-match-p (regexp-quote dir) path))
-            (setenv "PATH" (concat dir path-separator (or path ""))))))))
   (defun +agent-shell-dot-subdir (subdir)
     "Return the centralized Agent Shell data directory for SUBDIR."
     (let* ((cwd (directory-file-name (agent-shell-cwd)))
@@ -213,16 +202,8 @@ Use this format:
         agent-shell-show-context-usage-indicator 'detailed
         agent-shell-file-display-action '((display-buffer-reuse-window display-buffer-pop-up-window)))
   :config
-  (+agent-shell-ensure-path)
-  (require 'agent-shell-xai)
-  (setq agent-shell-xai-acp-command '("grok" "agent" "stdio")
-        agent-shell-xai-environment nil
-        agent-shell-agent-configs (list #'agent-shell-xai-make-grok-config)
-        agent-shell-preferred-agent-config 'grok-build)
-  (unless (or (file-executable-p +agent-shell-grok-bin)
-              (executable-find "grok"))
-    (warn "Cannot find Grok Build CLI at %s. Install it and run `grok login'."
-          +agent-shell-grok-bin))
+  ;; Dock Emacs does not inherit shell PATH; installer puts grok in ~/.grok/bin.
+  (add-to-list 'exec-path (expand-file-name "~/.grok/bin"))
   (advice-add #'agent-shell--update-bootstrapping-fragment :override #'ignore))
 
 (use-package agent-shell-fork-tree
