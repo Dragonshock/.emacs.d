@@ -96,7 +96,7 @@
           flymake-diagnostics-buffer-mode
 
           ;; grep-mode occur-mode rg-mode
-          osx-dictionary-mode
+          lexdb-mode
 
           "^\\*Process List\\*" process-menu-mode
 

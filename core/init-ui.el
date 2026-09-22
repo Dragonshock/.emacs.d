@@ -160,7 +160,7 @@
         doric-themes-to-rotate doric-themes-collection))
 
 (defvar +light-theme 'doric-tiger)
-(defvar +dark-theme 'doric-water)
+(defvar +dark-theme 'doric-borage)
 ;; Align with upstream roife: always re-detect dark/light and switch when the
 ;; picked theme differs.  First pass may run before xterm OSC 11; tty-setup-hook
 ;; re-runs after reportBackground so TUI can correct light → dark.

@@ -14,6 +14,7 @@
                      'init-xterm
                      (when (eq system-type 'gnu/linux) 'init-linux)
                      (when (eq system-type 'darwin) 'init-mac)
+                     'init-lexdb
                      'init-completion
                      'init-tools
                      'init-highlight
