@@ -22,6 +22,7 @@
          ("C-c d s" . lexdb-search))
   :init
   (setq lexdb-multi-dict-mode t
+        ;; Press t on a line to show its Chinese.
         lexdb-ui-translation-display 'peek
         lexdb-audio-player (or (executable-find "mpv")
                                (and (file-executable-p "/opt/homebrew/bin/mpv")
@@ -31,7 +32,11 @@
                                     "/opt/homebrew/bin/ffplay")
                                "mpv")
         lexdb-dictionaries
-        `((:id ldoce :type ldoce :name "朗文当代"
+        `((:id ldoce6pp :type ldoce :name "朗文6++"
+           :audio nil
+           :db-file ,(expand-file-name "sqlite/LDOCE6++.db" +lexdb-data-dir)
+           :priority 0)
+          (:id ldoce :type ldoce :name "朗文当代"
            :db-file ,(expand-file-name "sqlite/LDOCE6.db" +lexdb-data-dir)
            :priority 1)
           (:id oald :type oald :name "牛津双解"
