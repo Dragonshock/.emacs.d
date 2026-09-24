@@ -9,7 +9,7 @@
   ;; deepseek-v4-flash / vision-exp still route there temporarily.
   (setq gptel-model 'deepseek-flash
         gptel-default-mode 'org-mode
-        gptel-confirm-tool-calls 'auto)
+        gptel-confirm-tool-calls nil)
   :config
   (setq gptel-backend
         (gptel-make-deepseek "DeepSeek"
