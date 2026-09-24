@@ -197,7 +197,7 @@ such as shell-maker's current prompt."
              (notification (and appt-mode-string (cadar appt-time-msg-list)))
              (preview (and notification
                            (truncate-string-to-width notification 24 nil nil "…")))
-             (text (propertize (format " A %d%s " count
+             (text (propertize (format " %d%s " count
                                        (if preview (concat " " preview) ""))
                                'face 'font-lock-keyword-face)))
         (setq +tab-bar-org-agenda-indicator-cache
