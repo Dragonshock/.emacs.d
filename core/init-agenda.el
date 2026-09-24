@@ -1,9 +1,5 @@
 ;;; -*- lexical-binding: t -*-
 
-(defconst +agenda-file
-  (file-truename (expand-file-name "~/Documents/Emacs/agenda/agenda.org"))
-  "Single Org agenda file, outside `org-directory'.")
-
 ;; [org] Task, project, and refile workflow shared by Agenda and Capture.
 (use-package org
   :straight (:type built-in)
@@ -41,9 +37,13 @@
   :straight nil
   :hook (org-after-refile-insert . save-buffer)
   :init
-  ;; Refile within the single agenda file.
+  ;; Refile clarified inbox items into an action list or a project.
   (setq org-refile-targets
-        `((,+agenda-file :maxlevel . 3))
+        `((,(mapcar (lambda (file)
+                      (expand-file-name file "~/Documents/Emacs/agenda/"))
+                    '("actions.org" "work.org" "personal.org"
+                      "routines.org" "someday.org"))
+           :maxlevel . 3))
         org-refile-use-outline-path 'file
         org-outline-path-complete-in-steps nil
         org-refile-allow-creating-parent-nodes 'confirm))
@@ -56,35 +56,35 @@
   :bind ("C-c o c" . org-capture)
   :config
   (setq
-   org-default-notes-file +agenda-file
+   org-default-notes-file (expand-file-name "inbox.org" "~/Documents/Emacs/agenda/")
    ;; Capture quickly; clarify and organize during inbox processing.
-   org-capture-templates `(("t" "Inbox task" entry
-                            (file ,+agenda-file)
+   org-capture-templates '(("t" "Inbox task" entry
+                            (file org-default-notes-file)
                             "* TODO %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n%a\n"
                             :empty-lines 1)
                            ("n" "Inbox note" entry
-                            (file ,+agenda-file)
+                            (file org-default-notes-file)
                             "* %? :note:\n:PROPERTIES:\n:CREATED: %U\n:END:\n%a\n"
                             :empty-lines 1)
                            ("a" "Next action" entry
-                            (file ,+agenda-file)
+                            (file+headline "~/Documents/Emacs/agenda/actions.org" "Actions")
                             "* NEXT %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n%a\n"
                             :empty-lines 1)
                            ("p" "Project")
                            ("pw" "Work project" entry
-                            (file ,+agenda-file)
+                            (file "~/Documents/Emacs/agenda/work.org")
                             "* TODO %^{Project name} :project:\n:PROPERTIES:\n:CREATED: %U\n:END:\n** NEXT %?\n"
                             :empty-lines 1)
                            ("pp" "Personal project" entry
-                            (file ,+agenda-file)
+                            (file "~/Documents/Emacs/agenda/personal.org")
                             "* TODO %^{Project name} :project:\n:PROPERTIES:\n:CREATED: %U\n:END:\n** NEXT %?\n"
                             :empty-lines 1)
                            ("r" "Reminder" entry
-                            (file ,+agenda-file)
+                            (file org-default-notes-file)
                             "* TODO %?\nSCHEDULED: %^{When}T\n:PROPERTIES:\n:CREATED: %U\n:APPT_WARNTIME: %^{Warn before (minutes)|15}\n:END:\n"
                             :empty-lines 1)
                            ("R" "Repeating reminder" entry
-                            (file ,+agenda-file)
+                            (file+headline "~/Documents/Emacs/agenda/routines.org" "Recurring")
                             "* TODO %?
 SCHEDULED: %(let ((time (org-read-date t t nil \"First occurrence: \")))
               (format \"<%s %s>\"
@@ -100,11 +100,11 @@ SCHEDULED: %(let ((time (org-read-date t t nil \"First occurrence: \")))
 "
                             :empty-lines 1)
                            ("s" "Someday / maybe" entry
-                            (file ,+agenda-file)
+                            (file+headline "~/Documents/Emacs/agenda/someday.org" "Someday / Maybe")
                             "* SOMEDAY %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n%a\n"
                             :empty-lines 1)
                            ("e" "Calendar event" entry
-                            (file ,+agenda-file)
+                            (file "~/Documents/Emacs/agenda/calendar.org")
                             "* %^{Title}\n:PROPERTIES:\n:CREATED: %U\n:APPT_WARNTIME: %^{Warn before (minutes)|15}\n:END:\n%^{When}T\n%?\n"
                             :empty-lines 1))))
 
@@ -117,36 +117,58 @@ SCHEDULED: %(let ((time (org-read-date t t nil \"First occurrence: \")))
          :map org-agenda-mode-map
          ([remap org-agenda-goto-calendar] . +agenda-calendar-blocks))
   :config
-  (setq org-agenda-files (list +agenda-file)
-        org-agenda-sticky t
-        org-agenda-window-setup 'current-window
-        org-agenda-restore-windows-after-quit t
-        org-agenda-inhibit-startup t
-        org-agenda-dim-blocked-tasks nil
-        org-agenda-use-tag-inheritance nil
-        org-agenda-ignore-properties '(stats)
-        org-agenda-skip-scheduled-if-done t
-        org-agenda-skip-deadline-if-done t
-        org-agenda-deadline-faces '((1.001 . error)
-                                    (1.0 . org-warning)
-                                    (0.5 . org-upcoming-deadline)
-                                    (0.0 . org-upcoming-distant-deadline))
-        org-agenda-custom-commands
-        '(("d" "Dashboard"
-           ((agenda "")
-            (todo "URGENT" ((org-agenda-overriding-header "Urgent actions")))
-            (todo "NEXT" ((org-agenda-overriding-header "Next actions")))
-            (tags-todo "+project/TODO"
-                       ((org-agenda-overriding-header "Projects")))
-            (todo "WAIT" ((org-agenda-overriding-header "Waiting")))
-            (todo "SOMEDAY" ((org-agenda-overriding-header "Someday / maybe")))))
-          ("i" "Urgent actions" todo "URGENT")
-          ("n" "Next actions" todo "NEXT")
-          ("w" "Waiting" todo "WAIT")
-          ("p" "Projects"
-           ((tags-todo "+project/TODO"
-                       ((org-agenda-overriding-header "Projects")))))
-          ("s" "Someday / maybe" todo "SOMEDAY"))))
+  (cl-flet ((files (&rest names)
+              (mapcar (lambda (name)
+                        (expand-file-name (concat name ".org")
+                                          "~/Documents/Emacs/agenda/"))
+                      names)))
+    (let* ((agenda-files (files "actions" "calendar" "inbox" "personal"
+                                "routines" "someday" "work"))
+           (dated-files (remove (car (files "someday")) agenda-files))
+           (action-files (remove (car (files "calendar")) dated-files))
+           (project-files (files "personal" "work"))
+           (someday-files (files "personal" "someday" "work")))
+      (setq
+       org-agenda-files agenda-files
+       org-agenda-sticky t
+       org-agenda-window-setup 'current-window
+       org-agenda-restore-windows-after-quit t
+       org-agenda-inhibit-startup t
+       org-agenda-dim-blocked-tasks nil
+       org-agenda-use-tag-inheritance nil
+       org-agenda-ignore-properties '(stats)
+       org-agenda-skip-scheduled-if-done t
+       org-agenda-skip-deadline-if-done t
+       org-agenda-deadline-faces '((1.001 . error)
+                                   (1.0 . org-warning)
+                                   (0.5 . org-upcoming-deadline)
+                                   (0.0 . org-upcoming-distant-deadline))
+       org-agenda-custom-commands
+       `(("d" "Dashboard"
+          ((agenda "" ((org-agenda-files ',dated-files)))
+           (todo "URGENT" ((org-agenda-files ',action-files)
+                           (org-agenda-overriding-header "Urgent actions")))
+           (todo "NEXT" ((org-agenda-files ',action-files)
+                         (org-agenda-overriding-header "Next actions")))
+           (tags-todo "+project/TODO"
+                      ((org-agenda-files ',project-files)
+                       (org-agenda-overriding-header "Projects")))
+           (todo "WAIT" ((org-agenda-files ',action-files)
+                         (org-agenda-overriding-header "Waiting")))
+           (todo "SOMEDAY" ((org-agenda-files ',someday-files)
+                            (org-agenda-overriding-header "Someday / maybe")))))
+         ("i" "Urgent actions" todo "URGENT"
+          ((org-agenda-files ',action-files)))
+         ("n" "Next actions" todo "NEXT"
+          ((org-agenda-files ',action-files)))
+         ("w" "Waiting" todo "WAIT"
+          ((org-agenda-files ',action-files)))
+         ("p" "Projects"
+          ((tags-todo "+project/TODO"
+                      ((org-agenda-files ',project-files)
+                       (org-agenda-overriding-header "Projects")))))
+         ("s" "Someday / maybe" todo "SOMEDAY"
+          ((org-agenda-files ',someday-files))))))))
 
 
 ;; [calendar]
