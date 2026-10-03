@@ -21,7 +21,7 @@
             org-footnote org-list org-pcomplete org-src org-macro ob t)
   :init
   (setq org-modules '(org-habit)
-        org-directory (file-truename "~/org/"))
+        org-directory (file-truename "~/Documents/Emacs/org/"))
   :custom-face
   (org-quote ((t (:inherit org-block-begin-line))))
   :hook ((org-babel-after-execute . org-link-preview-refresh)
@@ -196,6 +196,16 @@
   (when (derived-mode-p 'org-mode) (+org-appear-meow-integration))
   )
 
+
+(use-package org-modern
+  :straight t
+  :require-incrementally t
+  :after org
+  :hook ((org-mode . org-modern-mode)
+         (org-agenda-finalize . org-modern-agenda))
+  :config
+  (setq org-modern-star 'replace
+        org-modern-replace-stars "◉○◈◇✳"))
 
 ;; [ox]
 (use-package ox

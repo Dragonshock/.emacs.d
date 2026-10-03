@@ -1,0 +1,29 @@
+#!/bin/sh
+# Refresh local Atom files for Elfeed, then let Emacs fetch feeds.
+# Reddit soft-skip (no token) → zero and does not fail the run.
+#
+# HN DeepSeek: set ELFEED_HN_LLM=1 (or any non-empty value).
+# Interactive elfeed-update (search `g') always exports this from Emacs.
+# Background elfeed-update-background does not — no unattended paid APIs.
+# Output (no-littering): var/rss/hackernews.atom, var/rss/reddit-emacs.atom.
+
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+status=0
+
+if [ -n "$ELFEED_HN_LLM" ]; then
+  echo "== hn-elfeed (LLM gated ON) =="
+  if ! "$script_dir/hn-elfeed.py" update; then
+    status=1
+    echo "hn-elfeed failed" >&2
+  fi
+else
+  echo "== hn-elfeed skipped (set ELFEED_HN_LLM=1 for DeepSeek summarization) =="
+fi
+
+echo "== reddit-elfeed =="
+if ! "$script_dir/reddit-elfeed.py"; then
+  status=1
+  echo "reddit-elfeed failed" >&2
+fi
+
+exit "$status"

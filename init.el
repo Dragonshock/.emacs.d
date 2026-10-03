@@ -28,10 +28,11 @@
                      'init-vcs
                      'init-ibuffer
                      'init-ime
-                     'init-modal
+                     ;; 'init-modal
                      'init-modeline
                      'init-ai
                      'init-social
+                     'init-elfeed
                      'init-media
                      'init-test
                      ))

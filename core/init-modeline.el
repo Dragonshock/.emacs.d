@@ -105,6 +105,43 @@
 (add-hook! envrc-mode-hook #'+mode-line-update-envrc)
 
 
+(defun +mode-line--drop-empty-imenu-names (nodes)
+  "Return imenu NODES without empty-string names.
+The cdr is non-nil when any name was dropped.  `shell-maker' indexes
+an empty prompt as \"\", and `breadcrumb' signals `args-out-of-range'
+when it puts a text property on that string."
+  (let (dropped kept)
+    (dolist (node nodes)
+      (cond
+       ((not (consp node))
+        (push node kept))
+       ((and (stringp (car node)) (string-empty-p (car node)))
+        (setq dropped t))
+       ((and (fboundp 'imenu--subalist-p) (imenu--subalist-p node))
+        (let ((child (+mode-line--drop-empty-imenu-names (cdr node))))
+          (when (cdr child) (setq dropped t))
+          (when (car child)
+            (push (cons (car node) (car child)) kept))))
+       (t (push node kept))))
+    (cons (nreverse kept) dropped)))
+
+(defun +mode-line-imenu-crumbs ()
+  "Imenu crumbs for the mode line.
+Drop empty imenu names before `breadcrumb-imenu-crumbs' runs, and
+keep a later `args-out-of-range' from breaking redisplay."
+  (when (and (boundp 'imenu--index-alist) imenu--index-alist)
+    (let ((cleaned (+mode-line--drop-empty-imenu-names imenu--index-alist)))
+      (when (cdr cleaned)
+        (setq imenu--index-alist (car cleaned))
+        ;; The loaded bytecode still uses the old name.  The source
+        ;; checkout uses the new one.  Either cache skips a rebuild.
+        (dolist (var '(breadcrumb--ipath-plain-cache bc--ipath-plain-cache))
+          (when (boundp var)
+            (set var nil))))))
+  (condition-case nil
+      (breadcrumb-imenu-crumbs)
+    (args-out-of-range nil)))
+
 (defsubst +mode-line-normal ()
   "Formatting active-long mode-line."
   (let* ((active-p (mode-line-window-selected-p))
@@ -125,7 +162,7 @@
       (:propertize +mode-line-remote-host-name
                    face +mode-line-host-name-active-face)
       "  "
-      (:eval (breadcrumb-imenu-crumbs))
+      (:eval (+mode-line-imenu-crumbs))
       (:eval +mode-line-encoding))
     ))
 

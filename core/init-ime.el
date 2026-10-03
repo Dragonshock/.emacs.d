@@ -9,11 +9,79 @@
                     (concat path path-separator value)
                   path))))))
 
-(let ((profile (expand-file-name "~/.nix-profile")))
-  (+liberime-prepend-env-path "CPATH" (expand-file-name "include" profile))
-  (+liberime-prepend-env-path "LIBRARY_PATH" (expand-file-name "lib" profile))
-  (+liberime-prepend-env-path "PKG_CONFIG_PATH"
-                              (expand-file-name "lib/pkgconfig" profile)))
+(defun +liberime-home-path ()
+  "Return the active Home Manager package directory, if any."
+  (let ((path (expand-file-name
+               "~/.local/state/home-manager/gcroots/current-home/home-path")))
+    (and (file-directory-p path) path)))
+
+(defun +liberime-nix-store-program ()
+  "Return an absolute nix-store executable, or nil."
+  (or (executable-find "nix-store")
+      (let ((fallback "/nix/var/nix/profiles/default/bin/nix-store"))
+        (and (file-executable-p fallback) fallback))))
+
+(defun +liberime-rime-prefix ()
+  "Return the librime prefix from the Home Manager rime.pc."
+  (let ((home (+liberime-home-path)))
+    (when home
+      (let ((pc (expand-file-name "lib/pkgconfig/rime.pc" home)))
+        (when (file-exists-p pc)
+          (directory-file-name
+           (file-name-directory
+            (directory-file-name
+             (file-name-directory (file-truename pc))))))))))
+
+(defun +liberime-deriver (output)
+  "Return the Nix derivation that produced OUTPUT, or nil."
+  (let ((program (+liberime-nix-store-program)))
+    (when (and program output)
+      (with-temp-buffer
+        (when (eq 0 (call-process program nil t nil "-q" "--deriver" output))
+          (let ((deriver (string-trim (buffer-string))))
+            (and (string-suffix-p ".drv" deriver)
+                 (file-readable-p deriver)
+                 deriver)))))))
+
+(defun +liberime-deriver-input (deriver relative)
+  "Return the first store path in DERIVER that contains RELATIVE."
+  (when (and deriver (file-readable-p deriver))
+    (with-temp-buffer
+      (insert-file-contents deriver)
+      (let (found)
+        (while (and (not found)
+                    (re-search-forward
+                     "/nix/store/[0-9a-z]+-[^\"'[:space:]]+" nil t))
+          (let ((path (match-string 0)))
+            (when (file-exists-p (expand-file-name relative path))
+              (setq found path))))
+        found))))
+
+(defun +liberime-setup-build-env ()
+  "Expose librime and its private headers to the native module builds.
+Home Manager puts librime on `home-path`.  `rime.pc` only lists the
+public headers, while liberime-regexp compiles vendored internal
+headers that include Boost and marisa.  Those two directories come
+from the librime derivation.  `~/.nix-profile` stays as a fallback."
+  (dolist (profile (delq nil (list (expand-file-name "~/.nix-profile")
+                                   (+liberime-home-path))))
+    (+liberime-prepend-env-path "CPATH" (expand-file-name "include" profile))
+    (+liberime-prepend-env-path "LIBRARY_PATH" (expand-file-name "lib" profile))
+    (+liberime-prepend-env-path "PKG_CONFIG_PATH"
+                                (expand-file-name "lib/pkgconfig" profile)))
+  (let* ((deriver (+liberime-deriver (+liberime-rime-prefix)))
+         (boost (+liberime-deriver-input
+                 deriver "include/boost/signals2/connection.hpp"))
+         (marisa (+liberime-deriver-input deriver "include/marisa.h")))
+    (when boost
+      (setenv "BOOST_INCLUDE" (expand-file-name "include" boost))
+      (+liberime-prepend-env-path "CPATH" (getenv "BOOST_INCLUDE")))
+    (when marisa
+      (let ((include (expand-file-name "include" marisa)))
+        (+liberime-prepend-env-path "CPATH" include)
+        (setenv "RIME_INTERNAL_CXXFLAGS" (concat "-I" include))))))
+
+(+liberime-setup-build-env)
 
 (use-package liberime
   :straight (liberime :type git :host github :repo "emacs-rime/liberime"
@@ -58,6 +126,10 @@
                                    rimel-predicate-tex-math-or-command-p)))
 
 (register-input-method "rimel" "Chinese" #'rimel-activate "中" "Rimel")
+
+;; Command-Space toggles Chinese.  C-\ is Emacs's default for this.
+(unbind-key "C-\\")
+(bind-key "s-SPC" #'toggle-input-method)
 
 ;; [sis] automatically switch input source
 (use-package sis

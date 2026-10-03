@@ -40,7 +40,7 @@
   ;; Refile clarified inbox items into an action list or a project.
   (setq org-refile-targets
         `((,(mapcar (lambda (file)
-                      (expand-file-name (concat "agenda/" file) org-directory))
+                      (expand-file-name file "~/Documents/Emacs/agenda/"))
                     '("actions.org" "work.org" "personal.org"
                       "routines.org" "someday.org"))
            :maxlevel . 3))
@@ -56,7 +56,7 @@
   :bind ("C-c o c" . org-capture)
   :config
   (setq
-   org-default-notes-file (expand-file-name "agenda/inbox.org" org-directory)
+   org-default-notes-file (expand-file-name "inbox.org" "~/Documents/Emacs/agenda/")
    ;; Capture quickly; clarify and organize during inbox processing.
    org-capture-templates '(("t" "Inbox task" entry
                             (file org-default-notes-file)
@@ -67,16 +67,16 @@
                             "* %? :note:\n:PROPERTIES:\n:CREATED: %U\n:END:\n%a\n"
                             :empty-lines 1)
                            ("a" "Next action" entry
-                            (file+headline "agenda/actions.org" "Actions")
+                            (file+headline "~/Documents/Emacs/agenda/actions.org" "Actions")
                             "* NEXT %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n%a\n"
                             :empty-lines 1)
                            ("p" "Project")
                            ("pw" "Work project" entry
-                            (file "agenda/work.org")
+                            (file "~/Documents/Emacs/agenda/work.org")
                             "* TODO %^{Project name} :project:\n:PROPERTIES:\n:CREATED: %U\n:END:\n** NEXT %?\n"
                             :empty-lines 1)
                            ("pp" "Personal project" entry
-                            (file "agenda/personal.org")
+                            (file "~/Documents/Emacs/agenda/personal.org")
                             "* TODO %^{Project name} :project:\n:PROPERTIES:\n:CREATED: %U\n:END:\n** NEXT %?\n"
                             :empty-lines 1)
                            ("r" "Reminder" entry
@@ -84,7 +84,7 @@
                             "* TODO %?\nSCHEDULED: %^{When}T\n:PROPERTIES:\n:CREATED: %U\n:APPT_WARNTIME: %^{Warn before (minutes)|15}\n:END:\n"
                             :empty-lines 1)
                            ("R" "Repeating reminder" entry
-                            (file+headline "agenda/routines.org" "Recurring")
+                            (file+headline "~/Documents/Emacs/agenda/routines.org" "Recurring")
                             "* TODO %?
 SCHEDULED: %(let ((time (org-read-date t t nil \"First occurrence: \")))
               (format \"<%s %s>\"
@@ -100,11 +100,11 @@ SCHEDULED: %(let ((time (org-read-date t t nil \"First occurrence: \")))
 "
                             :empty-lines 1)
                            ("s" "Someday / maybe" entry
-                            (file+headline "agenda/someday.org" "Someday / Maybe")
+                            (file+headline "~/Documents/Emacs/agenda/someday.org" "Someday / Maybe")
                             "* SOMEDAY %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n%a\n"
                             :empty-lines 1)
                            ("e" "Calendar event" entry
-                            (file "agenda/calendar.org")
+                            (file "~/Documents/Emacs/agenda/calendar.org")
                             "* %^{Title}\n:PROPERTIES:\n:CREATED: %U\n:APPT_WARNTIME: %^{Warn before (minutes)|15}\n:END:\n%^{When}T\n%?\n"
                             :empty-lines 1))))
 
@@ -119,7 +119,8 @@ SCHEDULED: %(let ((time (org-read-date t t nil \"First occurrence: \")))
   :config
   (cl-flet ((files (&rest names)
               (mapcar (lambda (name)
-                        (expand-file-name (concat "agenda/" name ".org") org-directory))
+                        (expand-file-name (concat name ".org")
+                                          "~/Documents/Emacs/agenda/"))
                       names)))
     (let* ((agenda-files (files "actions" "calendar" "inbox" "personal"
                                 "routines" "someday" "work"))
