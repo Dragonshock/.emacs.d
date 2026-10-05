@@ -2,38 +2,43 @@
 
 (use-package gptel
   :straight t
+  :demand t
   :init
-  ;; README: default backend via gptel-make-deepseek; key from ~/.authinfo
-  ;; (machine api.deepseek.com login apikey …).
-  ;; Official API (2026-09-10): deepseek-flash = V4.1-Flash.  Legacy
-  ;; deepseek-v4-flash / vision-exp still route there temporarily.
-  (setq gptel-model 'deepseek-flash
-        gptel-default-mode 'org-mode
+  (setq gptel-default-mode 'org-mode
         gptel-confirm-tool-calls nil)
   :config
-  (setq gptel-backend
-        (gptel-make-deepseek "DeepSeek"
-          :stream t
-          :key gptel-api-key
-          :request-params '(:thinking (:type "enabled")
-                            :reasoning_effort "low")
-          ;; gptel's bundled catalog still lists retired v4-flash ids.
-          :models '((deepseek-flash
-                     :description "DeepSeek-V4.1-Flash"
-                     :capabilities (media tool-use reasoning url)
-                     :mime-types ("image/jpeg" "image/png" "image/gif" "image/webp")
-                     :context-window 1000
-                     :input-cost 0.3
-                     :output-cost 1.2)
-                    (deepseek-v4-pro
-                     :description "DeepSeek-V4-Pro-0813"
-                     :capabilities (tool-use reasoning)
-                     :context-window 1000
-                     :input-cost 1.32
-                     :output-cost 3.96))))
+  ;; DeepSeek stays registered so the menu can switch back to HTTP.
+  ;; The default backend is Grok, set by gptel-acp.
+  (gptel-make-deepseek "DeepSeek"
+    :stream t
+    :key gptel-api-key
+    :request-params '(:thinking (:type "enabled")
+                      :reasoning_effort "low")
+    :models '((deepseek-flash
+               :description "DeepSeek-V4.1-Flash"
+               :capabilities (media tool-use reasoning url)
+               :mime-types ("image/jpeg" "image/png" "image/gif" "image/webp")
+               :context-window 1000
+               :input-cost 0.3
+               :output-cost 1.2)
+              (deepseek-v4-pro
+               :description "DeepSeek-V4-Pro-0813"
+               :capabilities (tool-use reasoning)
+               :context-window 1000
+               :input-cost 1.32
+               :output-cost 3.96)))
   (add-hook! gptel-post-stream-hook #'gptel-auto-scroll)
   (add-hook! gptel-post-response-functions #'gptel-end-of-response))
 
+(use-package gptel-acp
+  :straight nil
+  :load-path "/Users/dragon/src/local/gptel-acp"
+  :demand t
+  :init
+  (setq gptel-acp-reasoning-effort "high")
+  :config
+  (setq gptel-backend (gptel-get-backend "Grok")
+        gptel-model 'grok-4.7-build-fast))
 
 (use-package gptel-agent
   :straight t
