@@ -31,8 +31,7 @@
   (add-hook! gptel-post-response-functions #'gptel-end-of-response))
 
 (use-package gptel-acp
-  :straight nil
-  :load-path "/Users/dragon/src/local/gptel-acp"
+  :straight (:type git :host github :repo "Dragonshock/gptel-acp")
   :demand t
   :init
   (setq gptel-acp-reasoning-effort "high")
