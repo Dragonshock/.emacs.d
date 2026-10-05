@@ -21,7 +21,7 @@
             org-footnote org-list org-pcomplete org-src org-macro ob t)
   :init
   (setq org-modules '(org-habit)
-        org-directory (file-truename "~/Documents/Emacs/org/"))
+        org-directory (file-truename "~/org/"))
   :custom-face
   (org-quote ((t (:inherit org-block-begin-line))))
   :hook ((org-babel-after-execute . org-link-preview-refresh)

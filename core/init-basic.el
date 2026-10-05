@@ -374,10 +374,12 @@
   :straight t
   :unless noninteractive
   :init
-  (setq exec-path-from-shell-arguments '("-l")
-        exec-path-from-shell-variables '("PATH" "HOMEBREW"
-                                         "JAVA_HOME" "JAVA21_HOME" "JAVA26_HOME"
-                                         "JDTLS_JAVA_HOME" "MANPATH"))
+  (setq exec-path-from-shell-shell-name "/etc/profiles/per-user/dragon/bin/fish"
+        exec-path-from-shell-arguments nil
+        exec-path-from-shell-variables
+        '("PATH" "MANPATH"
+          "NIX_SSL_CERT_FILE" "NIX_PATH"
+          "JAVA_HOME" "JAVA21_HOME" "JAVA26_HOME" "JDTLS_JAVA_HOME"))
   ;; External programs can be needed by mode hooks during startup, so import
   ;; the login-shell environment before the rest of the configuration loads.
   (exec-path-from-shell-initialize))

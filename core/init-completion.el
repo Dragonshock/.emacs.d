@@ -102,7 +102,7 @@
   :straight t
   :bind (("C-;" . embark-act)
          ("M-;" . embark-dwim)
-         ("C-h B" . embark-bindings)
+         ("C-h E" . embark-bindings)
          :map embark-file-map
          ("s" . sudo-edit)
          ("g" . +embark-magit-status))
@@ -136,48 +136,14 @@
          ([remap locate]                        . consult-locate)
          ([remap load-theme]                    . consult-theme)
          ([remap man]                           . consult-man)
-         ([remap recentf-open-files]            . consult-recent-file)        ; C-x C-r
-         ([remap switch-to-buffer]              . consult-buffer)             ; C-x b
-         ([remap switch-to-buffer-other-window] . consult-buffer-other-window); C-x 4 b
-         ([remap switch-to-buffer-other-frame]  . consult-buffer-other-frame) ; C-x 5 b
-         ([remap yank-pop]                      . consult-yank-pop)           ; M-y
-         ;; ── C-c (mode-specific); skip C-c h — hs uses C-c h TAB / ` ──
-         ("C-c M" . consult-mode-command)
-         ("C-c k" . consult-kmacro)
-         ;; ── C-x ──
-         ("C-x M-:" . consult-complex-command)
-         ;; ── registers (dakra) ──
-         ("M-#"   . consult-register-load)
-         ("M-'"   . consult-register-store)
-         ("C-M-#" . consult-register)
-         ;; ── M-g (goto-map); goto-line already via remap ──
-         ("M-g e" . consult-compile-error)
-         ("M-g o" . consult-outline)
-         ("M-g m" . consult-mark)
-         ("M-g k" . consult-global-mark)
-         ;; M-i kept for minuet (init-prog); imenu via remap + M-g i / M-s i
-         ("M-g i" . consult-imenu)
-         ("M-g I" . consult-imenu-multi)
-         ;; ── M-s (search-map) ──
-         ("M-s d" . consult-fd)          ; dakra uses consult-find; keep fd
-         ("M-s D" . consult-locate)
-         ("M-s g" . consult-grep)
-         ("M-s G" . consult-git-grep)
-         ("M-s r" . consult-ripgrep)
-         ("M-s l" . consult-line)
-         ("M-s L" . consult-line-multi)
-         ("M-s k" . consult-keep-lines)
-         ("M-s u" . consult-focus-lines)
-         ("M-s i" . consult-imenu)
-         ("M-s I" . consult-imenu-multi)
-         ("M-s e" . consult-isearch-history)
-         ;; ── global search primary (dakra) ──
-         ("C-s" . consult-line)
-         :map isearch-mode-map
-         ("M-e"   . consult-isearch-history)
-         ("M-s e" . consult-isearch-history)
-         ("M-s l" . consult-line)
-         ("M-s L" . consult-line-multi)
+         ([remap recentf-open-files]            . consult-recent-file)
+         ([remap switch-to-buffer]              . consult-buffer)
+         ([remap switch-to-buffer-other-window] . consult-buffer-other-window)
+         ([remap switch-to-buffer-other-frame]  . consult-buffer-other-frame)
+         ([remap yank-pop]                      . consult-yank-pop)
+         ("C-c d l"                             . consult-line)
+         ("C-c d r"                             . consult-ripgrep)
+         ("C-c d f"                             . consult-fd)
          :map minibuffer-mode-map
          ("C-r"                                 . consult-history))
   :config

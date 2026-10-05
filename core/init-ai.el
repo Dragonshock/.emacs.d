@@ -2,31 +2,11 @@
 
 (use-package gptel
   :straight t
-  :demand t
   :init
   (setq gptel-default-mode 'org-mode
         gptel-confirm-tool-calls nil)
   :config
-  ;; DeepSeek stays registered so the menu can switch back to HTTP.
   ;; The default backend is Grok, set by gptel-acp.
-  (gptel-make-deepseek "DeepSeek"
-    :stream t
-    :key gptel-api-key
-    :request-params '(:thinking (:type "enabled")
-                      :reasoning_effort "low")
-    :models '((deepseek-flash
-               :description "DeepSeek-V4.1-Flash"
-               :capabilities (media tool-use reasoning url)
-               :mime-types ("image/jpeg" "image/png" "image/gif" "image/webp")
-               :context-window 1000
-               :input-cost 0.3
-               :output-cost 1.2)
-              (deepseek-v4-pro
-               :description "DeepSeek-V4-Pro-0813"
-               :capabilities (tool-use reasoning)
-               :context-window 1000
-               :input-cost 1.32
-               :output-cost 3.96)))
   (add-hook! gptel-post-stream-hook #'gptel-auto-scroll)
   (add-hook! gptel-post-response-functions #'gptel-end-of-response))
 
@@ -315,7 +295,7 @@ This restores the event subscription without replaying history."
   :init
   (setq agent-recall-search-paths
         (mapcar #'expand-file-name
-                '("~/.config/emacs" "~/code" "~/.config" "~/.config/emacs/var/agent-shell"))
+                '("~/.config/emacs" "~/src" "~/.config" "~/.config/emacs/var/agent-shell"))
         agent-recall-max-depth 3
         agent-recall-search-function 'consult-ripgrep
         agent-recall-browse-sort 'modified-desc
@@ -342,6 +322,7 @@ This restores the event subscription without replaying history."
 
 ;; [gptel-copilot] gptel-powered inline code completion
 (use-package gptel-copilot
+  :disabled
   :straight (:type git :host github :repo "roife/gptel-copilot")
   :commands gptel-copilot-mode
   :preface
@@ -362,13 +343,9 @@ This restores the event subscription without replaying history."
               ("C-e" . +gptel-copilot-complete)
               ("M-f" . +gptel-copilot-complete-word))
   :config
-  ;; DeepSeek thinking is on by default, and those tokens count toward
-  ;; gptel-copilot's 256-token cap, so an inline request can finish
-  ;; before any code is produced.
-  (setq gptel-copilot-model 'deepseek-flash
+  (require 'gptel-openai-oauth)
+
+  (setq gptel-copilot-model 'gpt-5.4-mini
         gptel-copilot-idle-delay 0.2
-        gptel-copilot-backend
-        (gptel-make-deepseek "DeepSeek Inline"
-          :stream t
-          :key gptel-api-key
-          :request-params '(:thinking (:type "disabled")))))
+        gptel-copilot-backend (gptel-make-openai-oauth "OpenAI OAuth Inline"
+                                :request-params '(:reasoning (:effort "low")))))
