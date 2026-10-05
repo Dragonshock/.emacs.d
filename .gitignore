@@ -22,3 +22,11 @@
 private.el
 emacs.pdmp
 
+# Local notes, agent scratch, and machine symlinks
+/.grok/
+/.scratch/
+/AGENTS.md
+/dev-docs/
+/scripts/update-gnus-sources
+/tree-sitter
+

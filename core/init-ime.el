@@ -127,8 +127,7 @@ from the librime derivation.  `~/.nix-profile` stays as a fallback."
 
 (register-input-method "rimel" "Chinese" #'rimel-activate "中" "Rimel")
 
-;; Command-Space toggles Chinese.  C-\ is Emacs's default for this.
-(unbind-key "C-\\")
+;; C-\ is Emacs's default.  Command-Space does the same where the terminal delivers s-SPC.
 (bind-key "s-SPC" #'toggle-input-method)
 
 ;; [sis] automatically switch input source
