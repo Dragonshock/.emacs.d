@@ -87,6 +87,8 @@ included; for the final argument the leading separator is included."
     (meow-esc-mode -1))
 
   (defun +meow-bind-keys ()
+    (define-key meow-insert-state-keymap (kbd "C-g") #'meow-insert-exit)
+
     (add-to-list 'meow-char-thing-table '(?a . arg))
     (meow-thing-register 'arg
                          #'+bounds-of-thing-at-point-arg
