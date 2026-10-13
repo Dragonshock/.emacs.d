@@ -16,7 +16,6 @@
 
 ;; [autorevert]
 (use-package autorevert
-  :straight nil
   :hook (find-file . +auto-revert-mode)
   :config
   (setq auto-revert-verbose t
@@ -24,14 +23,6 @@
         auto-revert-stop-on-user-input nil
         ;; Only prompts for confirmation when buffer is unsaved.
         revert-without-query (list "."))
-
-  (defun +visible-buffers ()
-    "Return visible buffers across all frames."
-    (let (buffers)
-      (walk-windows (lambda (window)
-                      (push (window-buffer window) buffers))
-                    'no-minibuf t)
-      (delete-dups buffers)))
 
   (defun +auto-revert-buffer-h (&rest _)
     "Auto revert current buffer when it is stale."
@@ -55,7 +46,7 @@
 
   (defun +auto-revert-visible-buffers-h (&rest _)
     "Auto revert visible stale buffers."
-    (dolist (buffer (+visible-buffers))
+    (dolist (buffer (delete-dups (mapcar #'window-buffer (window-list-1 nil 'no-minibuf t))))
       (with-current-buffer buffer
         (+auto-revert-buffer-h))))
 
@@ -169,16 +160,12 @@
         ediff-merge-split-window-function 'split-window-horizontally
         ediff-highlight-all-diffs t
         ;; turn off whitespace checking
-        ediff-diff-options "-w")
-  )
+        ediff-diff-options "-w"))
 
 
 ;; [elec-pair] Automatic parenthesis pairing
 (use-package elec-pair
-  :hook ((prog-mode conf-mode yaml-mode org-mode markdown-ts-mode minibuffer-mode) . electric-pair-mode)
-  :config
-  (setq electric-pair-inhibit-predicate 'electric-pair-default-inhibit)
-  )
+  :hook ((prog-mode conf-mode yaml-mode org-mode markdown-ts-mode minibuffer-mode) . electric-pair-mode))
 
 
 ;; [mwim] Better C-a C-e for programming
@@ -244,8 +231,7 @@
           (if (eq original-func 'delete-backward-char)
               (backward-delete-char-untabify 1)
             (call-interactively original-func)))
-      (puni-backward-delete-char)))
-  )
+      (puni-backward-delete-char))))
 
 ;; [dtdr-indent] Detect indentation size
 (use-package dtrt-indent
@@ -256,17 +242,16 @@
 (use-package dogears
   :straight t
   :hook (after-init . dogears-mode)
-  :bind (:map global-map
-              ("M-g d" . dogears-go)
-              ("M-g M-b" . dogears-back)
-              ("M-g M-f" . dogears-forward)
-              ("M-g M-d" . dogears-list)
-              ("M-g M-D" . dogears-sidebar))
+  :bind (("M-g d" . dogears-go)
+         ("M-g M-b" . dogears-back)
+         ("M-g M-f" . dogears-forward)
+         ("M-g M-d" . dogears-list)
+         ("M-g M-D" . dogears-sidebar))
   :config
   (setq dogears-idle 1
         dogears-limit 200
-        dogears-position-delta 20)
-  (setq dogears-functions '(find-file
+        dogears-position-delta 20
+        dogears-functions '(find-file
                             recenter-top-bottom
                             other-window switch-to-buffer
                             aw-select

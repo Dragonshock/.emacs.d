@@ -11,15 +11,10 @@
   :hook ((after-init . vertico-mode))
   :config
   (setq vertico-cycle t
-        vertico-count 15)
-
-  ;; WORKAROUND: https://github.com/minad/vertico#problematic-completion-commands
-  (setq org-refile-use-outline-path 'file
-        org-outline-path-complete-in-steps nil))
+        vertico-count 15))
 
 
 (use-package vertico-directory
-  :straight nil
   :after vertico
   :bind (:map vertico-map
               ("RET" . vertico-directory-enter)
@@ -30,14 +25,12 @@
 
 
 (use-package vertico-quick
-  :straight nil
   :after vertico
   :bind (:map vertico-map
               ("C-," . vertico-quick-jump)))
 
 
 (use-package vertico-buffer
-  :straight nil
   :after vertico
   :hook (vertico-mode . vertico-buffer-mode)
   :config
@@ -54,34 +47,33 @@
 (use-package orderless
   :straight t
   :init
-  ;; Component modifiers:
+  ;; Component prefix modifiers:
   ;;   !foo excludes, =foo matches literally, ~foo uses flex,
   ;;   ^foo matches a literal prefix, ,foo uses initialism,
   ;;   %foo enables char-folding, @foo matches annotations.
+  (defconst +orderless-prefix-styles
+    '((?! . orderless-without-literal)
+      (?% . char-fold-to-regexp)
+      (?^ . orderless-literal-prefix)
+      (?, . orderless-initialism)
+      (?= . orderless-literal)
+      (?~ . orderless-flex)
+      (?@ . orderless-annotation)))
+
   (defun +orderless-dispatch (pattern _index _total)
-    (cond
-     ;; Ensure $ works with Consult commands, which add disambiguation suffixes
-     ((string-suffix-p "$" pattern) `(orderless-regexp . ,(concat (substring pattern 0 -1) "[\x200000-\x300000]*$")))
-     ((string= "!" pattern) `(orderless-literal . ""))
-     ((string-prefix-p "!" pattern) `(orderless-without-literal . ,(substring pattern 1)))
-     ((string-prefix-p "%" pattern) `(char-fold-to-regexp . ,(substring pattern 1)))
-     ((string-suffix-p "%" pattern) `(char-fold-to-regexp . ,(substring pattern 0 -1)))
-     ((string-prefix-p "^" pattern) `(orderless-literal-prefix . ,(substring pattern 1)))
-     ((string-suffix-p "^" pattern) `(orderless-literal-prefix . ,(substring pattern 0 -1)))
-     ((string-prefix-p "," pattern) `(orderless-initialism . ,(substring pattern 1)))
-     ((string-suffix-p "," pattern) `(orderless-initialism . ,(substring pattern 0 -1)))
-     ((string-prefix-p "=" pattern) `(orderless-literal . ,(substring pattern 1)))
-     ((string-suffix-p "=" pattern) `(orderless-literal . ,(substring pattern 0 -1)))
-     ((string-prefix-p "~" pattern) `(orderless-flex . ,(substring pattern 1)))
-     ((string-suffix-p "~" pattern) `(orderless-flex . ,(substring pattern 0 -1)))
-     ((string-prefix-p "@" pattern) `(orderless-annotation . ,(substring pattern 1)))
-     ((string-suffix-p "@" pattern) `(orderless-annotation . ,(substring pattern 0 -1)))))
+    "Dispatch PATTERN's prefix modifier or trailing regexp end anchor."
+    (unless (string-empty-p pattern)
+      (let* ((first (aref pattern 0))
+             (style (alist-get first +orderless-prefix-styles)))
+        (cond
+         ;; Ensure $ works with Consult commands, which add disambiguation suffixes
+         ((string-suffix-p "$" pattern) `(orderless-regexp . ,(concat (substring pattern 0 -1) "[\x200000-\x300000]*$")))
+         ((string= "!" pattern) '(orderless-literal . ""))
+         (style (cons style (substring pattern 1)))))))
 
   (setq completion-styles '(orderless basic)
         completion-category-defaults nil
         completion-ignore-case t
-        read-buffer-completion-ignore-case t
-        read-file-name-completion-ignore-case t
         completion-category-overrides '((file (styles basic partial-completion))
                                         (eglot (styles orderless))
                                         (eglot-capf (styles orderless)))
@@ -253,7 +245,6 @@
       (corfu-mode 1))))
 
 (use-package corfu-history
-  :straight nil
   :after corfu
   :config
   (corfu-history-mode 1)
@@ -261,14 +252,12 @@
     (cl-pushnew 'corfu-history savehist-additional-variables)))
 
 (use-package corfu-popupinfo
-  :straight nil
   :after corfu
   :config
   (corfu-popupinfo-mode 1)
   (setq corfu-popupinfo-delay '(1.0 . 1.0)))
 
 (use-package corfu-quick
-  :straight nil
   :after corfu
   :bind (:map corfu-map
               ("C-, ," . corfu-quick-complete)))
@@ -276,22 +265,14 @@
 
 (use-package cape
   :straight t
-  :hook (((TeX-mode LaTeX-mode org-mode markdown-ts-mode) . +completion-add-tex-capfs))
+  :hook ((TeX-mode LaTeX-mode org-mode markdown-ts-mode) . +cape-tex-setup)
   :init
   (setq cape-dabbrev-buffer-function #'buffer-list)
-
-  (defun +completion-add-capfs (&rest capfs)
-    "Append CAPFS to the buffer-local `completion-at-point-functions'."
-    (dolist (capf capfs)
-      (unless (memq capf completion-at-point-functions)
-        (setq-local completion-at-point-functions
-                    (append completion-at-point-functions (list capf))))))
-
   (setq-default completion-at-point-functions
                 (append completion-at-point-functions (list #'cape-file #'cape-dabbrev)))
 
-  (defun +completion-add-tex-capfs ()
-    (+completion-add-capfs #'cape-tex)))
+  (defun +cape-tex-setup ()
+    (add-hook 'completion-at-point-functions #'cape-tex 90 t)))
 
 
 ;;; Snippets
@@ -309,11 +290,10 @@
   (defvar +tempel-trigger-capf nil)
 
   (defun +tempel-setup-capf ()
-    (unless +tempel-trigger-capf
-      (setq +tempel-trigger-capf (cape-capf-trigger #'tempel-complete ?/)))
-    (unless (memq +tempel-trigger-capf completion-at-point-functions)
-      (setq-local completion-at-point-functions
-                  (cons +tempel-trigger-capf completion-at-point-functions)))))
+    (add-hook 'completion-at-point-functions
+              (or +tempel-trigger-capf
+                  (setq +tempel-trigger-capf (cape-capf-trigger #'tempel-complete ?/)))
+              -90 t)))
 
 
 (use-package tempel-collection

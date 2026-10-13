@@ -302,7 +302,6 @@ This restores the event subscription without replaying history."
         agent-recall-resume-continue-transcript t))
 
 (use-package agent-recall-consult
-  :straight nil
   :bind ("C-c g /" . agent-recall-consult-search)
   :init
   (setq agent-recall-consult-resumable-only nil))

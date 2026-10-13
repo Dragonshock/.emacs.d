@@ -27,7 +27,7 @@
 ;; [ezf] Use Emacs completion from terminal shells
 (use-package ezf
   :straight (:type git :host github :repo "roife/ezf")
-  :demand t)
+  :commands ezf-client)
 
 
 ;; [speedbar]
@@ -41,14 +41,6 @@
 (use-package goto-addr
   :hook ((text-mode . goto-address-mode)
          (prog-mode . goto-address-prog-mode)))
-
-
-;; [arxiv.el] Search, browse, and save arXiv papers
-;; (use-package arxiv
-;;   :straight (:type git :host github :repo "roife/arxiv.el")
-;;   :config
-;;   (setq arxiv-browser-function #'arxiv-eww-browse-url)
-;;   (arxiv-url-handler-mode 1))
 
 
 ;; [avy] Jump with several key strock
@@ -143,8 +135,6 @@
 
 ;; [re-builder]
 (use-package re-builder
-  :ensure nil
-  :commands re-builder
   :bind (:map reb-mode-map
               ("C-c C-k" . reb-quit)
               ("C-c C-p" . reb-prev-match)
@@ -164,13 +154,12 @@
 
 ;; [emacs-reader] read docs in emacs
 (use-package reader
-  :straight `(reader :type git :host codeberg :repo "MonadicSheep/emacs-reader"
-                     :files (:defaults ,(concat "render-core" module-file-suffix))
-                     :pre-build ("make" "all")))
+  :straight  `(reader :type git :host codeberg :repo "MonadicSheep/emacs-reader"
+                      :files (:defaults ,(concat "render-core" module-file-suffix))
+                      :pre-build ("make" "all" "CC=cc" "USE_PKGCONFIG=yes")))
 
 ;; [browse-url] Pass a URL to browser
 (use-package browse-url
-  :defines dired-mode-map
   :bind (("C-, o" . browse-url-at-point)
          ("C-, e" . browse-url-emacs)))
 

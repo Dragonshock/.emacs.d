@@ -2,22 +2,13 @@
 ;;; Mainly for speeding up startup time
 
 ;; Defer GC during startup, then restore sane runtime defaults later.
-(defvar +gc-cons-threshold (* 32 1024 1024)
-  "Default `gc-cons-threshold' after startup.")
-(defvar +gc-cons-percentage 0.2
-  "Default `gc-cons-percentage' after startup.")
-
 (setq gc-cons-threshold most-positive-fixnum
       gc-cons-percentage 1.0)
-
-(defun +restore-gc-threshold-h ()
-  "Restore GC settings after startup."
-  (setq gc-cons-threshold +gc-cons-threshold
-        gc-cons-percentage +gc-cons-percentage))
-
-(add-hook 'emacs-startup-hook #'+restore-gc-threshold-h 100)
-
-(setq native-comp-jit-compilation t)
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (setq gc-cons-threshold (* 32 1024 1024)
+                  gc-cons-percentage 0.2))
+          100)
 
 ;; Keep early startup quiet unless we're debugging init.
 (setq ad-redefinition-action 'accept
@@ -28,8 +19,8 @@
       warning-suppress-types '((defvaralias) (lexical-binding))
       warning-inhibit-types '((files missing-lexbind-cookie)))
 
-;; Increase process read size before any package can start subprocesses.
-(setq read-process-output-max (* 64 1024))
+;; Larger process output buffer (mainly for LSP).
+(setq read-process-output-max (* 4 1024 1024))
 
 ;; In noninteractive sessions, prioritize .el file. It saves IO time
 (setq load-prefer-newer noninteractive)
@@ -40,7 +31,6 @@
 ;; Inhibit startup screen & message
 (setq inhibit-startup-screen t
       inhibit-startup-echo-area-message t
-      inhibit-startup-message t
       inhibit-startup-buffer-menu t
       inhibit-x-resources t
       inhibit-default-init t
@@ -63,19 +53,19 @@
 (setq package-enable-at-startup nil)
 
 ;; Faster to disable these here (before initialized)
-(push '(tab-bar-lines . 1) default-frame-alist)
+;; init-modeline enables the tab bar later to avoid clipping PGTK's echo area.
+(push '(tab-bar-lines . 0) default-frame-alist)
 (push '(menu-bar-lines . 0) default-frame-alist)
 (push '(tool-bar-lines . 0) default-frame-alist)
 (push '(vertical-scroll-bars) default-frame-alist)
 (push '(internal-border-width . 0) default-frame-alist)
-;; (push '(undecorated-round . t) default-frame-alist)
 (when (featurep 'ns)
   (push '(ns-transparent-titlebar . t) default-frame-alist))
-                                        ; Set these to nil so users don't have to toggle the modes twice to reactivate.
+;; Set these to nil so users don't have to toggle the modes twice to reactivate.
 (setq menu-bar-mode nil
       tool-bar-mode nil
       scroll-bar-mode nil
-      tab-bar-mode t)
+      tab-bar-mode nil)
 
 ;; Avoid toolbar setup work during startup. It is unnecessary while the toolbar is
 ;; disabled, and can be reconstructed if `tool-bar-mode' is enabled later.

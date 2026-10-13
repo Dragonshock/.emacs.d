@@ -75,52 +75,12 @@ DOCSTRING and BODY are as in `defun'.
          (dolist (target (cdr targets))
            (advice-add target (car targets) #',symbol))))))
 
-(defmacro +advice-pp-to-prin1! (&rest body)
-  "Define an advice called SYMBOL that map `pp' to `prin1' when called.
-PLACE is the function to which to add the advice, like in `advice-add'.
-
-\(fn SYMBOL &rest [PLACES...]\)"
-  `(progn
-     (dolist (target (list ,@body))
-       (advice-add target :around #'+call-fn-with-pp-to-prin1))))
-
-(defmacro defun-call! (symbol args &rest body)
-  "Define a function and optionally apply it with specified arguments.
-
-\(fn SYMBOL ARGS &optional [DOCSTRING] &optional [:call-with APPLY_ARGS] BODY\)"
-  (declare (indent defun))
-  (let* ((docstring (if (stringp (car body)) (pop body)))
-         (apply-body (if (eq :call-with (car body))
-                         (progn
-                           (cl-assert (eq (pop body) :call-with))
-                           (pop body))
-                       nil)))
-    `(progn
-       (defun ,symbol ,args
-         ,@(if docstring
-               (cons docstring body)
-             body))
-       (apply ',symbol
-              ,(if (listp apply-body)
-                   `(list ,@apply-body)
-                 `(list ,apply-body))))))
-
-(defun +call-fn-with-pp-to-prin1 (fn &rest args)
-  "Call FN with ARGS, map `pp' to `prin1' when called."
-  (cl-letf (((symbol-function #'pp) #'prin1)
-            ((symbol-function #'pp-to-string) #'prin1-to-string))
-    (apply fn args)))
-
 (defun +unfill-region (start end)
   "Replace newline chars in region from START to END by single spaces.
 This command does the inverse of `fill-region'."
   (interactive "r")
   (let ((fill-column most-positive-fixnum))
     (fill-region start end)))
-
-(defun +temp-buffer-p (buffer)
-  "Return t if BUFFER is temporary."
-  (string-match-p "^ " (buffer-name buffer)))
 
 (defun +enable-conservative-scrolling ()
   "Use conservative scrolling in the current buffer."

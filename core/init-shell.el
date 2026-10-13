@@ -37,9 +37,7 @@
 
    ;; Completion like bash
    eshell-cmpl-ignore-case t
-   eshell-cmpl-cycle-completions nil
-   )
-
+   eshell-cmpl-cycle-completions nil)
 
   (defun +eshell-toggle (&optional arg)
     "Toggle a persistent Eshell popup window for the current project or directory.
@@ -48,8 +46,7 @@ If the popup is focused, kill it.
 If no project is found, create a temporary Eshell instance in the current directory."
     (interactive "P")
     (require 'eshell)
-    (require 'project)  ;; Ensure we load project.el
-    (let* ((project (project-current)) ;; Get the current project
+    (let* ((project (project-current))
            (dir-name (directory-file-name default-directory))
            (root-name (if project
                           (file-name-nondirectory (directory-file-name (project-root project))) ;; Use project name
@@ -81,30 +78,29 @@ If no project is found, create a temporary Eshell instance in the current direct
                   (ignore-errors
                     (delete-window (get-buffer-window popup-buffer-name)))))))))))
 
-  (defun +eshell/define-alias ()
-    "Define alias for eshell"
-    ;; Aliases
-    (defalias 'eshell-f 'find-file)
-    (defalias 'eshell-fo 'find-file-other-window)
-    (defalias 'eshell-d 'dired)
-    (eshell/alias "l" "ls -lah $*")
-    (eshell/alias "ll" "ls -laG $*")
-    (defalias 'eshell-q 'eshell/exit)
-    (eshell/alias "rg" "rg --color=always $*")
-    ;; Vim
-    (defalias 'eshell-vim 'find-file)
-    (defalias 'eshell-vi 'find-file)
-    ;; Git
-    (eshell/alias "git" "git $*")
-    (eshell/alias "gst" "git status $*")
-    (eshell/alias "ga" "git add $*")
-    (eshell/alias "gc" "git commit $*")
-    (eshell/alias "gp" "git push $*")
-    (eshell/alias "gb" "git branch $*")
-    (eshell/alias "gch" "git checkout $*")
-    (eshell/alias "gcb" "git checkout -b $*")
-    )
-  (add-hook! eshell-first-time-mode-hook #'+eshell/define-alias)
+  (add-hook! eshell-first-time-mode-hook
+    (defun +eshell/define-alias ()
+      "Define alias for eshell"
+      (pcase-dolist (`(,name . ,command)
+                     '((eshell-f . find-file)
+                       (eshell-fo . find-file-other-window)
+                       (eshell-d . dired)
+                       (eshell-q . eshell/exit)
+                       (eshell-vim . find-file)
+                       (eshell-vi . find-file)))
+        (defalias name command))
+      (pcase-dolist (`(,name . ,definition)
+                     '(("l" . "ls -lah $*")
+                       ("ll" . "ls -laG $*")
+                       ("rg" . "rg --color=always $*")
+                       ("gst" . "git status $*")
+                       ("ga" . "git add $*")
+                       ("gc" . "git commit $*")
+                       ("gp" . "git push $*")
+                       ("gb" . "git branch $*")
+                       ("gch" . "git checkout $*")
+                       ("gcb" . "git checkout -b $*")))
+        (eshell/alias name definition))))
   ;; Don't auto-write our aliases! Let us manage our own `eshell-aliases-file' via elisp
   (advice-add #'eshell-write-aliases-list :override #'ignore)
 
@@ -196,8 +192,7 @@ If no project is found, create a temporary Eshell instance in the current direct
       (when (and (equal major-mode 'eshell-mode)
                  ;; avoid renaming buffer name like Eshell-popup: ...
                  (not (string-match-p "^Eshell-popup: " (buffer-name))))
-        (rename-buffer (concat "Esh: " (abbreviate-file-name default-directory)) t))))
-  )
+        (rename-buffer (concat "Esh: " (abbreviate-file-name default-directory)) t)))))
 
 
 ;; [esh-syntax-highlighting] Fish-like syntax highlighting
@@ -314,5 +309,4 @@ Like normal Emacs `C-k'.  Kill to end of line and put content in kill-ring."
 
 
 (use-package ghostel-eshell
-  :straight nil
   :hook (eshell-load . ghostel-eshell-visual-command-mode))

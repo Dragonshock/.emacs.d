@@ -11,15 +11,12 @@
    dired-recursive-copies 'always
    ;; Move between two dired buffer quickly
    dired-dwim-target t
-   ;; Ask whether destination dirs should get created when copying/removing files.
-   dired-create-destination-dirs 'ask
    ;; don't prompt to revert, just do it
    dired-auto-revert-buffer #'dired-buffer-stale-p
    ;; symlink
    dired-hide-details-hide-symlink-targets nil
    ;; free disk
-   dired-free-space nil
-   )
+   dired-free-space nil)
 
   (when (eq system-type 'darwin)
     (if (executable-find "gls")
@@ -30,8 +27,7 @@
   (when (or (not (eq system-type 'darwin)) (executable-find "gls"))
     (setq ls-lisp-use-insert-directory-program t ; Using `insert-directory-program'
           ;; Show directory first
-          dired-listing-switches "-alh --group-directories-first"))
-  )
+          dired-listing-switches "-alh --group-directories-first")))
 
 ;; [dired-git-info] Show git info in dired
 (use-package dired-git-info
@@ -41,13 +37,13 @@
               ("G" . dired-git-info-mode))
   :config
   (setq dgi-commit-message-format "%h %cs %s"
-        dgi-auto-hide-details-p nil)
-  )
+        dgi-auto-hide-details-p nil))
 
 ;; [dired-aux] Extra Dired functionality
 (use-package dired-aux
   :after dired
   :config
+  ;; Ask whether destination dirs should get created when copying/removing files.
   (setq dired-create-destination-dirs 'ask
         dired-vc-rename-file t))
 
@@ -60,11 +56,9 @@
   :config
   (setq dired-omit-verbose nil
         ;; hide dot files
-        dired-omit-files "^\\..*\\'")
-
-  ;; Disable the prompt about killing the Dired buffer for a deleted directory.
-  (setq dired-clean-confirm-killing-deleted-buffers nil)
-  )
+        dired-omit-files "^\\..*\\'"
+        ;; Disable the prompt about killing the Dired buffer for a deleted directory.
+        dired-clean-confirm-killing-deleted-buffers nil))
 
 
 ;; [fd-dired] Using `fd' with `find-dired'
@@ -94,8 +88,7 @@
 
   (use-package dired-narrow
     :bind (:map dired-mode-map
-                (";" . dired-narrow-fuzzy)))
-  )
+                (";" . dired-narrow-fuzzy))))
 
 
 ;; [ffx] `dired-collapse'-style folding for file-name completion.
