@@ -162,8 +162,7 @@
   ;; recenters the view after the jump
   (defadvice! +save-place-recenter-a (&rest _)
     :after #'save-place-find-file-hook
-    (when buffer-file-name (ignore-errors (recenter))))
-  )
+    (when buffer-file-name (ignore-errors (recenter)))))
 
 
 ;;; [recentf] recently visited files
@@ -171,9 +170,8 @@
   :bind (("C-x C-r" . recentf-open-files))
   :hook (after-init . recentf-mode)
   :config
-  (setq recentf-autosave-interval 1000)
-
-  (setq recentf-auto-cleanup 'never
+  (setq recentf-autosave-interval 1000
+        recentf-auto-cleanup 'never
         recentf-max-saved-items 200
         recentf-exclude (list "\\.?cache" ".cask" "url" "COMMIT_EDITMSG\\'" "bookmarks"
                               "\\.?ido\\.last$" "\\.revive$" "/G?TAGS$" "/.elfeed/"
@@ -193,8 +191,7 @@
   ;; Add dired directories to recentf file list.
   (add-hook! dired-mode-hook
     (defun +dired--add-to-recentf-h ()
-      (recentf-add-file default-directory)))
-  )
+      (recentf-add-file default-directory))))
 
 
 ;;; [savehist] Save variables to file
@@ -264,8 +261,7 @@
   (dolist (override '((bidi-display-reordering . nil)
                       (font-lock-maximum-decoration . 1)
                       (save-place-alist . nil)))
-    (add-to-list 'so-long-variable-overrides override))
-  )
+    (add-to-list 'so-long-variable-overrides override)))
 
 
 ;; [glyphless-display] Don't render glyphs, in case of undisplayable characters.

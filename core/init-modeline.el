@@ -1,7 +1,5 @@
 ;;; -*- lexical-binding: t -*-
 
-(eval-when-compile (require 'cl-lib))
-
 ;;; face
 (defgroup +mode-line nil
   "Mode-Line faces."
@@ -20,14 +18,11 @@
 ;;; Indicators
 (defsubst +mode-line-overwrite-readonly-indicator ()
   "Display modified, read-only, and overwrite indicators independently."
-  (let* ((mo (pcase (buffer-modified-p)
-               ('t (and (buffer-file-name) " *"))
-               ('autosaved " ~")
-               (_ nil)))
-         (ro (and buffer-read-only " %%"))
-         (ov (and overwrite-mode " #"))
-         (ans (concat mo ro ov)))
-    ans))
+  (concat (pcase (buffer-modified-p)
+            ('t (and (buffer-file-name) " *"))
+            ('autosaved " ~"))
+          (and buffer-read-only " %%")
+          (and overwrite-mode " #")))
 
 (defsubst +mode-line-macro-indicator ()
   "Display current Emacs macro being recorded."
@@ -133,11 +128,10 @@ keep a later `args-out-of-range' from breaking redisplay."
     (let ((cleaned (+mode-line--drop-empty-imenu-names imenu--index-alist)))
       (when (cdr cleaned)
         (setq imenu--index-alist (car cleaned))
-        ;; The loaded bytecode still uses the old name.  The source
-        ;; checkout uses the new one.  Either cache skips a rebuild.
-        (dolist (var '(breadcrumb--ipath-plain-cache bc--ipath-plain-cache))
-          (when (boundp var)
-            (set var nil))))))
+        ;; The short prefix in breadcrumb.el is a shorthand for the long
+        ;; one, so the cache lives under the long name once the file loads.
+        (when (boundp 'breadcrumb--ipath-plain-cache)
+          (setq breadcrumb--ipath-plain-cache nil)))))
   (condition-case nil
       (breadcrumb-imenu-crumbs)
     (args-out-of-range nil)))
@@ -163,8 +157,7 @@ keep a later `args-out-of-range' from breaking redisplay."
                    face +mode-line-host-name-active-face)
       "  "
       (:eval (+mode-line-imenu-crumbs))
-      (:eval +mode-line-encoding))
-    ))
+      (:eval +mode-line-encoding))))
 
 (setq-default mode-line-format '((:eval (+mode-line-normal))))
 (setq-default header-line-format nil)
@@ -178,10 +171,11 @@ keep a later `args-out-of-range' from breaking redisplay."
   (breadcrumb-project-leaf-face ((t (:inherit font-lock-function-name-face :bold t))))
   (breadcrumb-imenu-leaf-face ((t (:inherit font-lock-function-name-face :foreground unspecified))))
   :config
+  ;; The short prefix in breadcrumb.el expands to `breadcrumb-' when that
+  ;; file is read, so the names below are the ones that exist afterwards.
   (setq breadcrumb-imenu-crumb-separator " ⋅ "
         breadcrumb-project-max-length 0.55
-        breadcrumb-idle-time 5)
-  )
+        breadcrumb-idle-time 5))
 
 ;; [tab-bar] Tab bar
 (use-package tab-bar
@@ -288,5 +282,4 @@ keep a later `args-out-of-range' from breaking redisplay."
   (add-hook! (server-after-make-frame-hook window-setup-hook) :call-immediately
     (defun +refresh-tab-bar (&rest _)
       (tab-bar--update-tab-bar-lines)
-      (force-mode-line-update)))
-  )
+      (force-mode-line-update))))

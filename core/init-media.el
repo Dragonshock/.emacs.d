@@ -169,14 +169,11 @@
   (emms-ui-now-playing-cover-max-size 640)
   (emms-ui-now-playing-default-view 'cover)
   :config
-  (define-key emms-ui-albums-mode-map [remap meow-left]
-              #'emms-ui-albums-previous)
-  (define-key emms-ui-albums-mode-map [remap meow-next]
-              #'emms-ui-albums-down)
-  (define-key emms-ui-albums-mode-map [remap meow-prev]
-              #'emms-ui-albums-up)
-  (define-key emms-ui-albums-mode-map [remap meow-right]
-              #'emms-ui-albums-next)
+  ;; h/j/k/l rather than remapping meow, which is not loaded.  l is
+  ;; already the list view, so the grid keeps that and uses h for back.
+  (define-key emms-ui-albums-mode-map (kbd "h") #'emms-ui-albums-previous)
+  (define-key emms-ui-albums-mode-map (kbd "j") #'emms-ui-albums-down)
+  (define-key emms-ui-albums-mode-map (kbd "k") #'emms-ui-albums-up)
 
   (dolist (map (list emms-ui-albums-mode-map
                      emms-ui-list-mode-map
@@ -185,14 +182,10 @@
     (define-key map (kbd "L") #'emms-ui-list)
     (define-key map (kbd "N") #'emms-ui-now-playing))
 
-  (define-key emms-ui-now-playing-mode-map [remap meow-left]
-              #'emms-seek-backward)
-  (define-key emms-ui-now-playing-mode-map [remap meow-next] #'emms-next)
-  (define-key emms-ui-now-playing-mode-map [remap meow-prev] #'emms-previous)
-  (define-key emms-ui-now-playing-mode-map [remap meow-right]
-              #'emms-seek-forward)
-  (define-key emms-ui-now-playing-mode-map [remap meow-keypad]
-              #'emms-pause)
+  ;; The page already binds l, p and SPC, so only the free keys move.
+  (define-key emms-ui-now-playing-mode-map (kbd "h") #'emms-seek-backward)
+  (define-key emms-ui-now-playing-mode-map (kbd "j") #'emms-next)
+  (define-key emms-ui-now-playing-mode-map (kbd "k") #'emms-previous)
   (define-key emms-ui-now-playing-mode-map (kbd "r")
               #'emms-ui-now-playing-toggle-random)
   (define-key emms-ui-now-playing-mode-map (kbd "R")

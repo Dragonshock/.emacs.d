@@ -3,21 +3,72 @@
 (use-package gptel
   :straight t
   :init
-  (setq gptel-default-mode 'org-mode
+  (setq gptel-model 'group/smart-split
+        gptel-default-mode 'org-mode
         gptel-confirm-tool-calls nil)
   :config
-  ;; The default backend is Grok, set by gptel-acp.
+  ;; The gateway picker writes its choice into the app's WebKit local
+  ;; storage.  `auto' is not that choice: it is WorkBuddy's own model id
+  ;; and always resolves there.  Read the picker before each request.
+  (defvar +gptel-magpie-store
+    (expand-file-name
+     (concat "Library/WebKit/com.yetone.magpie/WebsiteData/Default/"
+             "W7EjdJuyWhjGnN4UoO9On1R3uVoFOb07LV8R479DUDo/"
+             "W7EjdJuyWhjGnN4UoO9On1R3uVoFOb07LV8R479DUDo/"
+             "LocalStorage/localstorage.sqlite3")
+     "~"))
+
+  (defun +gptel-magpie-model ()
+    "Return the model currently chosen in Magpie's gateway picker.
+WebKit stores the value as a UTF-16LE blob.  Fall back to whatever
+`gptel-model' already is when the store cannot be read."
+    (let ((chosen (string-trim
+                   (shell-command-to-string
+                    (format "sqlite3 -readonly %s %s | xxd -r -p | iconv -f UTF-16LE"
+                            (shell-quote-argument +gptel-magpie-store)
+                            (shell-quote-argument
+                             "select hex(value) from ItemTable where key='magpie.model'"))))))
+      (if (string-empty-p chosen)
+          gptel-model
+        (intern chosen))))
+
+  (defun +gptel-magpie-models ()
+    "Return Magpie's current model ids as symbols.
+Read from `GET /v1/models', so the list follows the gateway instead of
+a fixed fallback.  Return nil when the gateway cannot be reached."
+    (condition-case nil
+        (with-temp-buffer
+          (let ((code (call-process "curl" nil t nil "--silent" "--show-error"
+                                    "--max-time" "5"
+                                    "-H" "Authorization: Bearer magpie"
+                                    "http://127.0.0.1:3425/v1/models")))
+            (when (eq code 0)
+              (goto-char (point-min))
+              (mapcar (lambda (model) (intern (alist-get 'id model)))
+                      (alist-get 'data (json-read))))))
+      (error nil)))
+
+  (defun +gptel-magpie-apply-model (&rest _)
+    "Point this request at Magpie's currently chosen model.
+This runs in the temporary prompt buffer, and the request body reads
+the buffer-local `gptel-model' there, so set that rather than the
+global value.  Register the choice on the backend too:
+`gptel--sanitize-model' drops any model the backend does not list."
+    (setq-local gptel-model (+gptel-magpie-model))
+    (unless (member gptel-model (gptel-backend-models gptel-backend))
+      (gptel--set-backend-models
+       gptel-backend (cons gptel-model (gptel-backend-models gptel-backend)))))
+
+  (setq-default gptel-backend
+                (gptel-make-openai "Magpie"
+                  :host "127.0.0.1:3425"
+                  :protocol "http"
+                  :key (lambda () "magpie")
+                  :models (or (+gptel-magpie-models) '(group/smart-split))))
+  (add-hook! gptel-prompt-transform-functions #'+gptel-magpie-apply-model)
   (add-hook! gptel-post-stream-hook #'gptel-auto-scroll)
   (add-hook! gptel-post-response-functions #'gptel-end-of-response))
 
-(use-package gptel-acp
-  :straight (:type git :host github :repo "Dragonshock/gptel-acp")
-  :demand t
-  :init
-  (setq gptel-acp-reasoning-effort "high")
-  :config
-  (setq gptel-backend (gptel-get-backend "Grok")
-        gptel-model 'grok-4.7-build-fast))
 
 (use-package gptel-agent
   :straight t
@@ -153,7 +204,8 @@ Use this format:
          ("C-c g p" . agent-shell-prompt-compose)
          ("C-c g w" . agent-shell-send-dwim)
          :map agent-shell-mode-map
-         ("M-<return>" . agent-shell-newline)
+         ;; Leave M-<return> on `agent-shell-submit-override`, which steers a
+         ;; busy turn.  A plain newline stays on shell-maker's S-<return>.
          ("C-c C-h" . agent-shell-help-menu)
          ("C-c C-q" . agent-shell-prompt-queue)
          ("C-c C-e" . agent-shell-prompt-steer))
@@ -201,8 +253,8 @@ This restores the event subscription without replaying history."
                  :on-failure on-failure)))))
     (apply original args))
   :init
-  (setq agent-shell-agent-configs '(agent-shell-xai-make-grok-config)
-        agent-shell-preferred-agent-config 'grok-build
+  (setq agent-shell-agent-configs '(agent-shell-pi-make-agent-config)
+        agent-shell-preferred-agent-config 'pi
         agent-shell-context-sources nil
         agent-shell-mcp-servers nil
         agent-shell-session-restore-verbosity 'full

@@ -194,7 +194,6 @@ When RUN-HN is non-nil (or `+elfeed-hn-llm'), export ELFEED_HN_LLM=1."
         ;; switch-to-buffer + delete-window breaks n/p with sole-window errors.
         elfeed-show-entry-switch #'pop-to-buffer
         elfeed-show-entry-delete #'delete-window
-        elfeed-search-clipboard-type 'CLIPBOARD
         elfeed-search-title-max-width 100
         elfeed-search-title-min-width 30
         elfeed-search-trailing-width 25

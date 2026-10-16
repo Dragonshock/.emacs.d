@@ -148,10 +148,6 @@
          ("C-c s p" . symbol-overlay-switch-backward)
          ("C-c s c" . symbol-overlay-remove-all)
          :map symbol-overlay-map
-         ;; conflits with `meow'
-         ("h" . nil)
-         ("q" . nil)
-         ("i" . nil)
          ("R" . symbol-overlay-query-replace)
          ("?" . symbol-overlay-map-help)
          ("c" . symbol-overlay-put)

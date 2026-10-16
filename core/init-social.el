@@ -36,6 +36,9 @@
       (telega-filters-push filter)
       (message "telega filter: %s" (if archive-p telega-filter-default 'archive))))
 
+  :init
+  ;; Read while the other image options take their defaults.
+  (setq telega-use-images nil)
   :custom-face
   (telega-msg-heading ((t (:inherit hl-line :background unspecified))))
   (telega-msg-inline-reply ((t (:inherit (hl-line font-lock-function-name-face)))))
@@ -95,8 +98,8 @@
         telega-filters-custom nil
         telega-filter-custom-show-folders nil
 
-        ;; images
-        telega-use-images nil
+        ;; images.  `telega-use-images' is set in :init, before these
+        ;; options take their defaults.
         telega-emoji-use-images nil
         telega-symbols-emojify '()
 

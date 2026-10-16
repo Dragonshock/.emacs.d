@@ -32,9 +32,8 @@
       (unless (display-graphic-p)
         (send-string-to-terminal "\e]112\a"))))
 
-  ;; Context mode
-  (add-hook! meow-insert-exit-hook #'sis-set-english)
-  (add-to-list 'sis-context-hooks 'meow-insert-enter-hook)
+  ;; Context mode.  sis already refreshes on entering meow's insert
+  ;; state.  meow is not loaded, so nothing is added here.
 
   ;; Ignore some mode with context mode
   (defadvice! +sis-context-guess-ignore-modes (fn &rest args)
@@ -44,10 +43,13 @@
       (apply fn args)))
 
   (defun +sis-context-switching-other (back-detect fore-detect)
-    (and meow-insert-mode
-         (or (and (derived-mode-p 'telega-chat-mode)
-                  (or (and (= (point) telega-chatbuf--input-marker) ; beginning of input
-                           (eolp)))))
+    "Keep the other input source at the start of a Telega compose line.
+Only while meow insert state is active.  `bound-and-true-p' stays nil
+when meow is not loaded, instead of signaling `void-variable'."
+    (and (bound-and-true-p meow-insert-mode)
+         (derived-mode-p 'telega-chat-mode)
+         (= (point) telega-chatbuf--input-marker) ; beginning of input
+         (eolp)
          'other))
   (add-to-list 'sis-context-detectors #'+sis-context-switching-other)
 
@@ -101,7 +103,9 @@
       (delete-char 1)))
   (setq sis-inline-tighten-head-rule #'+sis-remove-head-space-after-cc-punc)
 
-  ;; Drop the extra spaces, then leave exactly one.
+  ;; Leave exactly one space at the end of an inline English span.
+  ;; `+sis-remove-tail-space-before-cc-punc' deletes that space whenever
+  ;; the span ends, so pressing RET after English drops it.
   (setq sis-inline-tighten-tail-rule 'one))
 
 ;; `y-or-n-p' and `read-char-choice' use `read-key' in this config.

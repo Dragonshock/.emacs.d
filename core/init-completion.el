@@ -19,9 +19,7 @@
   :bind (:map vertico-map
               ("RET" . vertico-directory-enter)
               ("DEL" . vertico-directory-delete-char)
-              ("M-DEL" . vertico-directory-delete-word))
-  ;; Cleans up path when moving directories with shadowed paths syntax.
-  :hook (rfn-eshadow-update-overlay . vertico-directory-tidy))
+              ("M-DEL" . vertico-directory-delete-word)))
 
 
 (use-package vertico-quick
@@ -47,29 +45,21 @@
 (use-package orderless
   :straight t
   :init
-  ;; Component prefix modifiers:
-  ;;   !foo excludes, =foo matches literally, ~foo uses flex,
-  ;;   ^foo matches a literal prefix, ,foo uses initialism,
-  ;;   %foo enables char-folding, @foo matches annotations.
-  (defconst +orderless-prefix-styles
-    '((?! . orderless-without-literal)
-      (?% . char-fold-to-regexp)
-      (?^ . orderless-literal-prefix)
-      (?, . orderless-initialism)
-      (?= . orderless-literal)
-      (?~ . orderless-flex)
-      (?@ . orderless-annotation)))
+  ;; Keep `orderless-affix-dispatch' so a modifier works as a prefix or a
+  ;; suffix.  `@' marks annotations here; orderless uses `&' for that.
+  (setq orderless-affix-dispatch-alist
+        '((?% . char-fold-to-regexp)
+          (?! . orderless-not)
+          (?@ . orderless-annotation)
+          (?, . orderless-initialism)
+          (?= . orderless-literal)
+          (?^ . orderless-literal-prefix)
+          (?~ . orderless-flex)))
 
-  (defun +orderless-dispatch (pattern _index _total)
-    "Dispatch PATTERN's prefix modifier or trailing regexp end anchor."
-    (unless (string-empty-p pattern)
-      (let* ((first (aref pattern 0))
-             (style (alist-get first +orderless-prefix-styles)))
-        (cond
-         ;; Ensure $ works with Consult commands, which add disambiguation suffixes
-         ((string-suffix-p "$" pattern) `(orderless-regexp . ,(concat (substring pattern 0 -1) "[\x200000-\x300000]*$")))
-         ((string= "!" pattern) '(orderless-literal . ""))
-         (style (cons style (substring pattern 1)))))))
+  (defun +orderless-consult-dollar (pattern _index _total)
+    "Let a trailing $ match before Consult's disambiguation suffix."
+    (when (and (not (string-empty-p pattern)) (string-suffix-p "$" pattern))
+      `(orderless-regexp . ,(concat (substring pattern 0 -1) "[\x200000-\x300000]*$"))))
 
   (setq completion-styles '(orderless basic)
         completion-category-defaults nil
@@ -77,7 +67,7 @@
         completion-category-overrides '((file (styles basic partial-completion))
                                         (eglot (styles orderless))
                                         (eglot-capf (styles orderless)))
-        orderless-style-dispatchers '(+orderless-dispatch)
+        orderless-style-dispatchers '(orderless-affix-dispatch +orderless-consult-dollar)
         orderless-component-separator #'orderless-escapable-split
         completions-sort 'historical
         completion-pcm-leading-wildcard t))
@@ -170,19 +160,18 @@
           :face     'consult-file
           :history  'file-name-history
           :action   #'consult--file-action
-          :state    #'consult--file-preview
-          :async (lambda (sink)
-                   (let* ((consult-fd-args '("fd" "--full-path" "--color=never" "--hidden" "--follow"
-                                             "--exclude=.git" "--max-results=100"))
-                          (builder (consult--fd-make-builder
-                                    (list (or (consult--project-root)
-                                              (expand-file-name default-directory))))))
-                     (funcall
-                      (consult--process-collection builder
-                        :transform (consult--async-map #'abbreviate-file-name)
-                        :highlight t
-                        :file-handler t)
-                      sink)))))
+          :state    #'consult--file-state
+          ;; `:async' is the pipeline itself.  `consult--multi' passes it a
+          ;; sink, so wrapping another sink lambda here drops the updates.
+          :async (let ((consult-fd-args '("fd" "--full-path" "--color=never" "--hidden" "--follow"
+                                          "--exclude=.git" "--max-results=100")))
+                   (consult--process-collection
+                    (consult--fd-make-builder
+                     (list (or (consult--project-root)
+                               (expand-file-name default-directory))))
+                    :transform (consult--async-map #'abbreviate-file-name)
+                    :highlight t
+                    :file-handler t))))
   (add-to-list 'consult-buffer-sources '+consult-source-fd 'append))
 
 

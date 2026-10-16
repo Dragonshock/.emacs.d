@@ -30,7 +30,7 @@
               ("C-c v [" . diff-hl-previous-hunk)
               ("C-c v ]" . diff-hl-next-hunk)
               ("C-c v s" . diff-hl-stage-current-hunk)
-              ("C-c v u" . diff-hl-undo-revert-hunk))
+              ("C-c v u" . diff-hl-revert-hunk))
   :config
   (setq
    ;; Reduce load on remote

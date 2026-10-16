@@ -1,10 +1,5 @@
 ;;; -*- lexical-binding: t -*-
 
-;; [org-fragtog] Preview and edit latex in md/org elegantly
-;; (use-package org-fragtog
-;;   :straight t
-;;   :hook ((org-mode . org-fragtog-mode)))
-
 ;; [org-persist]
 (use-package org-persist
   :straight nil
@@ -111,7 +106,12 @@
 
   (define-key org-src-mode-map (kbd "C-c C-c") #'org-edit-src-exit)
 
-  (add-hook! meow-insert-exit-hook
+  ;; Realign after edits that never move to another field.  Org only
+  ;; realigns inside `org-table-next-field' and `org-table-next-row', so
+  ;; typing and then moving away with an ordinary command leaves the row
+  ;; ragged.  This used to run when leaving meow's insert state, and meow
+  ;; is not loaded.
+  (add-hook! post-command-hook
     (defun +org-realign-table-maybe-h ()
       "Realign the Org table at point when its contents changed."
       (when (and (derived-mode-p 'org-mode)
@@ -177,24 +177,19 @@
 
 
 ;; [org-appear] Make invisible parts of Org elements appear visible.
+;; `init-modal' is not loaded, so this does not depend on Meow.
 (use-package org-appear
   :straight t
   :require-incrementally t
-  :hook ((org-mode . org-appear-mode))
+  :hook (org-mode . org-appear-mode)
   :config
   (setq org-appear-autosubmarkers t
         org-appear-autoentities t
         org-appear-autokeywords t
         org-appear-inside-latex t
         org-appear-delay 0.1
-        org-appear-trigger 'manual)
+        org-appear-trigger 'always))
 
-  (add-hook! org-mode-hook
-    (defun +org-appear-meow-integration ()
-      (add-hook! meow-insert-enter-hook :local #'org-appear-manual-start)
-      (add-hook! meow-insert-exit-hook :local #'org-appear-manual-stop)))
-  (when (derived-mode-p 'org-mode) (+org-appear-meow-integration))
-  )
 
 
 (use-package org-modern

@@ -156,7 +156,12 @@
 (use-package reader
   :straight  `(reader :type git :host codeberg :repo "MonadicSheep/emacs-reader"
                       :files (:defaults ,(concat "render-core" module-file-suffix))
-                      :pre-build ("make" "all" "CC=cc" "USE_PKGCONFIG=yes")))
+                      ;; The Makefile forces USE_PKGCONFIG off when it finds nix, then
+                      ;; looks for a Homebrew mupdf.  A command-line assignment wins
+                      ;; over that, and this machine's mupdf comes from Home Manager.
+                      :pre-build ("make" "all" "CC=cc" "USE_PKGCONFIG=yes"
+                                  ,(concat "PKG_CONFIG_PATH="
+                                           (expand-file-name "~/.local/state/home-manager/gcroots/current-home/home-path/lib/pkgconfig")))))
 
 ;; [browse-url] Pass a URL to browser
 (use-package browse-url
