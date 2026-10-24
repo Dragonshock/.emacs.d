@@ -16,8 +16,10 @@
   :config
   (add-hook! buffer-list-update-hook
     (defun +sis-refresh-cursor-color ()
-      (sis--get)
-      (sis--update-cursor-color)))
+      (when sis-global-cursor-color-mode
+        (with-current-buffer (window-buffer (selected-window))
+          (sis--get)
+          (sis--update-cursor-color)))))
 
   ;; HACK: Set cursor color automatically
   (add-hook! (enable-theme-functions server-after-make-frame-hook) :unless-daemonp-call-immediately
@@ -27,10 +29,7 @@
       (+sis-refresh-cursor-color)))
 
   ;; Recover the terminal cursor color when leaving Emacs (TUI only).
-  (add-hook! kill-emacs-hook
-    (defun +sis-reset-terminal-cursor-color ()
-      (unless (display-graphic-p)
-        (send-string-to-terminal "\e]112\a"))))
+  (add-hook! kill-emacs-hook #'sis--reset-tty-cursor-color)
 
   ;; Context mode.  sis already refreshes on entering meow's insert
   ;; state.  meow is not loaded, so nothing is added here.
@@ -54,7 +53,7 @@ when meow is not loaded, instead of signaling `void-variable'."
   (add-to-list 'sis-context-detectors #'+sis-context-switching-other)
 
   ;; Inline-mode
-  (defconst +sis-chinese-puncs "，。？！；：（【「“")
+  (defconst +sis-chinese-puncs "，。？！；：、（）【】「」『』“”‘’《》〈〉")
   (defconst +sis-chinese-punc-chars (string-to-list +sis-chinese-puncs))
 
   (defvar-local +sis-inline-pending-space-pos nil

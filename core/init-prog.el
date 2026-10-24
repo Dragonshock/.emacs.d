@@ -409,6 +409,11 @@ separate argument, although the command accepts only one."
   :straight t)
 (use-package toml-mode
   :straight t)
+(use-package tuareg
+  :straight t
+  ;; Inheriting `default' would override the background of Org source blocks.
+  :custom-face
+  (tuareg-font-lock-constructor-face ((t (:inherit nil :background unspecified)))))
 
 
 (use-package js
