@@ -161,13 +161,7 @@
         (no-littering-expand-var-file-name "forge/drafts/"))
   (make-directory forge-post-fallback-directory t)
   :custom-face
-  (forge-topic-label ((t (:inherit variable-pitch :height 0.9 :width condensed :weight regular :underline unspecified))))
-  :config
-  (setq forge-topic-list-columns
-        '(("#" 5 forge-topic-list-sort-by-number (:right-align t) number nil)
-          ("Title" 60 t nil title  nil)
-          ("State" 6 t nil state nil)
-          ("Updated" 10 t nil updated nil))))
+  (forge-topic-label ((t (:inherit variable-pitch :height 0.9 :width condensed :weight regular :underline unspecified)))))
 
 
 ;; Show TODOs in magit

@@ -60,9 +60,15 @@ If no project is found, create a temporary Eshell instance in the current direct
           (if (eq (selected-window) win)
               (ignore-errors (delete-window win)) ;; Close window if already focused
             (select-window win)) ;; Focus the Eshell window if it exists but not selected
-        ;; If no Eshell window, create one
-        (let ((display-comint-buffer-action '(display-buffer-at-bottom
-                                              (inhibit-same-window . nil))))
+        ;; If no Eshell window, create one.  `display-comint-buffer-action'
+        ;; was removed in Emacs 31.  `eshell' passes `(category . comint)'
+        ;; and asks for the same window; an alist entry is consulted first.
+        ;; Append it so Popper's earlier rule still owns `Eshell-popup'.
+        (let ((display-buffer-alist
+               (append display-buffer-alist
+                       '(((category . comint)
+                          (display-buffer-at-bottom)
+                          (inhibit-same-window . nil))))))
           (if arg
               (with-current-buffer (ghostel-project)
                 ;; display current buffer
