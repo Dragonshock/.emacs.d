@@ -7,7 +7,7 @@
   (setq
    ;; A single workflow keeps tasks and project headings consistent.
    org-todo-keywords '((sequence
-                        "TODO(t)" "NEXT(n)" "WAIT(w@/!)" "SOMEDAY(s)" "URGENT(i!)"
+                        "TODO(t)" "NEXT(n)" "DOING(g!)" "WAIT(w@/!)" "SOMEDAY(s)"
                         "|" "DONE(d!)" "CANCELED(c@)"))
    org-log-done 'time
    org-log-into-drawer t
@@ -110,10 +110,38 @@ SCHEDULED: %(let ((time (org-read-date t t nil \"First occurrence: \")))
 ;; [org-agenda]
 (use-package org-agenda
   :require-incrementally t
+  :hook (org-agenda-finalize . +agenda-show-breadcrumbs)
   :bind (("C-c o a" . org-agenda)
          :map org-agenda-mode-map
          ([remap org-agenda-goto-calendar] . +agenda-calendar-blocks))
   :preface
+  (defun +agenda-show-breadcrumbs ()
+    "Append a muted file and parent path after each agenda item's title."
+    (let ((inhibit-read-only t))
+      (save-excursion
+        (goto-char (point-min))
+        (while (not (eobp))
+          (let* ((end (line-end-position))
+                 (marker (org-get-at-bol 'org-hd-marker))
+                 (heading (text-property-any (point) end 'org-heading t)))
+            (when (and marker heading
+                       (not (text-property-any (point) end '+agenda-breadcrumbs t)))
+              (when-let* ((path (org-with-point-at marker
+                                 (when-let* ((file (buffer-file-name (buffer-base-buffer))))
+                                   (cons (file-name-base file) (org-get-outline-path))))))
+                (goto-char heading)
+                (if (re-search-forward org-tag-group-re end t)
+                    (goto-char (match-beginning 0))
+                  (goto-char end))
+                (skip-chars-backward " \t" heading)
+                (insert (propertize
+                         (concat "  " (string-join path org-agenda-breadcrumbs-separator))
+                         'face 'font-lock-comment-face
+                         'org-heading nil '+agenda-breadcrumbs t)))))
+          (forward-line 1)))
+      (unless (eq org-agenda-remove-tags t)
+        (org-agenda-align-tags))))
+
   (defun +agenda-skip-habit ()
     "Keep repeating tasks out of ordinary agenda blocks."
     (when (org-get-repeat)
@@ -136,6 +164,8 @@ SCHEDULED: %(let ((time (org-read-date t t nil \"First occurrence: \")))
         (save-excursion (outline-next-heading) (point)))))
   :config
   (require 'org-habit)
+  ;; Keep event times compact instead of padding them with dots.
+  ;; (setf (nth 2 org-agenda-time-grid) "")
   ;; Defer indentation until an agenda entry is displayed.
   (add-hook! org-agenda-after-show-hook
     (when (and (derived-mode-p 'org-mode)
@@ -150,6 +180,11 @@ SCHEDULED: %(let ((time (org-read-date t t nil \"First occurrence: \")))
         org-agenda-sticky t
         org-agenda-window-setup 'current-window
         org-agenda-restore-windows-after-quit t
+        org-agenda-breadcrumbs-separator " ▸ "
+        org-agenda-prefix-format '((agenda . " %? t % s")
+                                   (todo . " ")
+                                   (tags . " ")
+                                   (search . " "))
         org-agenda-inhibit-startup t
         org-agenda-dim-blocked-tasks nil
         org-agenda-use-tag-inheritance nil
@@ -165,21 +200,21 @@ SCHEDULED: %(let ((time (org-read-date t t nil \"First occurrence: \")))
            ((agenda "")
             (alltodo "" ((org-agenda-overriding-header "Habits due this week")
                          (org-agenda-skip-function #'+agenda-skip-unless-habit-due-this-week)))
-            (todo "URGENT" ((org-agenda-overriding-header "Urgent actions")))
-            (todo "NEXT" ((org-agenda-overriding-header "Next actions")))
+            (todo "DOING" ((org-agenda-overriding-header "Doing")))
+            (todo "NEXT" ((org-agenda-overriding-header "Next")))
             (todo "TODO" ((org-agenda-overriding-header "TODO")))
             (todo "WAIT" ((org-agenda-overriding-header "Waiting")))
-            (todo "SOMEDAY" ((org-agenda-overriding-header "Someday / maybe"))))
+            (todo "SOMEDAY" ((org-agenda-overriding-header "Someday"))))
            ((org-agenda-skip-function #'+agenda-skip-habit)))
-          ("i" "Urgent actions" todo "URGENT"
+          ("g" "Doing" todo "DOING"
            ((org-agenda-skip-function #'+agenda-skip-habit)))
-          ("n" "Next actions" todo "NEXT"
+          ("n" "Next" todo "NEXT"
            ((org-agenda-skip-function #'+agenda-skip-habit)))
           ("w" "Waiting" todo "WAIT"
            ((org-agenda-skip-function #'+agenda-skip-habit)))
           ("p" "TODO" todo "TODO"
            ((org-agenda-skip-function #'+agenda-skip-habit)))
-          ("s" "Someday / maybe" todo "SOMEDAY"
+          ("s" "Someday" todo "SOMEDAY"
            ((org-agenda-skip-function #'+agenda-skip-habit))))))
 
 
