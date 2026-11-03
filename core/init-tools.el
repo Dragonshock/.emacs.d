@@ -152,16 +152,18 @@
   (setq separedit-default-mode 'markdown-ts-mode))
 
 
-;; [emacs-reader] read docs in emacs
-(use-package reader
-  :straight  `(reader :type git :host codeberg :repo "MonadicSheep/emacs-reader"
-                      :files (:defaults ,(concat "render-core" module-file-suffix))
-                      ;; The Makefile forces USE_PKGCONFIG off when it finds nix, then
-                      ;; looks for a Homebrew mupdf.  A command-line assignment wins
-                      ;; over that, and this machine's mupdf comes from Home Manager.
-                      :pre-build ("make" "all" "CC=cc" "USE_PKGCONFIG=yes"
-                                  ,(concat "PKG_CONFIG_PATH="
-                                           (expand-file-name "~/.local/state/home-manager/gcroots/current-home/home-path/lib/pkgconfig")))))
+;; [emureader] read docs in emacs.  The package renamed from `reader' and
+;; its module from `render-core' to `emureader-dyn' (see its Makefile).
+(use-package emureader
+  :straight  `(emureader :type git :host codeberg :repo "MonadicSheep/emacs-reader"
+                         :package "emureader" :local-repo "emacs-reader"
+                         :files (:defaults ,(concat "emureader-dyn" module-file-suffix))
+                         ;; The Makefile forces USE_PKGCONFIG off when it finds nix, then
+                         ;; looks for a Homebrew mupdf.  A command-line assignment wins
+                         ;; over that, and this machine's mupdf comes from Home Manager.
+                         :pre-build ("make" "all" "CC=cc" "USE_PKGCONFIG=yes"
+                                     ,(concat "PKG_CONFIG_PATH="
+                                              (expand-file-name "~/.local/state/home-manager/gcroots/current-home/home-path/lib/pkgconfig")))))
 
 ;; [browse-url] Pass a URL to browser
 (use-package browse-url

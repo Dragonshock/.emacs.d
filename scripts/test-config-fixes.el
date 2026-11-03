@@ -177,6 +177,28 @@
     (unless (string-match-p ":init[^\0]*?telega-use-images nil" text)
       (error "not set in :init"))))
 
+;; ------------------------------------------------------------ reader
+
+(+test "reader recipe follows the emureader rename"
+  (let ((text (+read "core/init-tools.el"))
+        (upstream (expand-file-name "straight/repos/emacs-reader/emureader.el" +repo)))
+    (unless (file-exists-p upstream)
+      (error "emureader.el not in the checkout"))
+    (unless (string-match-p "(provide 'emureader)"
+                            (with-temp-buffer (insert-file-contents upstream)
+                                              (buffer-string)))
+      (error "checkout no longer provides emureader; re-check the recipe"))
+    (let ((recipe (substring text (string-match "(use-package emureader" text)
+                                    (string-match "\n\n;; \\[browse-url\\]" text))))
+      (when (string-match-p "render-core" recipe)
+        (error "recipe still ships the old render-core module name")))
+    (unless (string-match-p "emureader-dyn" text)
+      (error "recipe does not ship emureader-dyn"))
+    (unless (string-match-p "(use-package emureader" text)
+      (error "use-package name is not the provided feature"))
+    (unless (string-match-p ":package \"emureader\"" text)
+      (error "recipe package name is not emureader"))))
+
 ;; ------------------------------------------------------- behavioral
 
 (+test "inline overlay deactivation survives without meow"
