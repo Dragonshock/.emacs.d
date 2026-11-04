@@ -93,7 +93,7 @@
   (defun +setup-fonts ()
     "Setup fonts."
     (when (display-graphic-p)
-      (set-face-attribute 'default nil :font (font-spec :family "Sarasa Mono SC" :size 16))
+      (set-face-attribute 'default nil :font (font-spec :family "Sarasa Mono SC" :size 13))
       (set-face-font 'fixed-pitch "Sarasa Mono SC")
       (set-face-font 'fixed-pitch-serif "Sarasa Mono Slab SC")
       (set-face-font 'variable-pitch "Sarasa UI SC")
@@ -127,8 +127,8 @@
 
   (doom-themes-org-config))
 
-(defvar +light-theme 'doom-gruvbox-light)
-(defvar +dark-theme 'doom-gruvbox)
+(defvar +light-theme 'doom-one)  ;; doom-gruvbox-light
+(defvar +dark-theme 'doom-ayu-dark)         ;; doom-gruvbox
 (defvar +system-appearance nil
   "Last reported system appearance, either `light' or `dark'.")
 

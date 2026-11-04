@@ -78,7 +78,7 @@ Safe to call repeatedly; does not duplicate entries."
         (setq elfeed-feeds (append elfeed-feeds (list entry)))))))
 
 (defvar +elfeed-hn-llm nil
-  "Force-enable HN DeepSeek when non-nil even on background updates.
+  "Force-enable HN Magpie summarization when non-nil even on background updates.
 
 Interactive `elfeed-update' (search `g') always runs HN generation.
 `elfeed-update-background' never does, unless this variable is non-nil.
@@ -92,7 +92,7 @@ Shell gate remains ELFEED_HN_LLM (see scripts/update-elfeed-feeds).")
 
   ;; Local generators rewrite Atom files, then the original update fetches
   ;; file:// + remote feeds.  All local atoms live under var/rss/ (no-littering).
-  ;; Interactive update always enables HN; background never pays DeepSeek unattended.
+  ;; Interactive update always enables HN; background never calls Magpie unattended.
   ;; Two :around hooks (not one shared) so RUN-HN is reliable — nadvice's
   ;; FN argument is a wrapper object, not eq to #'elfeed-update.
   (defun +elfeed--update-after-local-feeds (fn args run-hn)
@@ -144,7 +144,7 @@ When RUN-HN is non-nil (or `+elfeed-hn-llm'), export ELFEED_HN_LLM=1."
     (elfeed-update))
 
   ;; Background refresh: first run ~1 min after init, then every 2 hours.
-  ;; Skips HN DeepSeek — remote/file feeds + optional Reddit only.
+  ;; Skips HN Magpie summarization — remote/file feeds + optional Reddit only.
   (run-at-time "1 min" (* 60 60 2) #'elfeed-update-background)
   :bind (:map elfeed-search-mode-map
               ("g" . elfeed-update)

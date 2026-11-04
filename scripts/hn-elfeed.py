@@ -12,8 +12,10 @@
 """Build a Chinese Hacker News Atom feed for Elfeed.
 
 Fetch concurrency and LLM concurrency are separate. Article downloads use a
-short timeout and a 2 MiB cap; DeepSeek uses a longer timeout. A story that
-fails summarization still becomes a fallback entry so the feed is not empty.
+short timeout and a 2 MiB cap; Magpie uses a longer timeout. Hosts that
+answer with a bot challenge are not fetched; those entries keep HN comments
+only. A story that fails summarization still becomes a fallback entry so the
+feed is not empty.
 """
 
 from __future__ import annotations
@@ -43,9 +45,17 @@ from markdown_it import MarkdownIt
 from pypdf import PdfReader
 
 
-MODEL = "deepseek-v4-flash"
+MAGPIE_URL = "http://127.0.0.1:3425/v1/chat/completions"
+MAGPIE_API_KEY = "magpie"
+MAGPIE_FALLBACK_MODEL = "group/smart-split"
+MAGPIE_STORE = (
+    Path.home()
+    / "Library/WebKit/com.yetone.magpie/WebsiteData/Default"
+    / "W7EjdJuyWhjGnN4UoO9On1R3uVoFOb07LV8R479DUDo"
+    / "W7EjdJuyWhjGnN4UoO9On1R3uVoFOb07LV8R479DUDo"
+    / "LocalStorage/localstorage.sqlite3"
+)
 DEEPSEEK_HOST = "api.deepseek.com"
-DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
 HN_ITEM_URL = "https://hn.algolia.com/api/v1/items/{story_id}"
 HN_SEARCH_URL = (
     "https://hn.algolia.com/api/v1/search_by_date"
@@ -53,6 +63,9 @@ HN_SEARCH_URL = (
 )
 HN_COMMENTS_URL = "https://news.ycombinator.com/item?id={story_id}"
 HN_HOSTS = {"news.ycombinator.com", "www.news.ycombinator.com"}
+# Bot challenges, not transient errors. Retrying or spoofing a UA does not
+# return the article, so skip the download and summarize the HN thread.
+BLOCKED_ARTICLE_HOSTS = ("science.org", "ft.com", "wsj.com")
 SCRIPT_UA = "hn-elfeed/2.0 (personal Elfeed generator)"
 BROWSER_UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -71,7 +84,7 @@ AUTHINFO_GPG_PATH = Path.home() / ".authinfo.gpg"
 
 ARTICLE_TIMEOUT = 12
 ALGOLIA_TIMEOUT = 20
-LLM_TIMEOUT = 60
+LLM_TIMEOUT = 180
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 MAX_PDF_PAGES = 12
 MAX_ARTICLE_CHARS = 120_000
@@ -408,6 +421,14 @@ def article_is_self(item: dict[str, Any], article_url: str) -> bool:
     return host in HN_HOSTS
 
 
+def article_host_blocked(url: str) -> bool:
+    host = (urllib.parse.urlsplit(url).hostname or "").lower().rstrip(".")
+    return any(
+        host == suffix or host.endswith("." + suffix)
+        for suffix in BLOCKED_ARTICLE_HOSTS
+    )
+
+
 def extract_pdf(body: bytes) -> str:
     pages = []
     for page in PdfReader(BytesIO(body)).pages[:MAX_PDF_PAGES]:
@@ -420,6 +441,10 @@ def fetch_article_text(article_url: str, item: dict[str, Any]) -> str:
         return html_fragment_to_text(item.get("text", "") or "")
 
     target = item.get("url") or article_url
+    if article_host_blocked(target):
+        log(f"跳过无法自动抓取的站点 {article_url}，只保留 HN 评论")
+        return html_fragment_to_text(item.get("text", "") or "")
+
     try:
         body, headers, final_url = http_request(
             target,
@@ -467,8 +492,60 @@ def fetch_material(candidate: Candidate) -> Material:
     )
 
 
-def deepseek_json(
-    api_key: str,
+def magpie_model_from_blob(blob: bytes | memoryview | None) -> str:
+    """Return a Magpie model id from the picker's UTF-16LE local-storage blob.
+
+    The HTTP API takes the id itself, such as ``workbuddy/auto``.  A leading
+    ``magpie/`` is a Pi provider prefix and is removed.  Empty input falls
+    back to the routing group.
+    """
+    if not blob:
+        return MAGPIE_FALLBACK_MODEL
+    if isinstance(blob, memoryview):
+        blob = blob.tobytes()
+    text = blob.decode("utf-16-le", errors="replace").replace("\x00", "").strip()
+    if text.startswith("magpie/"):
+        text = text[len("magpie/") :]
+    return text or MAGPIE_FALLBACK_MODEL
+
+
+def magpie_model(store: Path | None = None) -> str:
+    """Read Magpie's current picker model, or the routing-group fallback."""
+    path = store or MAGPIE_STORE
+    if not path.is_file():
+        return MAGPIE_FALLBACK_MODEL
+    import sqlite3
+
+    try:
+        with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as conn:
+            row = conn.execute(
+                "select value from ItemTable where key=?",
+                ("magpie.model",),
+            ).fetchone()
+    except sqlite3.Error:
+        return MAGPIE_FALLBACK_MODEL
+    if not row:
+        return MAGPIE_FALLBACK_MODEL
+    return magpie_model_from_blob(row[0])
+
+
+def llm_request_body(model: str, messages: list[dict[str, str]], max_tokens: int) -> dict[str, Any]:
+    """Build an OpenAI-compatible body for the Magpie gateway.
+
+    ``thinking`` is DeepSeek-specific and is omitted so a routed model is not
+    rejected.  Temperature and JSON mode stay fixed.
+    """
+    return {
+        "model": model,
+        "messages": messages,
+        "temperature": 0,
+        "max_tokens": max_tokens,
+        "response_format": {"type": "json_object"},
+    }
+
+
+def llm_json(
+    model: str,
     system_prompt: str,
     payload: dict[str, Any],
     *,
@@ -485,24 +562,17 @@ def deepseek_json(
     last_error: BaseException | None = None
     for attempt in range(2):
         request_body = json.dumps(
-            {
-                "model": MODEL,
-                "messages": messages,
-                "thinking": {"type": "disabled"},
-                "temperature": 0,
-                "max_tokens": max_tokens,
-                "response_format": {"type": "json_object"},
-            },
+            llm_request_body(model, messages, max_tokens),
             ensure_ascii=False,
         ).encode()
         try:
             body, _, _ = http_request(
-                DEEPSEEK_URL,
+                MAGPIE_URL,
                 data=request_body,
                 timeout=LLM_TIMEOUT,
-                retries=1,
+                retries=0,
                 headers={
-                    "Authorization": f"Bearer {api_key}",
+                    "Authorization": f"Bearer {MAGPIE_API_KEY}",
                     "Content-Type": "application/json",
                 },
             )
@@ -515,7 +585,7 @@ def deepseek_json(
             last_error = error
             if attempt:
                 raise
-            log(f"DeepSeek 请求失败（{type(error).__name__}: {error}），重试")
+            log(f"Magpie 请求失败（{type(error).__name__}: {error}），重试")
             time.sleep(2)
             continue
 
@@ -530,8 +600,8 @@ def deepseek_json(
         except (json.JSONDecodeError, KeyError, IndexError, TypeError) as error:
             last_error = error
             if attempt:
-                raise RuntimeError(f"DeepSeek 连续返回无效 JSON：{error}") from error
-            log(f"DeepSeek 返回无效 JSON（{error}），要求模型重新生成")
+                raise RuntimeError(f"Magpie 连续返回无效 JSON：{error}") from error
+            log(f"Magpie 返回无效 JSON（{error}），要求模型重新生成")
             if content:
                 messages.append({"role": "assistant", "content": content})
             messages.append(
@@ -645,12 +715,12 @@ def cache_entry(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def summarize(material: Material, api_key: str) -> dict[str, Any]:
+def summarize(material: Material, model: str) -> dict[str, Any]:
     candidate = material.candidate
-    log(f"处理 {candidate.story_id}: {candidate.original_title}")
+    log(f"处理 {candidate.story_id}: {candidate.original_title} [{model}]")
     try:
-        article = deepseek_json(
-            api_key,
+        article = llm_json(
+            model,
             ARTICLE_SYSTEM_PROMPT,
             {
                 "hn_title": candidate.original_title,
@@ -670,8 +740,8 @@ def summarize(material: Material, api_key: str) -> dict[str, Any]:
 
     if material.comments_text:
         try:
-            comments = deepseek_json(
-                api_key,
+            comments = llm_json(
+                model,
                 COMMENTS_SYSTEM_PROMPT,
                 {
                     "hn_title": candidate.original_title,
@@ -835,13 +905,14 @@ def command_update(limit: int | None, jobs: int, llm_jobs: int) -> int:
                     )
 
     if materials:
-        api_key = deepseek_api_key()
+        model = magpie_model()
+        log(f"Magpie 模型 {model}")
         llm_workers = min(llm_jobs, len(materials))
         with ThreadPoolExecutor(
             max_workers=llm_workers, thread_name_prefix="hn-llm"
         ) as executor:
             futures = {
-                executor.submit(summarize, material, api_key): material
+                executor.submit(summarize, material, model): material
                 for material in materials
             }
             for future in as_completed(futures):
@@ -910,7 +981,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=DEFAULT_LLM_JOBS,
         metavar="N",
-        help=f"DeepSeek 并行数（默认 {DEFAULT_LLM_JOBS}）",
+        help=f"Magpie 并行数（默认 {DEFAULT_LLM_JOBS}）",
     )
     subparsers.add_parser("dry-run", help="只检查候选，不调用 AI 或生成文件")
     return parser

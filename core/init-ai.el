@@ -6,10 +6,10 @@
   (setq gptel-model 'group/smart-split
         gptel-default-mode 'org-mode
         gptel-confirm-tool-calls nil)
-  :config
   ;; The gateway picker writes its choice into the app's WebKit local
   ;; storage.  `auto' is not that choice: it is WorkBuddy's own model id
   ;; and always resolves there.  Read the picker before each request.
+  ;; Defined in :init so agent-shell can read it without loading gptel.
   (defvar +gptel-magpie-store
     (expand-file-name
      (concat "Library/WebKit/com.yetone.magpie/WebsiteData/Default/"
@@ -31,7 +31,7 @@ WebKit stores the value as a UTF-16LE blob.  Fall back to whatever
       (if (string-empty-p chosen)
           gptel-model
         (intern chosen))))
-
+  :config
   (defun +gptel-magpie-models ()
     "Return Magpie's current model ids as symbols.
 Read from `GET /v1/models', so the list follows the gateway instead of
@@ -253,7 +253,27 @@ This restores the event subscription without replaying history."
                  :on-failure on-failure)))))
     (apply original args))
   :init
-  (setq agent-shell-agent-configs '(agent-shell-pi-make-agent-config)
+  (defun +agent-shell-pi-model-id (model)
+    "Prefix MODEL with magpie/ unless it already names that provider.
+Pi treats the text before the first slash as the provider, so
+`workbuddy/auto' must be sent as `magpie/workbuddy/auto'."
+    (let ((name (if (symbolp model) (symbol-name model) model)))
+      (if (string-prefix-p "magpie/" name)
+          name
+        (concat "magpie/" name))))
+
+  (defun +agent-shell-pi-magpie-model-id ()
+    "Return Magpie's current picker model for a new Pi session."
+    (+agent-shell-pi-model-id (+gptel-magpie-model)))
+
+  (defun +agent-shell-pi-make-agent-config ()
+    "Pi config that follows Magpie's gateway picker."
+    (let ((config (agent-shell-pi-make-agent-config)))
+      (setf (alist-get :default-model-id config)
+            #'+agent-shell-pi-magpie-model-id)
+      config))
+
+  (setq agent-shell-agent-configs '(+agent-shell-pi-make-agent-config)
         agent-shell-preferred-agent-config 'pi
         agent-shell-context-sources nil
         agent-shell-mcp-servers nil
