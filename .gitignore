@@ -22,6 +22,10 @@
 private.el
 emacs.pdmp
 
+# Python caches (scripts/hn-elfeed.py, scripts/update-elfeed-feeds)
+__pycache__/
+*.pyc
+
 # Local notes, agent scratch, and machine symlinks
 /.grok/
 /.scratch/
