@@ -56,8 +56,7 @@ global value.  Register the choice on the backend too:
 `gptel--sanitize-model' drops any model the backend does not list."
     (setq-local gptel-model (+gptel-magpie-model))
     (unless (member gptel-model (gptel-backend-models gptel-backend))
-      (gptel--set-backend-models
-       gptel-backend (cons gptel-model (gptel-backend-models gptel-backend)))))
+      (push gptel-model (gptel-backend-models gptel-backend))))
 
   (setq-default gptel-backend
                 (gptel-make-openai "Magpie"

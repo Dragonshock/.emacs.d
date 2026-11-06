@@ -157,7 +157,12 @@
 (use-package saveplace
   :hook (after-init . save-place-mode)
   :config
-  (setq save-place-autosave-interval 1000)
+  ;; The :set function arms the timer, but only while the mode is on.
+  ;; `setq' stores the number and never calls it.
+  (add-hook 'save-place-mode-hook
+            (defun +save-place-set-autosave-interval-h ()
+              (when save-place-mode
+                (setopt save-place-autosave-interval 1000))))
 
   ;; Avoid autoloading TRAMP when normalizing saved remote paths, while keeping
   ;; other file name handlers active.
@@ -181,9 +186,14 @@
   :bind (("C-x C-r" . recentf-open-files))
   :hook (after-init . recentf-mode)
   :config
-  (setq recentf-autosave-interval 1000
-        recentf-auto-cleanup 'never
-        recentf-max-saved-items 200
+  ;; Both :set functions install timers, and only while the mode is on.
+  ;; `setq' leaves them idle.
+  (add-hook 'recentf-mode-hook
+            (defun +recentf-set-autosave-options-h ()
+              (when recentf-mode
+                (setopt recentf-autosave-interval 1000
+                        recentf-auto-cleanup 'never))))
+  (setq recentf-max-saved-items 200
         recentf-exclude (list "\\.?cache" ".cask" "url" "COMMIT_EDITMSG\\'" "bookmarks"
                               "\\.?ido\\.last$" "\\.revive$" "/G?TAGS$" "/.elfeed/"
                               "^/tmp/" "^/var/folders/.+$" "^/ssh:"
@@ -213,8 +223,13 @@
                                         global-mark-ring
                                         search-ring
                                         regexp-search-ring
-                                        dogears-list)
-        savehist-autosave-interval 1000)
+                                        dogears-list))
+  ;; `savehist-mode' first installs the default 300s timer.  :set replaces it;
+  ;; `setq' does not.
+  (add-hook 'savehist-mode-hook
+            (defun +savehist-set-autosave-interval-h ()
+              (when savehist-mode
+                (setopt savehist-autosave-interval 1000))))
 
   (with-eval-after-load 'vertico
     (add-to-list 'savehist-additional-variables 'vertico-repeat-history))

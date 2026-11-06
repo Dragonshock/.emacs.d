@@ -147,8 +147,12 @@ When RUN-HN is non-nil (or `+elfeed-hn-llm'), export ELFEED_HN_LLM=1."
   ;; Skips HN Magpie summarization — remote/file feeds + optional Reddit only.
   (run-at-time "1 min" (* 60 60 2) #'elfeed-update-background)
   :bind (:map elfeed-search-mode-map
-              ("g" . elfeed-update)
-              ("G" . revert-buffer)  ; elfeed-search-update--force obsolete since 4.0.0
+              ;; Elfeed 3.4 and 4.2: g redraws, G fetches.
+              ;; `elfeed-search-update--force' is an obsolete alias of
+              ;; `revert-buffer' since 4.0.0.  `elfeed-search-fetch'
+              ;; calls `elfeed-update', so the local-feed advice still runs.
+              ("g" . revert-buffer)
+              ("G" . elfeed-search-fetch)
               :map elfeed-show-mode-map
               ("M-v" . scroll-down-command)
               ("j" . scroll-up-line)

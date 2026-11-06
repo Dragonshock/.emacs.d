@@ -248,7 +248,8 @@ If no project is found, create a temporary Eshell instance in the current direct
 ;; [esh-tldr] Browse local tldr pages
 (use-package esh-tldr
   :straight (:host github :repo "roife/esh-tldr")
-  :commands (esh-tldr esh-tldr-dwim consult-esh-tldr)
+  ;; `consult-esh-tldr' was removed; pages complete via `completing-read'.
+  :commands (esh-tldr esh-tldr-dwim)
   :bind ("C-h t" . esh-tldr-dwim)
   :config
   (setq esh-tldr-use-tempel t))

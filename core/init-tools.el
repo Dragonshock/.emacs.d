@@ -76,10 +76,12 @@
     "Set up hideshow block definitions for modes that need overrides."
     (pcase major-mode
       ('ruby-mode
+       ;; `ruby-forward-sexp' has been obsolete since 28.1.  With the
+       ;; default SMIE grammar it only calls `forward-sexp'.
        (setq-local hs-block-start-regexp "class\\|d\\(?:ef\\|o\\)\\|module\\|[[{]"
                    hs-block-end-regexp "end\\|[]}]"
                    hs-c-start-regexp "#\\|=begin"
-                   hs-forward-sexp-function #'ruby-forward-sexp))
+                   hs-forward-sexp-function #'forward-sexp))
       ('nxml-mode
        (setq-local hs-block-start-regexp "<!--\\|<[^/>]*[^/]>"
                    hs-block-end-regexp "-->\\|</[^/>]*[^/]>"

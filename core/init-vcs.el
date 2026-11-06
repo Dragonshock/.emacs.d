@@ -176,8 +176,17 @@
 (use-package remoto
   :straight (:host github :repo "agzam/remoto.el")
   :config
+  ;; remoto 2.5 removed `remoto--find-github-token'.  GitHub tokens are now
+  ;; read by `remoto--find-token'; keep taking them from `gh auth token'.
+  (defun +remoto-github-token-from-gh-cli (fn forge)
+    "Return the GitHub CLI token for a GitHub FORGE; otherwise call FN."
+    ;; `remoto-forgejo' includes `remoto-github', so the type predicate is
+    ;; true for Codeberg too.  Match the GitHub forge by name.
+    (if (eq (remoto-forge-name forge) 'github)
+        (+ghub--token-from-gh-cli)
+      (funcall fn forge)))
   (advice-add #'remoto--warm-auth :override #'ignore)
-  (advice-add #'remoto--find-github-token :override #'+ghub--token-from-gh-cli))
+  (advice-add #'remoto--find-token :around #'+remoto-github-token-from-gh-cli))
 
 
 ;; [smerge] Highlight all the conflicted regions for git
