@@ -25,7 +25,7 @@
 ;; Larger process output buffer (mainly for LSP).
 (setq read-process-output-max (* 4 1024 1024))
 
-;; In noninteractive sessions, prioritize .el file. It saves IO time
+;; Batch jobs should pick up source files newer than their byte-code.
 (setq load-prefer-newer noninteractive)
 
 ;; Inhibit resizing frame

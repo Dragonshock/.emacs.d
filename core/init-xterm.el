@@ -9,10 +9,6 @@
                         'truncation
                         (make-glyph-code ?… 'shadow))
 
-;; Disable auto-composition in terminal.
-(setq-default auto-composition-mode "xterm-256color")
-
-
 ;; [Kitty Graphics Protocol] Implements support for Kitty's "graphics protocol",
 ;; which allows the terminal to display images and videos inline.
 (use-package kitty-graphics
