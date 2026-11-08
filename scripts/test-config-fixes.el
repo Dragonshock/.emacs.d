@@ -98,7 +98,7 @@
     (dolist (name '("breadcrumb-imenu-crumb-separator"
                     "breadcrumb-project-max-length" "breadcrumb-idle-time"
                     "breadcrumb-project-base-face" "breadcrumb-project-leaf-face"
-                    "breadcrumb-imenu-leaf-face" "breadcrumb--ipath-plain-cache"))
+                    "breadcrumb-imenu-leaf-face"))
       (unless (string-match-p name text)
         (error "missing %s" name)))
     (when (string-match-p "\\bbc-[a-z-]*" text)

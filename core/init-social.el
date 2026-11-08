@@ -36,6 +36,87 @@
       (telega-filters-push filter)
       (message "telega filter: %s" (if archive-p telega-filter-default 'archive))))
 
+  (defun +telega-reaction-emoji (emoji)
+    "Return EMOJI, using the emoji presentation for a plain heart."
+    (if (equal emoji "❤") "❤️" emoji))
+
+  (defun +telega-reaction-title (title)
+    "Use the emoji presentation when TITLE starts with a plain heart."
+    (if (and (stringp title) (string-prefix-p "❤" title))
+        (concat "❤️" (substring title 1))
+      title))
+
+  (defun +telega-alert--strip-text-properties (args)
+    "Strip text properties from the notification spec in ARGS.
+`alert' embeds the title and body in a notifier string, where Emacs
+text properties are invalid."
+    (let ((notify-spec (copy-sequence (car args))))
+      (dolist (key '(:title :body))
+        (let ((text (plist-get notify-spec key)))
+          (when (stringp text)
+            (setq notify-spec
+                  (plist-put notify-spec key
+                             (substring-no-properties text))))))
+      (list notify-spec)))
+
+  (defun +telega-save-file-to-clipboard (msg)
+    "Save the file attached to MSG onto the system clipboard."
+    (interactive (list (telega-msg-for-interactive)))
+    (let ((file (telega-msg--content-file msg)))
+      (unless file
+        (user-error "No file associated with message"))
+      (telega-file--download file
+        :priority 32
+        :update-callback
+        (lambda (dfile)
+          (telega-msg-redisplay msg)
+          (when (telega-file--downloaded-p dfile)
+            (let* ((fpath (telega-file--path dfile))
+                   (command
+                    (if (eq system-type 'darwin)
+                        (list "osascript" "-e"
+                              (format "set the clipboard to POSIX file %S" fpath))
+                      (list "sh" "-c" (format "wl-copy < %s" (shell-quote-argument fpath))))))
+              (make-process
+               :name "telega-clipboard"
+               :buffer nil
+               :command command)))))))
+
+  (defun +telega-msg-save-to-cloud-copyleft (msg)
+    "Send the file attached to MSG to Saved Messages."
+    (interactive (list (telega-msg-for-interactive)))
+    (let ((file (telega-msg--content-file msg)))
+      (unless file
+        (user-error "No file associated with message"))
+      (telega-file--download file
+        :priority 32
+        :update-callback
+        (lambda (dfile)
+          (telega-msg-redisplay msg)
+          (when (telega-file--downloaded-p dfile)
+            (let* ((fpath (telega-file--path dfile))
+                   (ifile (telega-chatbuf--gen-input-file fpath 'Document)))
+              (telega--sendMessage
+               (telega-chat-me t)
+               (list :@type "inputMessageDocument"
+                     :document (list :@type "inputDocument"
+                                     :document ifile)
+                     :caption (telega-fmt-text "#copyleft")))
+              (message "Saved to cloud: %s" (file-name-nondirectory fpath))))))))
+
+  (defun +telega-redraw-for-theme (&rest _)
+    "Redraw telega buffers so palette colors follow the enabled theme."
+    (when (and (boundp 'telega-root-buffer-name)
+               (get-buffer telega-root-buffer-name))
+      (telega-root-view--redisplay)
+      (dolist (chatbuf (telega-chat-buffers))
+        (with-current-buffer chatbuf
+          (when telega-chatbuf--ewoc
+            (with-telega-buffer-modify
+             (telega-save-cursor
+               (telega-chatbuf--footer-update)
+               (ewoc-refresh telega-chatbuf--ewoc))))))))
+
   :init
   ;; Read while the other image options take their defaults.
   (setq telega-use-images nil)
@@ -45,14 +126,21 @@
   (telega-msg-inline-forward ((t (:inherit (hl-line font-lock-type-face)))))
   (telega-msg-self-title ((t (:bold t :italic t))))
   :bind (:map telega-chat-button-map
-              ("h" . nil)
-              :map telega-root-mode-map
-              ("A" . +telega-toggle-archive))
+         ("h" . nil)
+         :map telega-root-mode-map
+         ("A" . +telega-toggle-archive)
+         :map telega-prefix-map
+         ("p" . telega-chatbuf-filter-search)
+         ("d" . telega-chat-remove-member)
+         ("m" . telega-describe-chat-members)
+         :map telega-msg-button-map
+         ("C" . +telega-save-file-to-clipboard)
+         ("s" . +telega-msg-save-to-cloud-copyleft))
   :hook ((telega-chat-mode . corfu-mode)
          (telega-chat-mode . +telega-completions-setup-capf))
   :config
-  (setq telega-root-fill-column 79
-        telega-chat-fill-column 79)
+  (setq telega-root-fill-column 70
+        telega-chat-fill-column 90)
 
   (add-hook! telega-chat-mode-hook
     (defun +telega-disable-visual-fill-column-h ()
@@ -70,7 +158,7 @@
         telega-avatar-text-function (lambda (&rest _) "")
 
         telega-translate-to-language-by-default "zh"
-        telega-chat-input-markups '(nil "org")
+        telega-chat-input-markups '("markdown2" "org")
         telega-server-libs-prefix (expand-file-name "~/.local")
 
         ;; root page
@@ -101,7 +189,12 @@
         ;; images.  `telega-use-images' is set in :init, before these
         ;; options take their defaults.
         telega-emoji-use-images nil
-        telega-symbols-emojify '()
+        telega-symbols-emojify
+        (cl-reduce (lambda (emojify key)
+                     (assq-delete-all key emojify))
+                   '(checkmark heavy-checkmark button-close)
+                   :initial-value (copy-sequence
+                                   (default-value 'telega-symbols-emojify)))
 
         telega-date-format-alist '((today . "%H:%M") (this-week . "%m/%d") (old . "%m/%d") (date . "%y/%m/%d")
                                    (time . "%H:%M") (date-time . "%y/%m/%d. %H:%M") (date-long . "%y/%m/%d")
@@ -209,6 +302,59 @@
                (lambda (&rest _)
                  (list (vertico--candidate)))))
       (apply fn args)))
+
+  ;; Lucius-style chat chrome.  His Matrix bridge, notification keyword
+  ;; filter, and nerd-icons symbols are not copied: the bridge data is
+  ;; personal, and nerd-icons is not part of this telega install.
+  (keymap-global-set "C-c t" telega-prefix-map)
+  (setq telega-autoplay-mode t
+        telega-notifications-mode t
+        telega-open-file-function #'org-open-file
+        telega-sticker-size '(6 . 24)
+        telega-symbol-mark (propertize " " 'face 'telega-button-highlight)
+        telega-msg-save-dir "~/Downloads"
+        telega-root-default-view-function 'telega-view-default
+        telega-chat-folders-insexp (lambda () nil)
+        telega-symbol-rich-text-table-border '(?─ ?\s ?\s)
+        telega-builtin-palettes-alist
+        '((light
+           ((:outline "#b4637a") (:foreground "#b4637a") (:background "#d1c7c7"))
+           ((:outline "#ea9d34") (:foreground "#ea9d34") (:background "#d1ccc7"))
+           ((:outline "#907aa9") (:foreground "#907aa9") (:background "#cdc7d1"))
+           ((:outline "#568D68") (:foreground "#568D68") (:background "#c7d1c7"))
+           ((:outline "#286983") (:foreground "#286983") (:background "#cacfcf"))
+           ((:outline "#56949f") (:foreground "#56949f") (:background "#c6cbd1"))
+           ((:outline "#d7827e") (:foreground "#d7827e") (:background "#d1c7cb")))
+          (dark
+           ((:outline "#eb6f92") (:foreground "#eb6f92") (:background "#3d2828"))
+           ((:outline "#f6c177") (:foreground "#f6c177") (:background "#2c2620"))
+           ((:outline "#b294bb") (:foreground "#b294bb") (:background "#2e1e2e"))
+           ((:outline "#95b1ac") (:foreground "#95b1ac") (:background "#1e2e1e"))
+           ((:outline "#81a2be") (:foreground "#81a2be") (:background "#234242"))
+           ((:outline "#9ccfd8") (:foreground "#9ccfd8") (:background "#1e262e"))
+           ((:outline "#ebbcba") (:foreground "#ebbcba") (:background "#470528"))))
+        telega-box-button-styles
+        (let ((styles (copy-tree telega-box-button-styles)))
+          (dolist (tag '(owner-sender-tag admin-sender-tag))
+            (plist-put (alist-get tag styles) :passive-face 'telega-shadow))
+          styles))
+  (add-hook 'enable-theme-functions #'+telega-redraw-for-theme)
+  (add-hook 'telega-msg-ignore-predicates
+            (telega-match-gen-predicate 'msg '(sender is-blocked)))
+  (advice-add 'telega-ins--msg-reaction-type :around
+              (lambda (fn rt)
+                (if (eq (intern (plist-get rt :@type)) 'reactionTypeEmoji)
+                    (telega-ins (+telega-reaction-emoji (plist-get rt :emoji)))
+                  (funcall fn rt))))
+  (advice-add 'telega-msg-reaction-title-for-completion :filter-return
+              #'+telega-reaction-title)
+  (require 'telega-mnz)
+  (global-telega-mnz-mode 1)
+  (when (eq system-type 'darwin)
+    (require 'telega-alert)
+    (advice-add 'telega-alert--notify :filter-args
+                #'+telega-alert--strip-text-properties)
+    (telega-alert-mode 1))
   )
 
 

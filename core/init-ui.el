@@ -80,6 +80,7 @@
   :hook (after-init . minibuffer-depth-indicate-mode))
 ;; Keep the cursor out of the read-only portions of the minibuffer
 (setq minibuffer-prompt-properties '(read-only t
+                                               intangible t
                                                cursor-intangible t
                                                face minibuffer-prompt))
 (add-hook! minibuffer-setup-hook #'cursor-intangible-mode)
@@ -87,24 +88,59 @@
 (setq epg-pinentry-mode 'loopback)
 
 
-;; Font: Same width and height for emoji, chinese and english characters
+;; CJK uses LXGW WenKai. It is proportional, so it is not the same width as PragmataPro.
+(defconst +default-font "PragmataPro 14")
+(defconst +org-font "PragmataPro Liga 14")
+
+(defvar +default-fontset-configured-p nil
+  "Non-nil after symbol and emoji entries have been added to the default fontset.")
+
+(defun +set-face-family-like-default (face)
+  "Make FACE use the family of `default' without fixing its size or style."
+  (set-face-attribute face nil
+                      :family (face-attribute 'default :family nil 'default)
+                      :height 'unspecified
+                      :weight 'unspecified
+                      :slant 'unspecified))
+
+(add-hook! org-mode-hook
+  (defun +org-set-buffer-font ()
+    "Set this Org buffer's face to `+org-font'."
+    (let ((face 'org-mode-font-face))
+      (unless (facep face)
+        (make-face face))
+      (set-face-attribute face nil :font +org-font)
+      (buffer-face-set face))))
+
 (add-hook! server-after-make-frame-hook :unless-daemonp-call-immediately
   (defun +setup-fonts ()
     "Setup fonts."
     (when (display-graphic-p)
-      (set-face-attribute 'default nil :font (font-spec :family "Sarasa Mono SC" :size 13))
-      (set-face-font 'fixed-pitch "Sarasa Mono SC")
-      (set-face-font 'fixed-pitch-serif "Sarasa Mono Slab SC")
-      (set-face-font 'variable-pitch "Sarasa UI SC")
+      (set-face-attribute 'default nil :font +default-font :weight 'normal)
+      (dolist (face '(fixed-pitch fixed-pitch-serif variable-pitch))
+        (+set-face-family-like-default face))
 
-      (dolist (charset '(han cjk-misc))
-        (set-fontset-font t charset (font-spec :family "Sarasa Mono SC")))
+      (dolist (charset '(han kana hangul cjk-misc bopomofo))
+        (set-fontset-font t charset (font-spec :family "LXGW WenKai")))
 
-      ;; font for emoji, set as unicode to cover more chars
-      (if (eq system-type 'darwin)
-          (progn (set-fontset-font t 'unicode (font-spec :family "Apple Color Emoji") nil 'append)
-                 (setq face-font-rescale-alist '(("Apple Color Emoji" . 0.79))))
-        (set-fontset-font t 'unicode (font-spec :family "Noto Color Emoji") nil 'append)))))
+      ;; Symbol and emoji entries are prepended. Repeating that on every
+      ;; frame would stack the same fallbacks.
+      (unless +default-fontset-configured-p
+        (setq use-default-font-for-symbols nil)
+        (let (chosen)
+          (dolist (family '("PragmataPro" "Apple Symbols"))
+            (when (and (not chosen)
+                       (find-font (font-spec :family family)))
+              (set-fontset-font t 'symbol (font-spec :family family) nil 'prepend)
+              (setq chosen t))))
+        (when (find-font (font-spec :family "Apple Color Emoji"))
+          (let ((spec (font-spec :family "Apple Color Emoji")))
+            ;; Also cover EYE and CARD INDEX DIVIDERS, which macOS otherwise
+            ;; draws as text. Do not use the `unicode' charset: that overrides
+            ;; the Latin font.
+            (dolist (target '(emoji #x1F441 #x1F5C2))
+              (set-fontset-font t target spec))))
+        (setq +default-fontset-configured-p t)))))
 
 
 ;; Smooth Scroll (less "jumpy" than defaults)
@@ -118,16 +154,12 @@
 (setq custom-safe-themes t)
 
 
-(use-package doom-themes
-  :straight t
-  :config
-  (setq doom-themes-enable-bold t
-        doom-themes-enable-italic t)
+(use-package ashen
+  :straight (:host github :repo "LuciusChen/ashen")
+  :demand t)
 
-  (doom-themes-org-config))
-
-(defvar +light-theme 'doom-one)  ;; doom-gruvbox-light
-(defvar +dark-theme 'doom-ayu-dark)         ;; doom-gruvbox
+(defvar +light-theme 'ashen-day)
+(defvar +dark-theme 'ashen-night)
 (defvar +system-appearance nil
   "Last reported system appearance, either `light' or `dark'.")
 
@@ -180,7 +212,7 @@
   ;; delimiter into the rendered glyph.  Keep ligatures out of Org buffers.
   :hook (prog-mode . ligature-mode)
   :config
-  ;; Enable Sarasa/Iosevka ligatures in programming modes
+  ;; Enable MonoLisaCode ligatures in programming modes
   (ligature-set-ligatures '(prog-mode)
                           '(;; Arrows
                             "<-" "<--" "<---" "<<-" "<-<" "->" "->>" "-->"

@@ -22,7 +22,11 @@
 ;; which allows the terminal to send key events to Emacs.
 (use-package kkp
   :straight t
-  :hook (tty-setup . global-kkp-mode))
+  :hook (tty-setup . global-kkp-mode)
+  :init
+  ;; Read when the mode turns on, so this has to precede it. KKP sends
+  ;; C-g as CSI-u; without this, a blocking call-process cannot be quit.
+  (setq kkp-restore-legacy-keys-around-subprocesses t))
 
 
 ;; [xterm]

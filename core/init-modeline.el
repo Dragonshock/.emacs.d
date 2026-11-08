@@ -1,165 +1,35 @@
 ;;; -*- lexical-binding: t -*-
 
 ;;; face
-(defgroup +mode-line nil
-  "Mode-Line faces."
-  :group 'faces)
-
+;; Popper's mode-line indicator still inherits this face.
 (defface +mode-line-meta-face
   '((t (:inherit (font-lock-function-name-face bold))))
-  "The face for meta panel on the mode-line of an inactive window."
-  :group '+mode-line)
+  "The face for the popper mode-line indicator."
+  :group 'faces)
 
-(defface +mode-line-host-name-active-face
-  '((t (:inherit (font-lock-function-name-face bold))))
-  "The face for host name on the mode-line of an active window."
-  :group '+mode-line)
+(defun +mode-line-box-match-background (&rest _)
+  "Color each mode-line box with that face's own background.
+Ashen draws the box in the foreground color.  Matching the background
+keeps the box without a contrasting outline.  `:overline' is cleared
+so an earlier top-only line does not remain."
+  (dolist (face '(mode-line mode-line-inactive))
+    (let ((background (face-background face nil 'default)))
+      (when (and (stringp background) (not (string-empty-p background)))
+        (set-face-attribute face nil
+                            :overline nil
+                            :box (list :line-width 1 :color background))))))
 
-;;; Indicators
-(defsubst +mode-line-overwrite-readonly-indicator ()
-  "Display modified, read-only, and overwrite indicators independently."
-  (concat (pcase (buffer-modified-p)
-            ('t (and (buffer-file-name) " *"))
-            ('autosaved " ~"))
-          (and buffer-read-only " %%")
-          (and overwrite-mode " #")))
+(defun +tab-bar-selected-underline-off (&rest _)
+  "Remove the underline under the selected tab-bar tab.
+Ashen uses that underline as the current-tab mark.  `tab-line' is
+left unchanged."
+  (set-face-attribute 'tab-bar-tab nil :underline nil))
 
-(defsubst +mode-line-macro-indicator ()
-  "Display current Emacs macro being recorded."
-  (cond (defining-kbd-macro " | MacroDef")
-        (executing-kbd-macro " | MacroExc")))
+(add-hook 'enable-theme-functions #'+mode-line-box-match-background)
+(add-hook 'after-init-hook #'+mode-line-box-match-background)
+(add-hook 'enable-theme-functions #'+tab-bar-selected-underline-off)
+(add-hook 'after-init-hook #'+tab-bar-selected-underline-off)
 
-(defsubst +mode-line-symbol-overlay-indicator ()
-  "Display the number of matches for symbol overlay."
-  (when-let* (((bound-and-true-p symbol-overlay-keywords-alist))
-              ((not symbol-overlay-temp-symbol))
-              (keyword (symbol-overlay-assoc (symbol-overlay-get-symbol t)))
-              (symbol (car keyword))
-              (before (length (symbol-overlay-get-list -1 symbol)))
-              (after (length (symbol-overlay-get-list 1 symbol))))
-    (format " | %d/%d sym%s" (1+ before) (+ before after) (if (cadr keyword) " in scope" ""))))
-
-
-;;; Cache remote host name
-(defvar-local +mode-line-remote-host-name nil)
-(add-hook! find-file-hook
-  (defun +mode-line-update-remote-host-name ()
-    "Hostname for remote buffers."
-    (setq +mode-line-remote-host-name
-          (when-let* ((hostname (and default-directory
-                                     (file-remote-p default-directory 'host))))
-            (when (not (string-equal hostname "localhost"))
-              (concat "@" hostname))))))
-
-
-;;; Cache encoding info
-(setq eol-mnemonic-unix "LF"
-      eol-mnemonic-dos "CRLF"
-      eol-mnemonic-mac "CR"
-      eol-mnemonic-undecided "?")
-
-(defvar-local +mode-line-encoding nil)
-(defadvice! +mode-line-update-encoding (&rest _)
-  :after '(after-insert-file-set-coding set-buffer-file-coding-system)
-  "Get encoding and EOL type of current buffer."
-  (setq +mode-line-encoding
-        (unless (and (memq (coding-system-category buffer-file-coding-system)
-                           '(coding-category-undecided coding-category-utf-8))
-                     (eq (coding-system-eol-type buffer-file-coding-system) 0))
-          " %Z")))
-(add-hook! find-file-hook #'+mode-line-update-encoding)
-
-;; [project-crumb]
-(defvar-local +mode-line-project-crumb nil)
-(defadvice! +mode-line-update-project-crumb (&rest _)
-  :after '(rename-buffer set-visited-file-name pop-to-buffer popup-create popup-delete)
-  (setq +mode-line-project-crumb
-        (breadcrumb-project-crumbs)))
-(add-hook! (find-file-hook after-save-hook clone-indirect-buffer-hook Info-selection-hook
-                           window-configuration-change-hook)
-  #'+mode-line-update-project-crumb)
-
-;;; Cache envrc status
-(defvar-local +mode-line-envrc nil)
-(defun +mode-line-update-envrc (&optional buffer)
-  "Cache envrc status for BUFFER."
-  (setq buffer (or buffer (current-buffer)))
-  (when (buffer-live-p buffer)
-    (with-current-buffer buffer
-      (setq +mode-line-envrc
-            (pcase (and (bound-and-true-p envrc-mode)
-                        envrc--status)
-              ('on " | ⎇")
-              ('error " | ⎇[error]")
-              (_ nil)))))
-  (force-mode-line-update t))
-(defadvice! +mode-line-envrc-after-apply (buffer _result)
-  :after #'envrc--apply
-  "Update the cached envrc status after applying BUFFER's environment."
-  (+mode-line-update-envrc buffer))
-(add-hook! envrc-mode-hook #'+mode-line-update-envrc)
-
-
-(defun +mode-line--drop-empty-imenu-names (nodes)
-  "Return imenu NODES without empty-string names.
-The cdr is non-nil when any name was dropped.  `shell-maker' indexes
-an empty prompt as \"\", and `breadcrumb' signals `args-out-of-range'
-when it puts a text property on that string."
-  (let (dropped kept)
-    (dolist (node nodes)
-      (cond
-       ((not (consp node))
-        (push node kept))
-       ((and (stringp (car node)) (string-empty-p (car node)))
-        (setq dropped t))
-       ((and (fboundp 'imenu--subalist-p) (imenu--subalist-p node))
-        (let ((child (+mode-line--drop-empty-imenu-names (cdr node))))
-          (when (cdr child) (setq dropped t))
-          (when (car child)
-            (push (cons (car node) (car child)) kept))))
-       (t (push node kept))))
-    (cons (nreverse kept) dropped)))
-
-(defun +mode-line-imenu-crumbs ()
-  "Imenu crumbs for the mode line.
-Drop empty imenu names before `breadcrumb-imenu-crumbs' runs, and
-keep a later `args-out-of-range' from breaking redisplay."
-  (when (and (boundp 'imenu--index-alist) imenu--index-alist)
-    (let ((cleaned (+mode-line--drop-empty-imenu-names imenu--index-alist)))
-      (when (cdr cleaned)
-        (setq imenu--index-alist (car cleaned))
-        ;; The short prefix in breadcrumb.el is a shorthand for the long
-        ;; one, so the cache lives under the long name once the file loads.
-        (when (boundp 'breadcrumb--ipath-plain-cache)
-          (setq breadcrumb--ipath-plain-cache nil)))))
-  (condition-case nil
-      (breadcrumb-imenu-crumbs)
-    (args-out-of-range nil)))
-
-(defsubst +mode-line-normal ()
-  "Formatting active-long mode-line."
-  (let* ((active-p (mode-line-window-selected-p))
-         (panel-face `(:inherit +mode-line-meta-face :inverse-video ,active-p)))
-    `((:propertize ,(concat " " (window-parameter (selected-window) 'ace-window-path))
-                   face ,panel-face)
-      (:propertize ,(+mode-line-overwrite-readonly-indicator) face ,panel-face)
-      (:propertize +mode-line-envrc face ,panel-face)
-      (,active-p (:propertize
-                  ,(concat (+mode-line-macro-indicator)
-                           (+mode-line-symbol-overlay-indicator))
-                  face ,panel-face))
-      (:propertize " " face ,panel-face)
-      mode-line-process
-      " "
-      ,(or +mode-line-project-crumb
-           '(:propertize "%b" face +mode-line-meta-face))
-      (:propertize +mode-line-remote-host-name
-                   face +mode-line-host-name-active-face)
-      "  "
-      (:eval (+mode-line-imenu-crumbs))
-      (:eval +mode-line-encoding))))
-
-(setq-default mode-line-format '((:eval (+mode-line-normal))))
 (setq-default header-line-format nil)
 
 ;;; Header Line

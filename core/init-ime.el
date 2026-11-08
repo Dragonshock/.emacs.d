@@ -14,6 +14,12 @@
   (sis-ism-lazyman-config nil "rimel" 'native)
   (sis-get) ; HACK: set sis--ism
   :config
+  (defun +ime-hide-input-method-title ()
+    "Do not show the Rime title at the left of the native mode line.
+`activate-input-method' fills `current-input-method-title' before this
+hook runs.  An empty title leaves input active and hides the mark."
+    (setq current-input-method-title ""))
+  (add-hook 'input-method-activate-hook #'+ime-hide-input-method-title)
   (add-hook! buffer-list-update-hook
     (defun +sis-refresh-cursor-color ()
       (when sis-global-cursor-color-mode
