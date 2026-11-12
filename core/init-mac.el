@@ -36,4 +36,5 @@
            ("s-f" . isearch-forward)
            ("s-w" . tab-close)
            ("s-t" . tab-new)
-           ("s-o" . other-window))
+           ("s-o" . other-window)
+           ("s-SPC" . toggle-input-method))

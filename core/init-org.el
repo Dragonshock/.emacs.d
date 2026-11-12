@@ -9,7 +9,7 @@
 
 ;; [org]
 (use-package org
-  :straight (:type built-in)
+  :straight t
   :require-incrementally
   (calendar find-func format-spec org-macs org-compat org-faces
             org-entities org-fold-core org-fold oc org-keys ol org-table

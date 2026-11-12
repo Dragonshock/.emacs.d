@@ -146,13 +146,24 @@
 
 ;; ------------------------------------------------------------ gptel
 
-(+test "magpie model is applied buffer-locally"
+(+test "gptel defaults to Magpie auto/deepseek-flash"
   (let* ((text (+read "core/init-ai.el"))
-         (start (string-match "(defun \\+gptel-magpie-apply-model" text)))
-    (unless start (error "function missing"))
-    (let ((fn (substring text start (+ start 500))))
-      (unless (string-match-p "setq-local gptel-model" fn)
-        (error "still sets the global value")))))
+         (start (string-match "(use-package gptel" text))
+         (end (string-match "\n(use-package gptel-agent" text)))
+    (unless (and start end) (error "gptel block missing"))
+    (let ((block (substring text start end)))
+      (unless (string-match-p "gptel-model 'auto/deepseek-flash" block)
+        (error "default model is not auto/deepseek-flash"))
+      (unless (string-match-p ":stream t" block)
+        (error "backend does not declare streaming"))
+      (unless (string-match-p ":models '(auto/deepseek-flash)" block)
+        (error "model is not on the backend list"))
+      (unless (string-match-p "setq-default gptel-backend" block)
+        (error "backend is not the default"))
+      (when (string-match-p "\\+gptel-magpie-apply-model" block)
+        (error "request still overrides the model from the picker"))
+      (unless (string-match-p "(defun \\+gptel-magpie-model" block)
+        (error "picker reader Pi still uses is gone")))))
 
 ;; ----------------------------------------------------------- consult
 

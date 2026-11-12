@@ -77,6 +77,33 @@ Safe to call repeatedly; does not duplicate entries."
       (unless known
         (setq elfeed-feeds (append elfeed-feeds (list entry)))))))
 
+(defun +elfeed-show-window ()
+  "Return a live window already showing an Elfeed entry, or nil."
+  (cl-find-if (lambda (window)
+                (with-current-buffer (window-buffer window)
+                  (derived-mode-p 'elfeed-show-mode)))
+              (window-list nil 'no-minibuf)))
+
+(defun +elfeed-display-entry (buffer)
+  "Show BUFFER to the right of the search list.
+
+Reuse an existing entry window so `n' and `SPC' replace the article
+instead of deleting that window and splitting again. Point stays in
+the entry window."
+  (let* ((search (get-buffer-window (elfeed-search-buffer)))
+         (existing (+elfeed-show-window))
+         (window (if (window-live-p existing)
+                     (progn
+                       (set-window-buffer existing buffer)
+                       existing)
+                   (display-buffer-in-direction
+                    buffer
+                    `((direction . right)
+                      (window . ,(or search (selected-window))))))))
+    (when (window-live-p window)
+      (select-window window))
+    window))
+
 (defvar +elfeed-hn-llm nil
   "Force-enable HN Magpie summarization when non-nil even on background updates.
 
@@ -194,10 +221,11 @@ When RUN-HN is non-nil (or `+elfeed-hn-llm'), export ELFEED_HN_LLM=1."
                       '("https://www.youtube.com/feeds/videos.xml?channel_id=UCue63vweCtx5j6jylVZsd7w" ytb-hummingbird)
                       '("https://www.youtube.com/feeds/videos.xml?channel_id=UCRewJ9oGONpRm_kaYU6UPGQ" ytb-kolar)
                       '("https://www.youtube.com/feeds/videos.xml?channel_id=UCMZZNUTkXjuWlYyB_RwxNKA" ytb-wsf-xmm))
-        ;; pop-to-buffer + delete-window: side-by-side search|entry; n/p reuse layout.
-        ;; switch-to-buffer + delete-window breaks n/p with sole-window errors.
-        elfeed-show-entry-switch #'pop-to-buffer
-        elfeed-show-entry-delete #'delete-window
+        ;; Right-hand entry window stays up. `n' / `SPC' replace its buffer
+        ;; and keep point there. Deleting the window makes the next article
+        ;; split again, and the direction then follows `split-window-sensibly'.
+        elfeed-show-entry-switch #'+elfeed-display-entry
+        elfeed-show-entry-delete #'ignore
         elfeed-search-title-max-width 100
         elfeed-search-title-min-width 30
         elfeed-search-trailing-width 25

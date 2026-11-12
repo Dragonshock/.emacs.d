@@ -40,12 +40,6 @@
            (mode . telega-image-mode)
            (mode . telega-webpage-mode)
            (name . "^\\*Telegram")))
-      ("Himalaya"
-       (or (mode . himalaya-list-envelopes-mode)
-           (mode . himalaya-read-message-mode)
-           (mode . himalaya-read-message-raw-mode)
-           (mode . himalaya-message-write-mode)
-           (name . "^\\*Himalaya")))
       ("Elfeed"
        (or (mode . elfeed-search-mode)
            (mode . elfeed-show-mode)))

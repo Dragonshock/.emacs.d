@@ -37,7 +37,10 @@
 
    ;; Completion like bash
    eshell-cmpl-ignore-case t
-   eshell-cmpl-cycle-completions nil)
+   eshell-cmpl-cycle-completions nil
+
+   ;; Aliases are defined below in Lisp.
+   eshell-aliases-file nil)
 
   (defun +eshell-toggle (&optional arg)
     "Toggle a persistent Eshell popup window for the current project or directory.
@@ -107,8 +110,6 @@ If no project is found, create a temporary Eshell instance in the current direct
                        ("gch" . "git checkout $*")
                        ("gcb" . "git checkout -b $*")))
         (eshell/alias name definition))))
-  ;; Don't auto-write our aliases! Let us manage our own `eshell-aliases-file' via elisp
-  (advice-add #'eshell-write-aliases-list :override #'ignore)
 
   ;;; A bunch of eshell functions
   ;; [emacs, e, ec, ecc]

@@ -44,7 +44,8 @@ left unchanged."
   ;; The short prefix in breadcrumb.el expands to `breadcrumb-' when that
   ;; file is read, so the names below are the ones that exist afterwards.
   (setq breadcrumb-imenu-crumb-separator " ⋅ "
-        breadcrumb-project-max-length 0.55
+        breadcrumb-project-max-length 0.5
+        breadcrumb-imenu-max-length 0.45
         breadcrumb-idle-time 5))
 
 ;; [tab-bar] Tab bar

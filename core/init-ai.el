@@ -3,13 +3,13 @@
 (use-package gptel
   :straight t
   :init
-  (setq gptel-model 'group/smart-split
+  (setq gptel-model 'auto/deepseek-flash
         gptel-default-mode 'org-mode
         gptel-confirm-tool-calls nil)
-  ;; The gateway picker writes its choice into the app's WebKit local
-  ;; storage.  `auto' is not that choice: it is WorkBuddy's own model id
-  ;; and always resolves there.  Read the picker before each request.
-  ;; Defined in :init so agent-shell can read it without loading gptel.
+  ;; Pi reads Magpie's menu-bar picker from WebKit local storage.
+  ;; `auto' is not that choice: it is WorkBuddy's own model id and
+  ;; always resolves there.  Defined in :init so agent-shell can read
+  ;; it without loading gptel.  gptel does not follow the picker.
   (defvar +gptel-magpie-store
     (expand-file-name
      (concat "Library/WebKit/com.yetone.magpie/WebsiteData/Default/"
@@ -32,39 +32,16 @@ WebKit stores the value as a UTF-16LE blob.  Fall back to whatever
           gptel-model
         (intern chosen))))
   :config
-  (defun +gptel-magpie-models ()
-    "Return Magpie's current model ids as symbols.
-Read from `GET /v1/models', so the list follows the gateway instead of
-a fixed fallback.  Return nil when the gateway cannot be reached."
-    (condition-case nil
-        (with-temp-buffer
-          (let ((code (call-process "curl" nil t nil "--silent" "--show-error"
-                                    "--max-time" "5"
-                                    "-H" "Authorization: Bearer magpie"
-                                    "http://127.0.0.1:3425/v1/models")))
-            (when (eq code 0)
-              (goto-char (point-min))
-              (mapcar (lambda (model) (intern (alist-get 'id model)))
-                      (alist-get 'data (json-read))))))
-      (error nil)))
-
-  (defun +gptel-magpie-apply-model (&rest _)
-    "Point this request at Magpie's currently chosen model.
-This runs in the temporary prompt buffer, and the request body reads
-the buffer-local `gptel-model' there, so set that rather than the
-global value.  Register the choice on the backend too:
-`gptel--sanitize-model' drops any model the backend does not list."
-    (setq-local gptel-model (+gptel-magpie-model))
-    (unless (member gptel-model (gptel-backend-models gptel-backend))
-      (push gptel-model (gptel-backend-models gptel-backend))))
-
+  ;; A host other than api.openai.com uses /v1/chat/completions.
+  ;; Streaming is ignored unless the backend sets :stream, and a model
+  ;; missing from :models is dropped.  gptel-backend is buffer-local.
   (setq-default gptel-backend
                 (gptel-make-openai "Magpie"
                   :host "127.0.0.1:3425"
                   :protocol "http"
+                  :stream t
                   :key (lambda () "magpie")
-                  :models (or (+gptel-magpie-models) '(group/smart-split))))
-  (add-hook! gptel-prompt-transform-functions #'+gptel-magpie-apply-model)
+                  :models '(auto/deepseek-flash)))
   (add-hook! gptel-post-stream-hook #'gptel-auto-scroll)
   (add-hook! gptel-post-response-functions #'gptel-end-of-response))
 
