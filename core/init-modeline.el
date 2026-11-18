@@ -43,6 +43,8 @@ left unchanged."
   :config
   ;; The short prefix in breadcrumb.el expands to `breadcrumb-' when that
   ;; file is read, so the names below are the ones that exist afterwards.
+  ;; Mechanism: file-local `read-symbol-shorthands' near the end of
+  ;; breadcrumb.el maps `bc-' to `breadcrumb-' at read time.
   (setq breadcrumb-imenu-crumb-separator " ⋅ "
         breadcrumb-project-max-length 0.5
         breadcrumb-imenu-max-length 0.45

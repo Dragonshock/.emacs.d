@@ -76,7 +76,7 @@
       (error "fontify function missing"))
     (unless (string-match-p "font-lock-add-keywords 'org-mode '((\\+org-fontify-special-blocks))" text)
       (error "font-lock keyword missing"))
-    (unless (string-match-p "plist-put org-format-latex-options :scale 1\\.2" text)
+    (unless (string-match-p "plist-put org-latex-preview-appearance-options :scale 1\\.2" text)
       (error "scale is not 1.2"))
     (unless (string-match-p ":background \"Transparent\"" text)
       (error "transparent background missing"))

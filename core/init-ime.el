@@ -188,10 +188,11 @@ when meow is not loaded, instead of signaling `void-variable'."
 
 (defun +liberime-setup-build-env ()
   "Expose librime and its private headers to the native module builds.
-Home Manager puts librime on `home-path`.  `rime.pc` only lists the
-public headers, while liberime-regexp compiles vendored internal
-headers that include Boost and marisa.  Those two directories come
-from the librime derivation.  `~/.nix-profile` stays as a fallback."
+Home Manager puts librime on `home-path'.  `rime.pc` only lists the
+public headers; this also reaches librime's internal Boost and marisa
+include dirs from the librime derivation.  liberime-regexp no longer
+needs them: since its 2026-10 rework (c106a01) it is pure Elisp over
+librime-lua and builds nothing.  `~/.nix-profile' stays as a fallback."
   (dolist (profile (delq nil (list (expand-file-name "~/.nix-profile")
                                    (+liberime-home-path))))
     (+liberime-prepend-env-path "CPATH" (expand-file-name "include" profile))

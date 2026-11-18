@@ -101,8 +101,13 @@
                     "breadcrumb-imenu-leaf-face"))
       (unless (string-match-p name text)
         (error "missing %s" name)))
-    (when (string-match-p "\\bbc-[a-z-]*" text)
-      (error "uses the bc- shorthand, which only expands inside breadcrumb.el"))))
+    (let ((code (mapconcat #'identity
+                           (delq nil (mapcar (lambda (l)
+                                               (and (not (string-match-p "^[ \t]*;;" l)) l))
+                                             (split-string text "\n")))
+                           "\n")))
+      (when (string-match-p "\\bbc-[a-z-]*" code)
+        (error "uses the bc- shorthand in code, which only expands inside breadcrumb.el; whole-line comments are exempt")))))
 
 ;; ------------------------------------------------------------ diff-hl
 

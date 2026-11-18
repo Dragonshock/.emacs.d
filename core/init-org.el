@@ -157,12 +157,21 @@
         t)))
 
   ;; Better Org Latex Preview
-  (setq org-preview-latex-default-process 'dvisvgm
+  ;; The two old names kept in the comments below are obsolete aliases
+  ;; that org-compat.el marks for removal in Org 10.0.  Migrated to the
+  ;; new names 2026-11-19, see
+  ;; dev-docs/notes/plugin-update-final-recommendations-2026-11-19.md.
+  ;; (setq org-preview-latex-default-process 'dvisvgm
+  ;;       org-startup-with-latex-preview nil
+  ;;       org-highlight-latex-and-related '(latex))
+  (setq org-latex-preview-process-default 'dvisvgm
         org-startup-with-latex-preview nil
         org-highlight-latex-and-related '(latex))
-  (plist-put org-format-latex-options :scale 1.2)
+  ;; (plist-put org-format-latex-options :scale 1.2)
+  (plist-put org-latex-preview-appearance-options :scale 1.2)
   ;; Let LaTeX and Typst previews show the surrounding face's background.
-  (plist-put org-format-latex-options :background "Transparent")
+  ;; (plist-put org-format-latex-options :background "Transparent")
+  (plist-put org-latex-preview-appearance-options :background "Transparent")
 
   ;; Allow CJK characters and full-width punctuation next to
   ;; emphasis markers.  Keep ASCII letters excluded to avoid
