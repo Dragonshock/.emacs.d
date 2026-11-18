@@ -126,16 +126,16 @@ text properties are invalid."
   (telega-msg-inline-forward ((t (:inherit (hl-line font-lock-type-face)))))
   (telega-msg-self-title ((t (:bold t :italic t))))
   :bind (:map telega-chat-button-map
-         ("h" . nil)
-         :map telega-root-mode-map
-         ("A" . +telega-toggle-archive)
-         :map telega-prefix-map
-         ("p" . telega-chatbuf-filter-search)
-         ("d" . telega-chat-remove-member)
-         ("m" . telega-describe-chat-members)
-         :map telega-msg-button-map
-         ("C" . +telega-save-file-to-clipboard)
-         ("s" . +telega-msg-save-to-cloud-copyleft))
+              ("h" . nil)
+              :map telega-root-mode-map
+              ("A" . +telega-toggle-archive)
+              :map telega-prefix-map
+              ("p" . telega-chatbuf-filter-search)
+              ("d" . telega-chat-remove-member)
+              ("m" . telega-describe-chat-members)
+              :map telega-msg-button-map
+              ("C" . +telega-save-file-to-clipboard)
+              ("s" . +telega-msg-save-to-cloud-copyleft))
   :hook ((telega-chat-mode . corfu-mode)
          (telega-chat-mode . +telega-completions-setup-capf))
   :config
@@ -225,8 +225,8 @@ text properties are invalid."
       (defun +telega-enable-linux-proxy-h ()
         "Add and enable the local SOCKS5 proxy before Telega authorizes."
         (telega--addProxy '(:server "127.0.0.1" :port 7891 :type (:@type "proxyTypeSocks5"))
-                          :enable-p t
-                          :comment "Local SOCKS5 proxy"))))
+          :enable-p t
+          :comment "Local SOCKS5 proxy"))))
 
   ;; HACK: Work around upstream bot command completion returning nested lists.
   ;; Each mapped candidate list is freshly allocated, so `mapcan' is safe here.
@@ -313,7 +313,7 @@ text properties are invalid."
         telega-sticker-size '(6 . 24)
         telega-symbol-mark (propertize " " 'face 'telega-button-highlight)
         telega-msg-save-dir "~/Downloads"
-        telega-root-default-view-function 'telega-view-default
+        telega-root-default-view-function 'telega-view-folders
         telega-chat-folders-insexp (lambda () nil)
         telega-symbol-rich-text-table-border '(?─ ?\s ?\s)
         telega-builtin-palettes-alist
