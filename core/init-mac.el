@@ -25,6 +25,12 @@
 (setq +mac-appearance-timer
       (run-with-timer 2 2 #'+mac-sync-system-appearance))
 
+
+;; [Modifier keys] Command as Meta, Option as Super
+;; (setq mac-command-modifier 'meta
+;;       mac-option-modifier 'super)
+
+
 (unbind-key "s-,")
 (bind-keys ("s-a" . mark-whole-buffer)
            ("s-x" . kill-region)
