@@ -13,8 +13,9 @@
 ;; [show-paren-mode] Highlight matching parens
 (use-package paren
   :custom-face (show-paren-match ((t (:foreground "SpringGreen3" :underline t :weight bold))))
+  :hook (after-init . show-paren-mode)
   :config
-  (setq show-paren-when-point-inside-paren t
+  (setq show-paren-when-point-inside-paren nil
         show-paren-when-point-in-periphery t
         show-paren-context-when-offscreen t
         blink-matching-paren-highlight-offscreen t
@@ -44,14 +45,16 @@
 
 
 ;; [highlight-parentheses] Highlight surrounding parentheses
-(use-package highlight-parentheses
-  :straight t
-  :hook ((minibuffer-setup . highlight-parentheses-minibuffer-setup)
-         (prog-mode . highlight-parentheses-mode))
-  :config
-  (setq highlight-parentheses-colors '("green3" "firebrick1" "orange1")
-        highlight-parentheses-attributes '((:underline t) (:underline t) (:underline t))
-        highlight-parentheses-delay 0.25))
+;; Disabled: the underlined outer parens are too noisy next to
+;; `rainbow-delimiters', which already colors every depth.
+;; (use-package highlight-parentheses
+;;   :straight t
+;;   :hook ((minibuffer-setup . highlight-parentheses-minibuffer-setup)
+;;          (prog-mode . highlight-parentheses-mode))
+;;   :config
+;;   (setq highlight-parentheses-colors '("green3" "firebrick1" "orange1")
+;;         highlight-parentheses-attributes '((:underline t) (:underline t) (:underline t))
+;;         highlight-parentheses-delay 0.25))
 
 
 ;; [rainbow-mode] Colorize color names in buffers
@@ -86,11 +89,13 @@
 
 
 ;; [goggles] Highlight modified region
-(use-package goggles
-  :straight t
-  :hook ((prog-mode text-mode) . goggles-mode)
-  :config
-  (setq-default goggles-pulse nil))
+;; Disabled: it only pulses undo/yank/kill/delete/transpose, so plain
+;; typing never triggers it.
+;; (use-package goggles
+;;   :straight t
+;;   :hook ((prog-mode text-mode) . goggles-mode)
+;;   :config
+;;   (setq-default goggles-pulse nil))
 
 
 ;; [pulse] Highlight line at cursor after switching window

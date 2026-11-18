@@ -17,6 +17,26 @@
 (blink-cursor-mode -1)
 
 
+;; [Line & column numbers] relative line numbers, plus column number in mode-line
+(setopt display-line-numbers-type 'relative)
+(global-display-line-numbers-mode 1)
+(column-number-mode 1)
+
+;; Reading/chat UIs get no line numbers.  An explicit (display-line-numbers-mode -1)
+;; in a major mode's hook makes the globalized mode skip that buffer for good
+;; (Emacs >= 24.1), so this reads as "never on" rather than "on, then off".
+(defun +line-numbers-off-h ()
+  "Turn off display-line-numbers-mode in the current buffer."
+  (display-line-numbers-mode -1))
+
+(add-hook! (telega-chat-mode-hook telega-root-mode-hook telega-image-mode-hook
+                                  telega-webpage-mode-hook elfeed-search-mode-hook elfeed-show-mode-hook
+                                  elfeed-tree-mode-hook mu4e-main-mode-hook mu4e-headers-mode-hook
+                                  mu4e-view-mode-hook mu4e-compose-mode-hook mu4e-raw-view-mode-hook
+                                  ghostel-mode-hook)
+  #'+line-numbers-off-h)
+
+
 ;; [Fringes] Reduce the clutter in the fringes, but indicate eob lines
 (setq indicate-buffer-boundaries nil
       indicate-empty-lines t)
