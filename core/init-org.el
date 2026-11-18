@@ -22,9 +22,15 @@
   :hook ((org-babel-after-execute . org-link-preview-refresh)
          (org-mode . (lambda () (setq-local dabbrev-abbrev-skip-leading-regexp "[=*]"))))
   :config
+  ;; Org 10.0 dropped the old alias kept in the comments below; preview
+  ;; caching is governed by `org-latex-preview-cache' instead.  Retired
+  ;; 2026-11-19, see dev-docs/notes/org-preview-cache-research-2026-11-19.md.
+  (setopt org-latex-preview-cache 'persist)
   (setq
    ;; Keep generated LaTeX previews out of note directories.
-   org-preview-latex-image-directory (no-littering-expand-var-file-name "org/latex/")
+   ;; (Dead since straight's Org 10.0-pre took over; previews now go through
+   ;; ;;  `org-latex-preview-cache' set above.  Kept for the record.)
+   ;; org-preview-latex-image-directory (no-littering-expand-var-file-name "org/latex/")
    ;; Recognize a), A), a., and A. as list markers.
    org-list-allow-alphabetical t
    ;; Always use shift to select
