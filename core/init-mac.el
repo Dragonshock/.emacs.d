@@ -7,13 +7,21 @@
 
 (defun +mac-read-system-appearance ()
   "Return `dark' or `light' from AppleInterfaceStyle."
-  (if (with-temp-buffer
-        (when (eq 0 (call-process "defaults" nil t nil
-                                  "read" "-g" "AppleInterfaceStyle"))
-          (goto-char (point-min))
-          (search-forward "Dark" nil t)))
-      'dark
-    'light))
+  ;; `call-process' inside `with-temp-buffer' signals file-missing
+  ;; ("Setting current directory") when `default-directory' points at
+  ;; a deleted directory, which made the sync timer below error
+  ;; every 2 seconds.  `with-temp-buffer' inherits this binding.
+  (let ((default-directory
+          (if (file-directory-p default-directory)
+              default-directory
+            "/")))
+    (if (with-temp-buffer
+          (when (eq 0 (call-process "defaults" nil t nil
+                                    "read" "-g" "AppleInterfaceStyle"))
+            (goto-char (point-min))
+            (search-forward "Dark" nil t)))
+        'dark
+      'light)))
 
 (defun +mac-sync-system-appearance ()
   "Update `+system-appearance' when the macOS appearance changes."
