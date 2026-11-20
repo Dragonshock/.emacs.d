@@ -87,7 +87,13 @@
          ("C-h E" . embark-bindings)
          :map embark-file-map
          ("s" . sudo-edit)
-         ("g" . +embark-magit-status))
+         ("g" . +embark-magit-status)
+         ;; Collect/export only inside the minibuffer, as Prot does: a
+         ;; global C-c C-c would be shadowed by org-ctrl-c-ctrl-c and
+         ;; comment-dwim in their major modes.
+         :map minibuffer-local-map
+         ("C-c C-c" . embark-collect)
+         ("C-c C-e" . embark-export))
   :init
   (setq prefix-help-command 'embark-prefix-help-command)
   :config
@@ -113,8 +119,8 @@
          ([remap list-registers]                . consult-register)
          ([remap goto-line]                     . consult-goto-line)
          ([remap imenu]                         . consult-imenu)
-         ("C-c d i"                             . consult-imenu)
-         ("C-c d I"                             . consult-imenu-multi)
+         ("M-s M-i"                             . consult-imenu)
+         ("M-s M-I"                             . consult-imenu-multi)
          ([remap locate]                        . consult-locate)
          ([remap load-theme]                    . consult-theme)
          ([remap man]                           . consult-man)
@@ -123,9 +129,9 @@
          ([remap switch-to-buffer-other-window] . consult-buffer-other-window)
          ([remap switch-to-buffer-other-frame]  . consult-buffer-other-frame)
          ([remap yank-pop]                      . consult-yank-pop)
-         ("C-c d l"                             . consult-line)
-         ("C-c d r"                             . consult-ripgrep)
-         ("C-c d f"                             . consult-fd)
+         ("M-s M-l"                             . consult-line)
+         ("M-s M-g"                             . consult-ripgrep)
+         ("M-s M-f"                             . consult-fd)
          :map minibuffer-mode-map
          ("C-r"                                 . consult-history))
   :config
@@ -166,12 +172,12 @@
           :async (let ((consult-fd-args '("fd" "--full-path" "--color=never" "--hidden" "--follow"
                                           "--exclude=.git" "--max-results=100")))
                    (consult--process-collection
-                    (consult--fd-make-builder
-                     (list (or (consult--project-root)
-                               (expand-file-name default-directory))))
-                    :transform (consult--async-map #'abbreviate-file-name)
-                    :highlight t
-                    :file-handler t))))
+                       (consult--fd-make-builder
+                        (list (or (consult--project-root)
+                                  (expand-file-name default-directory))))
+                     :transform (consult--async-map #'abbreviate-file-name)
+                     :highlight t
+                     :file-handler t))))
   (add-to-list 'consult-buffer-sources '+consult-source-fd 'append))
 
 
