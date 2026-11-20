@@ -101,42 +101,149 @@ WebKit stores the value as a UTF-16LE blob.  Fall back to whatever
          ("C-c g s" . +gptel-quick-summarize)
          ("C-c g d" . +gptel-quick-dict))
   :preface
-  (defun +gptel-quick-region-or-buffer (system-message &optional limit-response thing)
+  ;; [render] Local addition: stream responses into a reusable side-window
+  ;; buffer instead of the fork's posframe popup (see
+  ;; dev-docs/notes/gptel-render-non-popup-requirements-2026-02-11.md).
+  (defvar +gptel-quick-render-function 'buffer
+    "Where `+gptel-quick-region-or-buffer' renders results.
+`buffer' streams the response into a reusable \"*gptel-quick:
+<action>*\" buffer displayed in a side window below.  `popup' keeps
+the roife/gptel-quick posframe popup.")
+
+  (defun +gptel-quick--buffer-name (action)
+    "Return the result buffer name for ACTION."
+    (format "*gptel-quick: %s*" action))
+
+  (defun +gptel-quick--setup-result-buffer (action source)
+    "Return the result buffer for ACTION, documenting SOURCE.
+Reuse the buffer across rounds, clearing stale contents and setting
+up the header line, major mode and word wrapping."
+    (let ((buffer (get-buffer-create (+gptel-quick--buffer-name action))))
+      (with-current-buffer buffer
+        (erase-buffer)
+        (if (fboundp 'markdown-ts-mode)
+            (markdown-ts-mode)
+          (text-mode))
+        (visual-line-mode 1)
+        (setq header-line-format
+              (format "gptel-quick %s · from %s" action source)))
+      buffer))
+
+  (defun +gptel-quick--insert-chunk (buffer chunk)
+    "Append CHUNK at the end of the result BUFFER."
+    (with-current-buffer buffer
+      (goto-char (point-max))
+      (insert chunk)))
+
+  (defun +gptel-quick--show-buffer (buffer)
+    "Display the result BUFFER, keeping focus.
+Reuse an existing window when one already shows BUFFER; otherwise let
+`split-window-sensibly' pick the direction from the window size
+(`split-window-preferred-direction' defaults to `longest' in Emacs 31:
+landscape frames split left-right, portrait frames top-bottom)."
+    ;; NOTE: `display-buffer-below-selected' would force a top-bottom
+    ;; split on every frame, including wide ones.
+    (display-buffer buffer
+                    '((display-buffer-reuse-window
+                       display-buffer-pop-up-window))))
+
+  (defun +gptel-quick--display-buffer-callback (response info)
+    "gptel-request callback rendering RESPONSE into the result buffer.
+INFO is gptel's request info; its :context is (ACTION SOURCE-BUFFER-NAME)
+as passed by `+gptel-quick-region-or-buffer'.  Append RESPONSE when it
+is a streaming chunk, display the buffer once the stream ends
+(RESPONSE is t), and report quietly on failure."
+    (let* ((context (plist-get info :context))
+           (action (or (nth 0 context) 'quick))
+           (source (or (nth 1 context) "?"))
+           (buffer (or (get-buffer (+gptel-quick--buffer-name action))
+                       (+gptel-quick--setup-result-buffer action source))))
+      (pcase response
+        ((pred stringp)
+         (+gptel-quick--insert-chunk buffer response)
+         ;; NOTE: curl's non-streaming path calls the callback once with
+         ;; the whole response and never sends the `t' completion signal
+         ;; (see `gptel-curl--sentinel'), so show here when INFO says the
+         ;; request did not stream.
+         (unless (plist-get info :stream)
+           (+gptel-quick--show-buffer buffer)
+           (message "gptel-quick: %s response is in %s"
+                    action (buffer-name buffer))))
+        ('t
+         (+gptel-quick--show-buffer buffer)
+         (message "gptel-quick: %s response is in %s" action (buffer-name buffer)))
+        ((pred null)
+         (message "gptel-quick failed: %s"
+                  (or (plist-get info :error) (plist-get info :status) "unknown")))
+        ;; NOTE: reasoning and tool chunks arrive as cons cells
+        ;; (streaming deepseek models send `reasoning' chunks).  Only
+        ;; nil means failure, so these are silently skipped.
+        (_ nil))))
+
+  (defun +gptel-quick-region-or-buffer (system-message &optional limit-response thing action)
     "Run `gptel-quick' on THING, the active region, or the buffer.
 Preserve SYSTEM-MESSAGE when requesting another response with `+'.  When
-LIMIT-RESPONSE is non-nil, apply gptel-quick's count-derived token limit."
-    (require 'gptel-quick)
-    (let ((query-text
-           (if thing
-               (or (thing-at-point thing t)
-                   (user-error "No %s at point" thing))
-             (if (use-region-p)
-                 (buffer-substring-no-properties (region-beginning) (region-end))
-               (buffer-substring-no-properties (point-min) (point-max))))))
+LIMIT-RESPONSE is non-nil, apply gptel-quick's count-derived token limit.
+Render into the ACTION result buffer when `+gptel-quick-render-function'
+is `buffer'."
+    (let* ((query-text
+            (if thing
+                (or (thing-at-point thing t)
+                    (user-error "No %s at point" thing))
+              (if (use-region-p)
+                  (buffer-substring-no-properties (region-beginning) (region-end))
+                (buffer-substring-no-properties (point-min) (point-max)))))
+           (action (or action 'quick)))
       (when (string-empty-p query-text)
         (user-error "Buffer is empty"))
-      (gptel-quick query-text nil
-                   (append (list :system system-message)
-                           (unless limit-response
-                             (list :max-tokens nil))))))
+      (if (eq +gptel-quick-render-function 'popup)
+          (progn
+            (require 'gptel-quick)
+            (gptel-quick query-text nil
+                         (append (list :system system-message)
+                                 (unless limit-response
+                                   (list :max-tokens nil)))))
+        ;; NOTE: mirror gptel-quick's count-derived token cap; the
+        ;; buffer path keeps gptel-quick lazy-loaded, so the cap
+        ;; applies only once its defcustom has been loaded.
+        ;; NOTE: the popup path pulls gptel in through `gptel-quick';
+        ;; the buffer path calls `gptel-request' directly, so make sure
+        ;; gptel itself is loaded first.
+        (unless (fboundp 'gptel-request)
+          (require 'gptel))
+        (let ((gptel-max-tokens
+               (when (and limit-response (boundp 'gptel-quick-word-count))
+                 (floor (+ (sqrt (length query-text))
+                           (* 2.5 gptel-quick-word-count))))))
+          (+gptel-quick--setup-result-buffer action (buffer-name))
+          (gptel-request query-text
+            :system system-message
+            ;; NOTE: `gptel-request' defaults :stream to nil, and a
+            ;; non-streaming run never sends the `t' completion
+            ;; signal that displays the buffer.  gptel still gates
+            ;; this on `gptel-stream', `gptel-use-curl' and the
+            ;; backend's own :stream flag.
+            :stream t
+            :context (list action (buffer-name))
+            :callback #'+gptel-quick--display-buffer-callback)))))
 
-  (defmacro +gptel-quick-define-command (name doc prompt &optional limit thing)
+  (defmacro +gptel-quick-define-command (name doc prompt &optional limit thing action)
     "Define NAME as a gptel-quick action over the region or buffer."
     `(defun ,name ()
        ,doc (interactive)
-       (+gptel-quick-region-or-buffer ,prompt ,limit ,thing)))
+       (+gptel-quick-region-or-buffer ,prompt ,limit ,thing ,action)))
 
   (+gptel-quick-define-command +gptel-quick-explain
                                "Explain the active region, or the whole buffer, in Chinese."
-                               "Explain in clear Chinese, preserving necessary context and details." t)
+                               "Explain in clear Chinese, preserving necessary context and details." t nil 'explain)
 
   (+gptel-quick-define-command +gptel-quick-translate-to-chinese
                                "Translate the active region, or the whole buffer, to Chinese."
-                               "Translate into fluent Chinese.")
+                               "Translate into fluent Chinese." nil nil 'translate)
 
   (+gptel-quick-define-command +gptel-quick-summarize
                                "Summarize the active region, or the whole buffer, in Chinese."
-                               "Summarize in Chinese while preserving details and key information." t)
+                               "Summarize in Chinese while preserving details and key information." t nil 'summarize)
 
   (+gptel-quick-define-command +gptel-quick-dict
                                "Explain the word at point in dictionary style."
@@ -155,7 +262,7 @@ Use this format:
 • ...
 2. English definition **中文**
      *Example sentence.*"
-                               nil 'word)
+                               nil 'word 'dict)
 
   (with-eval-after-load 'embark
     (keymap-set embark-general-map "?" #'gptel-quick)
