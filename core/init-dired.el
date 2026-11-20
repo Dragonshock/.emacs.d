@@ -75,6 +75,10 @@
   (use-package dired-subtree
     :bind (:map dired-mode-map
                 ("TAB" . dired-subtree-toggle))
+    ;; No depth backgrounds: the depth faces are hardcoded dark greens
+    ;; (#252e30 ...) that ignore the theme.  The line prefix still nests.
+    :custom
+    (dired-subtree-use-backgrounds nil)
     :config
     (setq dired-subtree-line-prefix "  |  "))
 
@@ -82,8 +86,11 @@
   (use-package f :straight t :demand t)
 
   (use-package dired-collapse
-    :custom-face
-    (dired-collapse-shadow ((t (:inherit diredfl-dir-name))))
+    ;; Keep folding, drop the shaded overlay: `dired-collapse-fontify'
+    ;; wraps every filename in `dired-collapse-shadow', which drags in
+    ;; hardcoded colors instead of following the theme.
+    :custom
+    (dired-collapse-fontify nil)
     :hook (dired-mode . dired-collapse-mode))
 
   (use-package dired-narrow
