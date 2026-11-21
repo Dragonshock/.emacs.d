@@ -1,4 +1,13 @@
 ;;; -*- lexical-binding: t -*-
+;; Declared here, not in init-ui: `init.el' requires init-theme before init-ui and
+;; +load-theme runs immediately below (tty-setup-hook with
+;; :unless-daemonp-call-immediately). The declaration is what puts
+;; straight/build/ashen on `custom-theme-load-path' and `load-path', so it must
+;; precede the first `load-theme' call.
+(use-package ashen
+  :straight (:host github :repo "LuciusChen/ashen")
+  :demand t)
+
 (defcustom +light-theme 'ashen-day
   "Theme used when the system appearance is light."
   :type 'symbol

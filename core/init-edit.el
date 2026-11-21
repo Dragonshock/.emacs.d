@@ -338,8 +338,15 @@
   (setq separedit-default-mode 'markdown-ts-mode))
 
 ;; [substitute] Replace targets across the buffer
+;; :demand t is load-bearing: `substitute-prefix-map' is a keymap variable, and
+;; `C-c r' must therefore be a *prefix* binding before sub-keys are added
+;; ("C-c r r" quickrun in init-prog, "C-c r c" citre). While `substitute' is
+;; deferred the symbol has no keymap value yet, so binding it makes `C-c r' a
+;; non-prefix key and the later `define-key' of "C-c r r" aborts startup with
+;; "Key sequence C-c r r starts with non-prefix key C-c r".
 (use-package substitute
   :straight t
+  :demand t
   :bind ("C-c r" . substitute-prefix-map)
   :hook (substitute-post-replace . substitute-report-operation)
   :config

@@ -974,6 +974,15 @@ Like normal Emacs `C-k'.  Kill to end of line and put content in kill-ring."
 * init-theme
 #+begin_src emacs-lisp :tangle core/init-theme.el
 ;;; -*- lexical-binding: t -*-
+;; Declared here, not in init-ui: `init.el' requires init-theme before init-ui and
+;; +load-theme runs immediately below (tty-setup-hook with
+;; :unless-daemonp-call-immediately). The declaration is what puts
+;; straight/build/ashen on `custom-theme-load-path' and `load-path', so it must
+;; precede the first `load-theme' call.
+(use-package ashen
+  :straight (:host github :repo "LuciusChen/ashen")
+  :demand t)
+
 (defcustom +light-theme 'ashen-day
   "Theme used when the system appearance is light."
   :type 'symbol
@@ -1198,11 +1207,6 @@ Like normal Emacs `C-k'.  Kill to end of line and put content in kill-ring."
 ;; Don't prompt to confirm theme safety. This avoids problems with
 ;; first-time startup on Emacs > 26.3.
 (setq custom-safe-themes t)
-
-
-(use-package ashen
-  :straight (:host github :repo "LuciusChen/ashen")
-  :demand t)
 
 
 ;; [window-divider] Display window divider
@@ -2430,8 +2434,15 @@ left unchanged."
   (setq separedit-default-mode 'markdown-ts-mode))
 
 ;; [substitute] Replace targets across the buffer
+;; :demand t is load-bearing: `substitute-prefix-map' is a keymap variable, and
+;; `C-c r' must therefore be a *prefix* binding before sub-keys are added
+;; ("C-c r r" quickrun in init-prog, "C-c r c" citre). While `substitute' is
+;; deferred the symbol has no keymap value yet, so binding it makes `C-c r' a
+;; non-prefix key and the later `define-key' of "C-c r r" aborts startup with
+;; "Key sequence C-c r r starts with non-prefix key C-c r".
 (use-package substitute
   :straight t
+  :demand t
   :bind ("C-c r" . substitute-prefix-map)
   :hook (substitute-post-replace . substitute-report-operation)
   :config

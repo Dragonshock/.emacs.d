@@ -174,11 +174,6 @@
 (setq custom-safe-themes t)
 
 
-(use-package ashen
-  :straight (:host github :repo "LuciusChen/ashen")
-  :demand t)
-
-
 ;; [window-divider] Display window divider
 (setq window-divider-default-places t
       window-divider-default-bottom-width 1
