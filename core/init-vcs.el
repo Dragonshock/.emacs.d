@@ -1,0 +1,248 @@
+;;; -*- lexical-binding: t -*-
+
+;; [vc-mode] Version control interface
+(use-package vc
+  :config
+  (setq vc-handled-backends '(Git)
+        vc-consult-headers nil
+        vc-allow-async-revert t
+        vc-allow-rewriting-published-history t
+        vc-dir-auto-hide-up-to-date 'revert))
+
+
+;; [git-link] Get remote repo URL for buffer location
+(use-package git-link
+  :straight t
+  :bind (("C-, g l" . git-link)
+         ("C-, g c" . git-link-commit)
+         ("C-, g h" . git-link-homepage)))
+
+
+;; [diff-hl] Highlight uncommitted changes using VC
+(use-package diff-hl
+  :straight t
+  :hook ((after-init . global-diff-hl-mode)
+         (vc-dir-mode  . diff-hl-dir-mode)
+         (dired-mode   . diff-hl-dired-mode))
+  :bind (:map diff-hl-mode-map
+              ("C-c v v" . diff-hl-show-hunk)
+              ("C-c v r" . diff-hl-revert-hunk)
+              ("C-c v [" . diff-hl-previous-hunk)
+              ("C-c v ]" . diff-hl-next-hunk)
+              ("C-c v s" . diff-hl-stage-current-hunk)
+              ("C-c v u" . diff-hl-revert-hunk))
+  :config
+  (setq
+   ;; A slightly faster algorithm for diffing
+   vc-git-diff-switches '("--histogram")
+   ;; Use margins in terminal frames where fringes don't exist.
+   diff-hl-fallback-to-margin t)
+
+  (defun +diff-hl--vc-face (type _pos)
+    (pcase type
+      ('insert 'diff-refine-added)
+      ('delete 'diff-refine-removed)
+      ('change 'diff-refine-changed)))
+  (setq diff-hl-fringe-face-function #'+diff-hl--vc-face
+        diff-hl-fringe-reference-face-function #'+diff-hl--vc-face)
+
+  ;; Integration with magit
+  (with-eval-after-load 'magit
+    (add-hook! magit-post-refresh-hook #'diff-hl-magit-post-refresh))
+
+  ;; WORKAROUND: Integration with ws-butler
+  (with-eval-after-load 'ws-butler
+    (advice-add #'ws-butler-after-save :after #'diff-hl-update))
+
+  ;; HACK: Update after vc-state refreshed
+  (advice-add #'vc-refresh-state :after #'diff-hl-update)
+
+  ;; Update after focus change for different mode.
+  (defun +diff-hl-update-after-focus-change ()
+    (cond ((bound-and-true-p diff-hl-mode)
+           (diff-hl-update))
+          ((bound-and-true-p diff-hl-dir-mode)
+           (diff-hl-dir-update))
+          ((bound-and-true-p diff-hl-dired-mode)
+           (diff-hl-dired-update))))
+  (add-function :after after-focus-change-function
+                #'+diff-hl-update-after-focus-change))
+
+
+;; [magit] Version control interface
+(use-package magit
+  :straight t
+  :require-incrementally
+  (compat with-editor eieio transient
+          magit-section magit-base magit-git magit-mode magit-process
+          git-commit magit-transient magit-margin magit-autorevert magit-core
+          magit-diff magit-log magit-wip magit-apply magit-repos t)
+  :bind (("C-x g" . magit))
+  :hook ((magit-process-mode . goto-address-mode))
+  :config
+  (setq
+   ;; dont paint whitespace
+   magit-diff-paint-whitespace nil
+   ;; Don't autosave repo buffers. This is too magical
+   magit-save-repository-buffers nil
+   ;; Don't display parent/related refs in commit buffers; they are rarely helpful and only add to runtime costs.
+   magit-revision-insert-related-refs nil
+   magit-diff-use-indicator-faces t
+   magit-diff-highlight-trailing nil)
+
+  ;; Exterminate Magit buffers
+  (defun +magit-kill-buffers (&rest _)
+    "Restore window configuration and kill all Magit buffers."
+    (interactive)
+    (magit-restore-window-configuration)
+    (let ((buffers (magit-mode-get-buffers)))
+      (when (eq major-mode 'magit-status-mode)
+        (mapc (lambda (buf)
+                (with-current-buffer buf
+                  (if (and magit-this-process
+                           (eq (process-status magit-this-process) 'run))
+                      (bury-buffer buf)
+                    (kill-buffer buf))))
+              buffers))))
+  (setq magit-bury-buffer-function #'+magit-kill-buffers)
+
+  (defun +toggle-magit-difftastic ()
+    "Toggle `magit-difftastic-mode' in Magit buffers."
+    (interactive)
+    (magit-difftastic-mode
+     (if magit-difftastic-mode -1 1)))
+  (transient-append-suffix 'magit-diff '(-1 -1)
+    [("D" "Difftastic Diff" +toggle-magit-difftastic)]))
+
+
+(use-package magit-difftastic
+  :straight (:host github :repo "rschmukler/magit-difftastic")
+  :require-incrementally t
+  :after magit
+  :config
+  (setq magit-difftastic-display "inline"
+        magit-difftastic-line-numbers nil
+        magit-difftastic-syntax-highlight nil))
+
+
+;; Use the GitHub CLI credential directly.  Keep the token in memory only
+;; and fetch it lazily.
+(use-package ghub
+  :straight t
+  :preface
+  (defvar +ghub-gh-token-cache nil)
+
+  (defun +ghub--token-from-gh-cli ()
+    "Return the GitHub CLI token, caching it for this Emacs session."
+    (or +ghub-gh-token-cache
+        (let ((gh (or (executable-find "gh")
+                      (user-error "GitHub CLI executable not found"))))
+          (with-temp-buffer
+            (call-process gh nil t nil "auth" "token" "--hostname" "github.com")
+            (setq +ghub-gh-token-cache (string-trim (buffer-string)))))))
+  :config
+  (defadvice! +ghub-token-from-gh-cli-a (fn host username package
+                                            &optional nocreate forge)
+    :around #'ghub--token
+    "Use `gh auth token' directly for GitHub; otherwise call FN."
+    (if (memq forge '(nil github))
+        (+ghub--token-from-gh-cli)
+      (funcall fn host username package nocreate forge))))
+
+
+(use-package forge
+  :straight t
+  :require-incrementally t
+  :after magit
+  :init
+  (setq forge-post-fallback-directory
+        (no-littering-expand-var-file-name "forge/drafts/"))
+  (make-directory forge-post-fallback-directory t)
+  :custom-face
+  (forge-topic-label ((t (:inherit variable-pitch :height 0.9 :width condensed :weight regular :underline unspecified)))))
+
+
+;; Show TODOs in magit
+(use-package magit-todos
+  :straight t
+  :require-incrementally t
+  :after magit
+  :init
+  (setq magit-todos-update nil)
+  (magit-todos-mode 1))
+
+
+;; [remoto] Browse GitHub repositories without cloning
+(use-package remoto
+  :straight (:host github :repo "agzam/remoto.el")
+  :config
+  ;; remoto 2.5 removed `remoto--find-github-token'.  GitHub tokens are now
+  ;; read by `remoto--find-token'; keep taking them from `gh auth token'.
+  (defun +remoto-github-token-from-gh-cli (fn forge)
+    "Return the GitHub CLI token for a GitHub FORGE; otherwise call FN."
+    ;; `remoto-forgejo' includes `remoto-github', so the type predicate is
+    ;; true for Codeberg too.  Match the GitHub forge by name.
+    (if (eq (remoto-forge-name forge) 'github)
+        (+ghub--token-from-gh-cli)
+      (funcall fn forge)))
+  (advice-add #'remoto--warm-auth :override #'ignore)
+  (advice-add #'remoto--find-token :around #'+remoto-github-token-from-gh-cli))
+
+
+;; [smerge] Highlight all the conflicted regions for git
+(use-package smerge-mode
+  :preface
+  (defun +smerge-flymake-backend (report-fn &rest _args)
+    "Report unresolved merge conflicts in the current buffer."
+    (let (diagnostics)
+      (save-excursion
+        (goto-char (point-min))
+        (while (smerge-find-conflict)
+          (let ((beg (match-beginning 0)))
+            (push (flymake-make-diagnostic
+                   (current-buffer) beg
+                   (save-excursion (goto-char beg) (line-end-position))
+                   'flymake-error "Unresolved merge conflict")
+                  diagnostics))))
+      (funcall report-fn (nreverse diagnostics))))
+
+  (defun +smerge-flymake-setup-h ()
+    "Add the Smerge Flymake backend to a conflicted buffer."
+    (when smerge-mode
+      (add-hook 'flymake-diagnostic-functions
+                #'+smerge-flymake-backend nil t)
+      (if (bound-and-true-p flymake-mode)
+          (flymake-start)
+        (flymake-mode 1))))
+
+  (defun +smerge-try-smerge ()
+    (when (and buffer-file-name
+               (save-excursion
+                 (goto-char (point-min))
+                 (re-search-forward "^<<<<<<< " nil t))
+               (vc-backend buffer-file-name))
+      (require 'smerge-mode)
+      (smerge-mode 1)))
+  :hook ((find-file . +smerge-try-smerge)
+         (smerge-mode . +smerge-flymake-setup-h)))
+
+
+;; [browse-at-remote] Open github/gitlab/bitbucket page
+(use-package browse-at-remote
+  :straight t
+  :bind (:map vc-prefix-map
+              ("B" . browse-at-remote)))
+
+
+;; [git-modes] Git configuration major modes
+(use-package git-modes
+  :straight t)
+
+
+;; [abridge-diff]
+(use-package abridge-diff
+  :straight t
+  :after magit
+  :hook (magit-diff-visit-file . abridge-diff-mode))
+
+(provide 'init-vcs)

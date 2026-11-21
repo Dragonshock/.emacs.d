@@ -1,0 +1,264 @@
+;;; -*- lexical-binding: t -*-
+
+;; [org-persist]
+(use-package org-persist
+  :straight nil
+  :init
+  (setq org-persist-directory (no-littering-expand-var-file-name "org/persist/")))
+
+
+;; [org]
+(use-package org
+  :straight t
+  :require-incrementally
+  (calendar find-func format-spec org-macs org-compat org-faces
+            org-entities org-fold-core org-fold oc org-keys ol org-table
+            org-footnote org-list org-pcomplete org-src org-macro ob t)
+  :init
+  (setq org-modules '(org-habit)
+        org-directory (file-truename "~/org/"))
+  :custom-face
+  (org-quote ((t (:inherit org-block-begin-line))))
+  :hook ((org-babel-after-execute . org-link-preview-refresh)
+         (org-mode . (lambda () (setq-local dabbrev-abbrev-skip-leading-regexp "[=*]"))))
+  :config
+  ;; Org 10.0 dropped the old alias kept in the comments below; preview
+  ;; caching is governed by `org-latex-preview-cache' instead.  Retired
+  ;; 2026-11-19, see dev-docs/notes/org-preview-cache-research-2026-11-19.md.
+  (setopt org-latex-preview-cache 'persist)
+  (setq
+   ;; Keep generated LaTeX previews out of note directories.
+   ;; (Dead since straight's Org 10.0-pre took over; previews now go through
+   ;; ;;  `org-latex-preview-cache' set above.  Kept for the record.)
+   ;; org-preview-latex-image-directory (no-littering-expand-var-file-name "org/latex/")
+   ;; Recognize a), A), a., and A. as list markers.
+   org-list-allow-alphabetical t
+   ;; Always use shift to select
+   org-support-shift-select 'always
+
+   ;; subscription: Use {} for sub- or super- scripts
+   org-use-sub-superscripts '{}
+   org-export-with-sub-superscripts '{}
+
+   ;; prettify
+   org-startup-indented t
+   ;; Respect #+startup visibility, archived trees, drawers, and hidden blocks.
+   org-startup-folded nil
+   org-pretty-entities t
+   org-ellipsis "…"
+   org-hide-emphasis-markers t
+   ;; Sparse trees should filter visibility without making every match look
+   ;; like an active region.
+   org-highlight-sparse-tree-matches nil
+   ;; Highlight quote and verse blocks
+   org-fontify-quote-and-verse-blocks t
+   ;; Highlight the whole line for headings
+   org-fontify-whole-heading-line t
+   org-image-actual-width nil
+   org-priority-faces '((?A . error)
+                        (?B . warning)
+                        (?C . shadow))
+
+   ;; Edit settings
+   org-auto-align-tags nil
+   org-tags-column 0
+   org-M-RET-may-split-line nil
+   org-insert-heading-respect-content t
+
+   ;; Source blocks
+   org-src-preserve-indentation t
+   org-src-tab-acts-natively t
+   org-src-window-setup 'other-window
+
+   ;; Store ID-based attachments centrally and inherit them in subtrees.
+   org-attach-id-dir (expand-file-name ".attach/" org-directory)
+   org-attach-store-link-p 'attached
+   org-attach-use-inheritance t
+
+   ;; Keep numbering opt-out explicit.
+   org-num-face '(:inherit org-special-keyword :underline nil :weight bold)
+   org-num-skip-tags '("noexport" "nonum")
+
+   ;; better keybindings
+   org-special-ctrl-a/e t
+   org-special-ctrl-k t
+   org-special-ctrl-o t
+   org-ctrl-k-protect-subtree 'error
+   org-fold-catch-invisible-edits 'show-and-error
+
+   org-imenu-depth 4)
+
+  ;; Common web and local-note link abbreviations.
+  (dolist (abbrev '(("github" . "https://github.com/%s")
+                    ("youtube" . "https://youtube.com/watch?v=%s")
+                    ("google" . "https://google.com/search?q=%s")
+                    ("gmap" . "https://maps.google.com/maps?q=%s")
+                    ("wiki" . "https://en.wikipedia.org/wiki/%s")
+                    ("wolfram" . "https://wolframalpha.com/input/?i=%s")
+                    ("org" . (lambda (path) (abbreviate-file-name (expand-file-name path org-directory))))))
+    (add-to-list 'org-link-abbrev-alist abbrev))
+
+  ;; Open file links in place, directories in Dired, and flag broken links.
+  (setf (alist-get 'file org-link-frame-setup) #'find-file)
+  (add-to-list 'org-file-apps '(directory . emacs))
+  (add-to-list 'org-file-apps '(remote . emacs))
+  (defun +org-file-link-face (path)
+    "Use a warning face for a missing local Org file link at PATH."
+    (if (or (file-remote-p path)
+            (file-exists-p (expand-file-name (org-link-unescape path))))
+        'org-link
+      '(warning org-link)))
+  (org-link-set-parameters "file" :face #'+org-file-link-face)
+
+  (define-key org-src-mode-map (kbd "C-c C-c") #'org-edit-src-exit)
+
+  ;; Realign after edits that never move to another field.  Org only
+  ;; realigns inside `org-table-next-field' and `org-table-next-row', so
+  ;; typing and then moving away with an ordinary command leaves the row
+  ;; ragged.  This used to run when leaving meow's insert state, and meow
+  ;; is not loaded.
+  (add-hook! post-command-hook
+    (defun +org-realign-table-maybe-h ()
+      "Realign the Org table at point when its contents changed."
+      (when (and (derived-mode-p 'org-mode)
+                 org-table-automatic-realign
+                 (org-at-table-p)
+                 org-table-may-need-update)
+        (let ((point (point))
+              (inhibit-message t))
+          (org-table-align)
+          (goto-char point)))))
+
+  ;; Give custom blocks such as #+begin_question the usual block face.
+  (defun +org-fontify-special-blocks (limit)
+    "Add `org-block' to special block contents found before LIMIT."
+    (let ((case-fold-search t))
+      (while (re-search-forward "^[ \t]*#\\+begin_\\S-+" limit t)
+        (let ((block (save-excursion
+                       (beginning-of-line)
+                       (org-element-at-point))))
+          (when (eq (org-element-type block) 'special-block)
+            (when-let* ((begin (org-element-property :contents-begin block))
+                        (end (org-element-property :contents-end block)))
+              (add-face-text-property begin end 'org-block t))))))
+    nil)
+  (font-lock-add-keywords 'org-mode '((+org-fontify-special-blocks)) 'append)
+
+  ;; Keep drawer and block delimiter faces compact after theme loading.
+  (dolist (face '(org-drawer org-meta-line org-block-begin-line org-block-end-line))
+    (set-face-attribute face nil :inherit 'font-lock-comment-face)
+    (set-face-attribute face nil :height 0.85))
+
+  ;; Cycle the visible parent heading when point is in or just past folded text.
+  (add-hook! org-cycle-tab-first-hook
+    (defun +org-cycle-visible-heading ()
+      "Cycle the visible parent heading at either edge of a folded subtree."
+      (when-let* ((folded-region (or (org-fold-get-region-at-point 'headline)
+                                     (and (> (point) (point-min))
+                                          (org-fold-get-region-at-point
+                                           'headline (1- (point)))))))
+        (goto-char (car folded-region))
+        (org-back-to-heading t)
+        (org-cycle)
+        t)))
+
+  ;; Better Org Latex Preview
+  ;; The two old names kept in the comments below are obsolete aliases
+  ;; that org-compat.el marks for removal in Org 10.0.  Migrated to the
+  ;; new names 2026-11-19, see
+  ;; dev-docs/notes/plugin-update-final-recommendations-2026-11-19.md.
+  ;; (setq org-preview-latex-default-process 'dvisvgm
+  ;;       org-startup-with-latex-preview nil
+  ;;       org-highlight-latex-and-related '(latex))
+  (setq org-latex-preview-process-default 'dvisvgm
+        org-startup-with-latex-preview nil
+        org-highlight-latex-and-related '(latex))
+  ;; (plist-put org-format-latex-options :scale 1.2)
+  (plist-put org-latex-preview-appearance-options :scale 1.2)
+  ;; Let LaTeX and Typst previews show the surrounding face's background.
+  ;; (plist-put org-format-latex-options :background "Transparent")
+  (plist-put org-latex-preview-appearance-options :background "Transparent")
+
+  ;; Allow CJK characters and full-width punctuation next to
+  ;; emphasis markers.  Keep ASCII letters excluded to avoid
+  ;; treating paths and identifiers as emphasis.
+  (setq org-emphasis-regexp-components '("-[:space:]('\"{[:nonascii:]"
+                                         "-[:space:].,:!?;'\")}\\[[:nonascii:]"
+                                         "[:space:]"
+                                         "."
+                                         1))
+  (org-set-emph-re 'org-emphasis-regexp-components org-emphasis-regexp-components))
+
+
+;; `org-element' and its `org-persist' dependency need Org loaded first.
+(use-package org-element
+  :straight nil
+  :require-incrementally (org t))
+
+
+;; [ob-mermaid] Generate Mermaid diagrams through Org Babel
+(use-package ob-mermaid
+  :straight t
+  :require-incrementally t
+  :after org
+  :init
+  (setf (alist-get 'mermaid org-babel-load-languages) t)
+  :config
+  (setq ob-mermaid-default-config-file
+        (no-littering-expand-etc-file-name "mermaid/config.json")))
+
+
+;; [org-appear] Make invisible parts of Org elements appear visible.
+;; `init-modal' is not loaded, so this does not depend on Meow.
+(use-package org-appear
+  :straight t
+  :require-incrementally t
+  :hook (org-mode . org-appear-mode)
+  :config
+  (setq org-appear-autosubmarkers t
+        org-appear-autoentities t
+        org-appear-autokeywords t
+        org-appear-inside-latex t
+        org-appear-delay 0.1
+        org-appear-trigger 'always))
+
+
+;; [org-fragtog] Toggle LaTeX fragment previews when point enters or leaves.
+;; It calls `org-latex-preview' directly, so it does not follow
+;; `org-typst-preview''s keymap remap, and it only matches LaTeX elements.
+(use-package org-fragtog
+  :straight t
+  :hook (org-mode . org-fragtog-mode))
+
+
+(use-package org-modern
+  :straight t
+  :require-incrementally t
+  :after org
+  :hook ((org-mode . org-modern-mode)
+         (org-agenda-finalize . org-modern-agenda))
+  :config
+  (setq org-modern-star 'replace
+        org-modern-replace-stars "◉○◈◇✳"))
+
+;; [ox]
+(use-package ox
+  :config
+  (setq org-export-with-smart-quotes t
+        org-html-validation-link nil
+        org-latex-prefer-user-labels t
+        org-export-with-latex t))
+
+
+;; [org-typst-preview] Render native Typst formulae asynchronously.
+(use-package org-typst-preview
+  :straight (:host github :repo "roife/org-typst-preview")
+  :require-incrementally t
+  :after org
+  :hook (org-mode . org-typst-preview-mode)
+  :config
+  (setq org-typst-preview-scale 1.5
+        org-typst-preview-image-directory
+        (no-littering-expand-var-file-name "org/typst/")))
+
+(provide 'init-org)

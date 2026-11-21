@@ -1,0 +1,549 @@
+;;; -*- lexical-binding: t -*-
+
+(use-package gptel
+  :straight t
+  :init
+  (setq gptel-model 'auto/deepseek-flash
+        gptel-default-mode 'org-mode
+        gptel-confirm-tool-calls nil)
+  ;; Pi reads Magpie's menu-bar picker from WebKit local storage.
+  ;; `auto' is not that choice: it is WorkBuddy's own model id and
+  ;; always resolves there.  Defined in :init so agent-shell can read
+  ;; it without loading gptel.  gptel does not follow the picker.
+  (defvar +gptel-magpie-store
+    (expand-file-name
+     (concat "Library/WebKit/com.yetone.magpie/WebsiteData/Default/"
+             "W7EjdJuyWhjGnN4UoO9On1R3uVoFOb07LV8R479DUDo/"
+             "W7EjdJuyWhjGnN4UoO9On1R3uVoFOb07LV8R479DUDo/"
+             "LocalStorage/localstorage.sqlite3")
+     "~"))
+
+  (defun +gptel-magpie-model ()
+    "Return the model currently chosen in Magpie's gateway picker.
+WebKit stores the value as a UTF-16LE blob.  Fall back to whatever
+`gptel-model' already is when the store cannot be read."
+    (let ((chosen (string-trim
+                   (shell-command-to-string
+                    (format "sqlite3 -readonly %s %s | xxd -r -p | iconv -f UTF-16LE"
+                            (shell-quote-argument +gptel-magpie-store)
+                            (shell-quote-argument
+                             "select hex(value) from ItemTable where key='magpie.model'"))))))
+      (if (string-empty-p chosen)
+          gptel-model
+        (intern chosen))))
+  :config
+  ;; A host other than api.openai.com uses /v1/chat/completions.
+  ;; Streaming is ignored unless the backend sets :stream, and a model
+  ;; missing from :models is dropped.  gptel-backend is buffer-local.
+  (setq-default gptel-backend
+                (gptel-make-openai "Magpie"
+                  :host "127.0.0.1:3425"
+                  :protocol "http"
+                  :stream t
+                  :key (lambda () "magpie")
+                  :models '(auto/deepseek-flash)))
+  (add-hook! gptel-post-stream-hook #'gptel-auto-scroll)
+  (add-hook! gptel-post-response-functions #'gptel-end-of-response))
+
+
+(use-package gptel-agent
+  :straight t
+  :after gptel
+  :config (gptel-agent-update))
+
+
+(use-package gptel-magit
+  :straight (gptel-magit :type git :host github :repo "roife/gptel-magit")
+  :require-incrementally (magit t)
+  :hook ((magit-mode . gptel-magit-install))
+  :config
+  (setq gptel-magit-body-length 72
+        gptel-magit-commit-prompt (cdr (assoc "Conventional Commits" gptel-magit-commit-styles-alist)))
+
+  (defun +gptel-magit-fish (fifo insertp)
+    "Generate a message, optionally insert it, and report through FIFO."
+    (let ((commit-buffer (magit-commit-message-buffer))
+          record fsm)
+      (cond
+       ((and insertp (not commit-buffer))
+        (user-error "No commit in progress"))
+       ((and (not insertp) commit-buffer)
+        (user-error "Commit already in progress")))
+      (setq fsm
+            (gptel-magit--generate
+             (lambda (message)
+               (setq record (concat "0" message)))
+             nil commit-buffer "Generating commit message..."))
+      (let ((info (gptel-fsm-info fsm)))
+        (plist-put
+         info :post
+         (append
+          (plist-get info :post)
+          (list
+           (lambda (request-info)
+             (with-temp-buffer
+               (insert
+                (or record
+                    (if (eq (gptel-fsm-state fsm) 'DONE)
+                        "0"
+                      (concat "1" (format "%s"
+                                          (or (plist-get request-info :status)
+                                              (plist-get request-info :error)
+                                              "generation failed"))))))
+               (write-region (point-min) (point-max)
+                             fifo nil 'silent)))))))
+      fsm)))
+
+(use-package gptel-quick
+  :straight (gptel-quick :type git :host github :repo "roife/gptel-quick")
+  :bind (("C-c g e" . +gptel-quick-explain)
+         ("C-c g t" . +gptel-quick-translate-to-chinese)
+         ("C-c g s" . +gptel-quick-summarize)
+         ("C-c g d" . +gptel-quick-dict))
+  :preface
+  ;; [render] Local addition: stream responses into a reusable side-window
+  ;; buffer instead of the fork's posframe popup (see
+  ;; dev-docs/notes/gptel-render-non-popup-requirements-2026-02-11.md).
+  (defvar +gptel-quick-render-function 'buffer
+    "Where `+gptel-quick-region-or-buffer' renders results.
+`buffer' streams the response into a reusable \"*gptel-quick:
+<action>*\" buffer displayed in a side window below.  `popup' keeps
+the roife/gptel-quick posframe popup.")
+
+  (defun +gptel-quick--buffer-name (action)
+    "Return the result buffer name for ACTION."
+    (format "*gptel-quick: %s*" action))
+
+  (defun +gptel-quick--setup-result-buffer (action source)
+    "Return the result buffer for ACTION, documenting SOURCE.
+Reuse the buffer across rounds, clearing stale contents and setting
+up the header line, major mode and word wrapping."
+    (let ((buffer (get-buffer-create (+gptel-quick--buffer-name action))))
+      (with-current-buffer buffer
+        (erase-buffer)
+        (if (fboundp 'markdown-ts-mode)
+            (markdown-ts-mode)
+          (text-mode))
+        (visual-line-mode 1)
+        (setq header-line-format
+              (format "gptel-quick %s · from %s" action source)))
+      buffer))
+
+  (defun +gptel-quick--insert-chunk (buffer chunk)
+    "Append CHUNK at the end of the result BUFFER."
+    (with-current-buffer buffer
+      (goto-char (point-max))
+      (insert chunk)))
+
+  (defun +gptel-quick--show-buffer (buffer)
+    "Display the result BUFFER, keeping focus.
+Reuse an existing window when one already shows BUFFER; otherwise let
+`split-window-sensibly' pick the direction from the window size
+(`split-window-preferred-direction' defaults to `longest' in Emacs 31:
+landscape frames split left-right, portrait frames top-bottom)."
+    ;; NOTE: `display-buffer-below-selected' would force a top-bottom
+    ;; split on every frame, including wide ones.
+    (display-buffer buffer
+                    '((display-buffer-reuse-window
+                       display-buffer-pop-up-window))))
+
+  (defun +gptel-quick--display-buffer-callback (response info)
+    "gptel-request callback rendering RESPONSE into the result buffer.
+INFO is gptel's request info; its :context is (ACTION SOURCE-BUFFER-NAME)
+as passed by `+gptel-quick-region-or-buffer'.  Append RESPONSE when it
+is a streaming chunk, display the buffer once the stream ends
+(RESPONSE is t), and report quietly on failure."
+    (let* ((context (plist-get info :context))
+           (action (or (nth 0 context) 'quick))
+           (source (or (nth 1 context) "?"))
+           (buffer (or (get-buffer (+gptel-quick--buffer-name action))
+                       (+gptel-quick--setup-result-buffer action source))))
+      (pcase response
+        ((pred stringp)
+         (+gptel-quick--insert-chunk buffer response)
+         ;; NOTE: curl's non-streaming path calls the callback once with
+         ;; the whole response and never sends the `t' completion signal
+         ;; (see `gptel-curl--sentinel'), so show here when INFO says the
+         ;; request did not stream.
+         (unless (plist-get info :stream)
+           (+gptel-quick--show-buffer buffer)
+           (message "gptel-quick: %s response is in %s"
+                    action (buffer-name buffer))))
+        ('t
+         (+gptel-quick--show-buffer buffer)
+         (message "gptel-quick: %s response is in %s" action (buffer-name buffer)))
+        ((pred null)
+         (message "gptel-quick failed: %s"
+                  (or (plist-get info :error) (plist-get info :status) "unknown")))
+        ;; NOTE: reasoning and tool chunks arrive as cons cells
+        ;; (streaming deepseek models send `reasoning' chunks).  Only
+        ;; nil means failure, so these are silently skipped.
+        (_ nil))))
+
+  (defun +gptel-quick-region-or-buffer (system-message &optional limit-response thing action)
+    "Run `gptel-quick' on THING, the active region, or the buffer.
+Preserve SYSTEM-MESSAGE when requesting another response with `+'.  When
+LIMIT-RESPONSE is non-nil, apply gptel-quick's count-derived token limit.
+Render into the ACTION result buffer when `+gptel-quick-render-function'
+is `buffer'."
+    (let* ((query-text
+            (if thing
+                (or (thing-at-point thing t)
+                    (user-error "No %s at point" thing))
+              (if (use-region-p)
+                  (buffer-substring-no-properties (region-beginning) (region-end))
+                (buffer-substring-no-properties (point-min) (point-max)))))
+           (action (or action 'quick)))
+      (when (string-empty-p query-text)
+        (user-error "Buffer is empty"))
+      (if (eq +gptel-quick-render-function 'popup)
+          (progn
+            (require 'gptel-quick)
+            (gptel-quick query-text nil
+                         (append (list :system system-message)
+                                 (unless limit-response
+                                   (list :max-tokens nil)))))
+        ;; NOTE: mirror gptel-quick's count-derived token cap; the
+        ;; buffer path keeps gptel-quick lazy-loaded, so the cap
+        ;; applies only once its defcustom has been loaded.
+        ;; NOTE: the popup path pulls gptel in through `gptel-quick';
+        ;; the buffer path calls `gptel-request' directly, so make sure
+        ;; gptel itself is loaded first.
+        (unless (fboundp 'gptel-request)
+          (require 'gptel))
+        (let ((gptel-max-tokens
+               (when (and limit-response (boundp 'gptel-quick-word-count))
+                 (floor (+ (sqrt (length query-text))
+                           (* 2.5 gptel-quick-word-count))))))
+          (+gptel-quick--setup-result-buffer action (buffer-name))
+          (gptel-request query-text
+            :system system-message
+            ;; NOTE: `gptel-request' defaults :stream to nil, and a
+            ;; non-streaming run never sends the `t' completion
+            ;; signal that displays the buffer.  gptel still gates
+            ;; this on `gptel-stream', `gptel-use-curl' and the
+            ;; backend's own :stream flag.
+            :stream t
+            :context (list action (buffer-name))
+            :callback #'+gptel-quick--display-buffer-callback)))))
+
+  (defmacro +gptel-quick-define-command (name doc prompt &optional limit thing action)
+    "Define NAME as a gptel-quick action over the region or buffer."
+    `(defun ,name ()
+       ,doc (interactive)
+       (+gptel-quick-region-or-buffer ,prompt ,limit ,thing ,action)))
+
+  (+gptel-quick-define-command +gptel-quick-explain
+                               "Explain the active region, or the whole buffer, in Chinese."
+                               "Explain in clear Chinese, preserving necessary context and details." t nil 'explain)
+
+  (+gptel-quick-define-command +gptel-quick-translate-to-chinese
+                               "Translate the active region, or the whole buffer, to Chinese."
+                               "Translate into fluent Chinese." nil nil 'translate)
+
+  (+gptel-quick-define-command +gptel-quick-summarize
+                               "Summarize the active region, or the whole buffer, in Chinese."
+                               "Summarize in Chinese while preserving details and key information." t nil 'summarize)
+
+  (+gptel-quick-define-command +gptel-quick-dict
+                               "Explain the word at point in dictionary style."
+                               "Given a word, explain it in the style of a concise English dictionary entry,
+and add accurate Chinese translations for each sense. Preserve the compact dictionary
+format in plain text rather than giving a long explanatory article or markdown document.
+No need for chinese in sentences.
+
+Use this format:
+*word* syllable division | pronunciation | part of speech (inflections)
+
+1. English definition **中文**
+     *Example sentence.*
+ | Sub-sense or extended meaning **中文**
+     *Example sentence.*
+• ...
+2. English definition **中文**
+     *Example sentence.*"
+                               nil 'word 'dict)
+
+  (with-eval-after-load 'embark
+    (keymap-set embark-general-map "?" #'gptel-quick)
+    (keymap-set embark-region-map "E" #'+gptel-quick-explain)
+    (keymap-set embark-region-map "T" #'+gptel-quick-translate-to-chinese)
+    (keymap-set embark-region-map "S" #'+gptel-quick-summarize)
+    (keymap-set embark-region-map "D" #'+gptel-quick-dict))
+
+  :config
+  (setq gptel-quick-word-count 50
+        gptel-quick-timeout nil))
+
+(use-package agent-shell
+  :straight (:type git :host github :repo "xenodium/agent-shell")
+  :require-incrementally
+  (acp-traffic acp comint shell shell-maker transient
+               agent-shell-faces agent-shell-work-buffer agent-shell-project
+               agent-shell-config agent-shell-markdown agent-shell-diff
+               agent-shell-styles agent-shell-usage agent-shell-list-edit
+               agent-shell-viewport agent-shell-ui t)
+  :bind (("C-c g a" . agent-shell)
+         ("C-c g p" . agent-shell-prompt-compose)
+         ("C-c g w" . agent-shell-send-dwim)
+         :map agent-shell-mode-map
+         ;; Leave M-<return> on `agent-shell-submit-override`, which steers a
+         ;; busy turn.  A plain newline stays on shell-maker's S-<return>.
+         ("C-c C-h" . agent-shell-help-menu)
+         ("C-c C-q" . agent-shell-prompt-queue)
+         ("C-c C-e" . agent-shell-prompt-steer))
+  :custom-face
+  (agent-shell-section-heading ((t (:inherit font-lock-function-name-face :height 0.9))))
+  (agent-shell-section-annotation ((t (:inherit shadow :height 0.8))))
+  :preface
+  (defun +agent-shell-dot-subdir (subdir)
+    "Return the centralized Agent Shell data directory for SUBDIR."
+    (let* ((cwd (directory-file-name (agent-shell-cwd)))
+           (name (file-name-nondirectory cwd))
+           (slug (replace-regexp-in-string
+                  "[^[:alnum:]._-]+" "-" (if (string-empty-p name) "root" name)))
+           (project-key
+            (format "%s-%s" slug (substring (secure-hash 'sha1 cwd) 0 10))))
+      (expand-file-name
+       (file-name-concat project-key ".agent-shell" subdir)
+       (locate-user-emacs-file "var/agent-shell/"))))
+
+  (cl-defun +agent-shell-resume-codex-fork
+      (original &rest args &key state client request buffer on-success on-failure
+                &allow-other-keys)
+    "Resume Codex forks before completing their initialization.
+This restores the event subscription without replaying history."
+    (when (and (equal (map-elt request :method) "session/fork")
+               (eq (map-nested-elt state '(:agent-config :identifier)) 'codex)
+               (map-elt state :supports-session-resume))
+      (setf (plist-get args :on-success)
+            (lambda (fork-response)
+              (let ((id (map-elt fork-response 'sessionId))
+                    (params (map-elt request :params)))
+                (unless (and (stringp id) (not (string-empty-p id))
+                             (not (equal id (map-elt params 'sessionId))))
+                  (error "Invalid fork session ID"))
+                (agent-shell--send-request
+                 :state state :client client :buffer (or buffer (map-elt state :buffer))
+                 :request (acp-make-session-resume-request
+                           :session-id id :cwd (map-elt params 'cwd)
+                           :mcp-servers (map-elt params 'mcpServers)
+                           :meta (map-elt params '_meta))
+                 :on-success (lambda (resume-response)
+                               (funcall on-success
+                                        (map-merge 'alist fork-response resume-response
+                                                   `((sessionId . ,id)))))
+                 :on-failure on-failure)))))
+    (apply original args))
+  :init
+  (defun +agent-shell-pi-model-id (model)
+    "Prefix MODEL with magpie/ unless it already names that provider.
+Pi treats the text before the first slash as the provider, so
+`workbuddy/auto' must be sent as `magpie/workbuddy/auto'."
+    (let ((name (if (symbolp model) (symbol-name model) model)))
+      (if (string-prefix-p "magpie/" name)
+          name
+        (concat "magpie/" name))))
+
+  (defun +agent-shell-pi-magpie-model-id ()
+    "Return Magpie's current picker model for a new Pi session."
+    (+agent-shell-pi-model-id (+gptel-magpie-model)))
+
+  (defun +agent-shell-pi-make-agent-config ()
+    "Pi config that follows Magpie's gateway picker."
+    (let ((config (agent-shell-pi-make-agent-config)))
+      (setf (alist-get :default-model-id config)
+            #'+agent-shell-pi-magpie-model-id)
+      config))
+
+  (setq agent-shell-agent-configs '(+agent-shell-pi-make-agent-config)
+        agent-shell-preferred-agent-config 'pi
+        agent-shell-context-sources nil
+        agent-shell-mcp-servers nil
+        agent-shell-session-restore-verbosity 'full
+        agent-shell-show-welcome-message nil
+        agent-shell-chat-mode-enabled nil
+        agent-shell-header-style 'text
+        agent-shell-activity-group-expand-by-default 'latest
+        agent-shell-markdown-table-zebra-stripe nil
+        agent-shell-dot-subdir-function #'+agent-shell-dot-subdir
+        agent-shell-show-context-usage-indicator 'detailed
+        agent-shell-file-display-action '((display-buffer-reuse-window display-buffer-pop-up-window)))
+  :config
+  (defun +agent-shell-header-option (option shell-buffer)
+    "Render OPTION with a menu that updates SHELL-BUFFER's session."
+    (let* ((id (map-elt option :id))
+           (current (map-elt option :current-value))
+           (name (map-elt option :name))
+           (label (agent-shell--config-option-value-name option current))
+           (menu (make-sparse-keymap name))
+           (map (make-sparse-keymap)))
+      (dolist (choice (reverse (agent-shell--config-option-value-choices option)))
+        (let ((value (map-elt (cdr choice) :value)))
+          (define-key menu (vector (intern (format "value-%s" value)))
+                      `(menu-item ,(car choice)
+                                  (lambda () (interactive)
+                                    (agent-shell-set-config-option-value
+                                     :shell-buffer ,shell-buffer :id ,id :value ,value))
+                                  :button (:toggle . ,(equal value current))))))
+      (define-key map [header-line down-mouse-1] #'ignore)
+      (define-key map [header-line mouse-1] menu)
+      (propertize (if (equal id "fast-mode") (concat "Fast " label) label)
+                  'face (pcase current
+                          ("on" 'success)
+                          ("off" 'shadow)
+                          ("plan" 'warning)
+                          (_ 'font-lock-constant-face))
+                  'help-echo (format "%s: %s" name label)
+                  'mouse-face 'mode-line-highlight
+                  'local-map map)))
+
+  (defadvice! +agent-shell-extend-header-model (original state &rest args)
+    :around #'agent-shell--make-header-model
+    "Append clickable collaboration and Fast mode options to the header."
+    (let* ((model (apply original state args))
+           (parts
+            (cons (map-elt model :context-indicator)
+                  (cl-loop for option in (agent-shell--config-options state)
+                           when (member (map-elt option :id) '("collaboration_mode" "fast-mode"))
+                           collect (+agent-shell-header-option option (current-buffer))))))
+      (setf (map-elt model :context-indicator)
+            (when-let* ((parts (delq nil parts)))
+              (string-join parts " · ")))
+      model))
+
+  (advice-add #'agent-shell--update-bootstrapping-fragment :override #'ignore)
+  ;; Run outside agent-shell-btw's request advice: it records the fork ID
+  ;; before resume, allowing its normal close hook to clean up after failures.
+  (advice-add #'agent-shell--send-request :around
+              #'+agent-shell-resume-codex-fork '((depth . -50))))
+
+(use-package agent-shell-fork-tree
+  :straight (:type git :host github :repo "roife/agent-shell-fork-tree")
+  :after agent-shell
+  :demand t
+  :hook (agent-shell-mode . agent-shell-fork-tree-mode)
+  :custom
+  (agent-shell-fork-tree-auto-rebuild nil)
+  :bind (("C-c g f" . agent-shell-fork-tree)
+         :map agent-shell-mode-map
+         ("C-c g t" . agent-shell-fork-tree)
+         :map agent-shell-viewport-edit-mode-map
+         ("C-c g t" . agent-shell-fork-tree)
+         :map agent-shell-viewport-view-mode-map
+         ("C-c g t" . agent-shell-fork-tree)))
+
+(use-package agent-shell-btw
+  :straight (:type git :host github :repo "roife/agent-shell-btw")
+  :after agent-shell
+  :demand t
+  :bind (("C-c g b" . agent-shell-btw)
+         :map agent-shell-mode-map
+         ("C-c b" . agent-shell-btw)
+         :map agent-shell-viewport-edit-mode-map
+         ("C-c b" . agent-shell-btw)
+         :map agent-shell-viewport-view-mode-map
+         ("C-c b" . agent-shell-btw)))
+
+(use-package agent-shell-links
+  :straight (:type git :host github :repo "ultronozm/agent-shell-links.el")
+  :after agent-shell
+  :require-incrementally (ol t)
+  :config
+  (agent-shell-links-bookmark-setup)
+  (with-eval-after-load 'ol
+    (org-link-set-parameters
+     "agent-shell"
+     :follow #'agent-shell-links-org-follow
+     :store #'agent-shell-links-org-store)))
+
+(use-package agent-shell-tramp
+  :straight (:type git :host github :repo "junyi-hou/agent-shell-tramp")
+  :after agent-shell
+  :require-incrementally t
+  :init
+  (setq agent-shell-tramp-transcript-directory
+        (expand-file-name
+         (locate-user-emacs-file "var/agent-shell/remote-transcripts/")))
+  :config
+  (agent-shell-tramp-mode 1))
+
+(use-package agent-shell-attention
+  :straight (:type git :host github :repo "ultronozm/agent-shell-attention.el")
+  :commands agent-shell-attention-mode
+  :hook (agent-shell-mode . +agent-shell-attention-enable)
+  :bind (("C-c g j" . agent-shell-attention-jump)
+         ("C-c g l" . agent-shell-attention-dashboard))
+  :preface
+  (defun +agent-shell-attention-enable ()
+    "Enable global Agent Shell attention tracking on first use."
+    (unless (bound-and-true-p agent-shell-attention-mode)
+      (agent-shell-attention-mode 1)))
+  :init
+  (setq agent-shell-attention-render-function 'agent-shell-attention-render-active
+        agent-shell-attention-show-zeros nil
+        agent-shell-attention-notify-function nil))
+
+(use-package agent-recall
+  :straight (:type git :host github :repo "mrx-xo/agent-recall")
+  :hook (agent-shell-mode . agent-recall-track-sessions)
+  :bind (("C-c g h" . agent-recall-browse)
+         ("C-c g u" . agent-recall-resume))
+  :init
+  (setq agent-recall-search-paths
+        (mapcar #'expand-file-name
+                '("~/.config/emacs" "~/src" "~/.config" "~/.config/emacs/var/agent-shell"))
+        agent-recall-max-depth 3
+        agent-recall-search-function 'consult-ripgrep
+        agent-recall-browse-sort 'modified-desc
+        agent-recall-resume-continue-transcript t))
+
+(use-package agent-recall-consult
+  :bind ("C-c g /" . agent-recall-consult-search)
+  :init
+  (setq agent-recall-consult-resumable-only nil))
+
+(use-package agent-review
+  :straight (:type git :host github :repo "nineluj/agent-review")
+  :commands agent-review
+  :bind ("C-c g r" . +agent-review-grok)
+  :preface
+  (defun +agent-review-grok ()
+    "Review staged and unstaged Git changes with Grok Build."
+    (interactive)
+    (require 'agent-review)
+    (require 'agent-shell-xai)
+    (agent-review (agent-shell-xai-make-grok-config))))
+
+
+;; [gptel-copilot] gptel-powered inline code completion
+(use-package gptel-copilot
+  :disabled
+  :straight (:type git :host github :repo "roife/gptel-copilot")
+  :commands gptel-copilot-mode
+  :preface
+  (defun +gptel-copilot-complete ()
+    "Accept the completion, or move to the end of code or line."
+    (interactive)
+    (or (gptel-copilot-accept-completion)
+        (mwim-end-of-code-or-line)))
+
+  (defun +gptel-copilot-complete-word ()
+    "Accept one completion word, or move forward one word."
+    (interactive)
+    (or (gptel-copilot-accept-completion-by-word 1)
+        (forward-word)))
+
+  :hook (prog-mode . gptel-copilot-mode)
+  :bind (:map gptel-copilot-mode-map
+              ("C-e" . +gptel-copilot-complete)
+              ("M-f" . +gptel-copilot-complete-word))
+  :config
+  (require 'gptel-openai-oauth)
+
+  (setq gptel-copilot-model 'gpt-5.4-mini
+        gptel-copilot-idle-delay 0.2
+        gptel-copilot-backend (gptel-make-openai-oauth "OpenAI OAuth Inline"
+                                :request-params '(:reasoning (:effort "low")))))
+
+(provide 'init-ai)

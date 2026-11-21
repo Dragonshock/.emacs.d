@@ -1,0 +1,128 @@
+;;; -*- lexical-binding: t -*-
+
+;; [dired] File manager
+(use-package dired
+  :bind (:map dired-mode-map
+              ("C-c C-p" . wdired-change-to-wdired-mode))
+  :config
+  (setq
+   ;; Always delete and copy recursively
+   dired-recursive-deletes 'top
+   dired-recursive-copies 'always
+   ;; Move between two dired buffer quickly
+   dired-dwim-target t
+   ;; don't prompt to revert, just do it
+   dired-auto-revert-buffer #'dired-buffer-stale-p
+   ;; symlink
+   dired-hide-details-hide-symlink-targets nil
+   ;; free disk
+   dired-free-space nil)
+
+  (when (eq system-type 'darwin)
+    (if (executable-find "gls")
+        (setq insert-directory-program "gls") ; Use GNU ls as `gls' from `coreutils' if available.
+      ;; Suppress the warning: `ls does not support --dired'.
+      (setq dired-use-ls-dired nil)))
+
+  (when (or (not (eq system-type 'darwin)) (executable-find "gls"))
+    (setq ls-lisp-use-insert-directory-program t ; Using `insert-directory-program'
+          ;; Show directory first
+          dired-listing-switches "-alh --group-directories-first")))
+
+;; [dired-git-info] Show git info in dired
+(use-package dired-git-info
+  :straight t
+  :after dired
+  :bind (:map dired-mode-map
+              ("G" . dired-git-info-mode))
+  :config
+  (setq dgi-commit-message-format "%h %cs %s"
+        dgi-auto-hide-details-p nil))
+
+;; [dired-aux] Extra Dired functionality
+(use-package dired-aux
+  :after dired
+  :config
+  ;; Ask whether destination dirs should get created when copying/removing files.
+  (setq dired-create-destination-dirs 'ask
+        dired-vc-rename-file t))
+
+
+;; [dired-x] Extra Dired functionality
+(use-package dired-x
+  :after dired
+  :bind (:map dired-mode-map
+              ("." . dired-omit-mode))
+  :config
+  (setq dired-omit-verbose nil
+        ;; hide dot files
+        dired-omit-files "^\\..*\\'"
+        ;; Disable the prompt about killing the Dired buffer for a deleted directory.
+        dired-clean-confirm-killing-deleted-buffers nil))
+
+
+;; [fd-dired] Using `fd' with `find-dired'
+(use-package fd-dired
+  :straight t
+  :bind ([remap find-dired] . fd-dired))
+
+
+;; [dired-hacks] Several additional extensions for dired
+(use-package dired-hacks
+  :straight (:host github :repo "roife/dired-hacks" :branch "fix/collapse-subtree")
+  :after dired
+  :init
+  (use-package dired-subtree
+    :bind (:map dired-mode-map
+                ("TAB" . dired-subtree-toggle))
+    ;; No depth backgrounds: the depth faces are hardcoded dark greens
+    ;; (#252e30 ...) that ignore the theme.  The line prefix still nests.
+    :custom
+    (dired-subtree-use-backgrounds nil)
+    :config
+    (setq dired-subtree-line-prefix "  |  "))
+
+  ;; TODO: remove it
+  (use-package f :straight t :demand t)
+
+  (use-package dired-collapse
+    ;; Keep folding, drop the shaded overlay: `dired-collapse-fontify'
+    ;; wraps every filename in `dired-collapse-shadow', which drags in
+    ;; hardcoded colors instead of following the theme.
+    :custom
+    (dired-collapse-fontify nil)
+    :hook (dired-mode . dired-collapse-mode))
+
+  (use-package dired-narrow
+    :bind (:map dired-mode-map
+                (";" . dired-narrow-fuzzy))))
+
+
+;; [ffx] `dired-collapse'-style folding for file-name completion.
+;; When a directory holds a single sub-directory chain (ignoring the same
+;; entries `dired-omit-mode' hides), offer an extra candidate that jumps
+;; straight to the end of the chain, alongside the normal one-level candidate.
+;; e.g. when "a/" only ever contains "a/b/c/d/", both show up:
+;;   a/
+;;   a/b/c/d/
+(use-package ffx
+  :straight (:host github :repo "roife/ffx.el")
+  :hook (after-init . ffx-mode))
+
+
+;; [diredfl] Make dired colorful
+(use-package diredfl
+  :straight t
+  :hook (dired-mode . diredfl-mode))
+
+;; [dired-preview] Preview the file at point
+(use-package dired-preview
+  :straight t
+  :hook (dired-mode . dired-preview-mode)
+  :bind (:map dired-mode-map ("V" . dired-preview-mode))
+  :config
+  (setq dired-preview-trigger-on-start nil
+        dired-preview-max-size (* (expt 2 20) 10)
+        dired-preview-delay 0.5))
+
+(provide 'init-dired)
